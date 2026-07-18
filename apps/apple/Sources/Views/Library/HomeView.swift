@@ -13,6 +13,25 @@ struct HomeView: View {
     }
 
     var body: some View {
+        Group {
+            if store.books.isEmpty {
+                emptyLibrary
+            } else {
+                populatedHome
+            }
+        }
+        .navigationTitle("Home")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Import", systemImage: "plus") {
+                    store.requestImport()
+                }
+                .help("Import an EPUB")
+            }
+        }
+    }
+
+    private var populatedHome: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 34) {
                 welcome
@@ -41,12 +60,18 @@ struct HomeView: View {
         }
         .contentMargins(.horizontal, 28, for: .scrollContent)
         .contentMargins(.top, 20, for: .scrollContent)
-        .navigationTitle("Home")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Import", systemImage: "plus") {}
-                    .help("Import an EPUB")
+    }
+
+    private var emptyLibrary: some View {
+        ContentUnavailableView {
+            Label("Your library starts here", systemImage: "books.vertical")
+        } description: {
+            Text("Import DRM-free EPUBs. Glassleaf keeps the originals on this device.")
+        } actions: {
+            Button("Import EPUBs", systemImage: "plus") {
+                store.requestImport()
             }
+            .buttonStyle(.borderedProminent)
         }
     }
 

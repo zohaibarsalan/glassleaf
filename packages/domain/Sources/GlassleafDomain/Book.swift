@@ -13,6 +13,7 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
     public var progress: ReadingProgress
     public var tags: Set<String>
     public var coverStyle: CoverStyle
+    public var asset: BookAsset?
 
     public init(
         id: UUID = UUID(),
@@ -26,7 +27,8 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
         isFavorite: Bool = false,
         progress: ReadingProgress = .notStarted,
         tags: Set<String> = [],
-        coverStyle: CoverStyle = .sage
+        coverStyle: CoverStyle = .sage,
+        asset: BookAsset? = nil
     ) {
         self.id = id
         self.title = title
@@ -40,12 +42,35 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
         self.progress = progress
         self.tags = tags
         self.coverStyle = coverStyle
+        self.asset = asset
     }
 
     public var readingState: ReadingState {
         if progress.isCompleted { return .finished }
         if progress.fraction > 0 { return .reading }
         return .unread
+    }
+}
+
+public struct BookAsset: Codable, Hashable, Sendable {
+    public let contentHash: String
+    public let byteCount: Int64
+    public let mediaType: String
+    public let originalFilename: String
+    public let localRelativePath: String
+
+    public init(
+        contentHash: String,
+        byteCount: Int64,
+        mediaType: String = "application/epub+zip",
+        originalFilename: String,
+        localRelativePath: String
+    ) {
+        self.contentHash = contentHash
+        self.byteCount = byteCount
+        self.mediaType = mediaType
+        self.originalFilename = originalFilename
+        self.localRelativePath = localRelativePath
     }
 }
 

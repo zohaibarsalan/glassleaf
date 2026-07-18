@@ -43,15 +43,29 @@ enum LibraryLayout: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 @Observable
 final class LibraryStore {
+    struct ImportAlert: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
+
     var books: [Book]
     var selection: SidebarDestination = .home
     var presentedBook: Book?
     var readerBook: Book?
     var searchText = ""
     var layout: LibraryLayout = .grid
+    var showsImporter = false
+    var isImporting = false
+    var importAlert: ImportAlert?
 
-    init(books: [Book] = []) {
+    private let isPreview: Bool
+    private let repository = LocalLibraryRepository()
+    private let importer = LocalBookImporter()
+
+    init(books: [Book] = [], isPreview: Bool = false) {
         self.books = books
+        self.isPreview = isPreview
     }
 
     func books(matching filter: LibraryFilter) -> [Book] {
@@ -67,6 +81,7 @@ final class LibraryStore {
         guard let index = books.firstIndex(where: { $0.id == id }) else { return }
         books[index].isFavorite.toggle()
         refreshPresentedBook(id: id)
+        persist()
     }
 
     func showDetails(for book: Book) {
@@ -93,6 +108,63 @@ final class LibraryStore {
         )
         books[index].lastOpened = .now
         readerBook = nil
+        persist()
+    }
+
+    func loadLibrary() async {
+        guard !isPreview else { return }
+
+        do {
+            books = try await repository.load()
+        } catch {
+            importAlert = ImportAlert(
+                title: "Library Couldn’t Be Loaded",
+                message: "Your stored books were left unchanged. Try reopening Glassleaf."
+            )
+        }
+    }
+
+    func requestImport() {
+        showsImporter = true
+    }
+
+    func importBooks(from urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+        isImporting = true
+        defer { isImporting = false }
+
+        var existingHashes = Set(books.compactMap(\.asset?.contentHash))
+        var importedCount = 0
+        var failures: [String] = []
+
+        for url in urls {
+            do {
+                let book = try await importer.importBook(
+                    from: url,
+                    existingHashes: existingHashes
+                )
+                books.insert(book, at: 0)
+                if let hash = book.asset?.contentHash {
+                    existingHashes.insert(hash)
+                }
+                importedCount += 1
+            } catch {
+                failures.append(error.localizedDescription)
+            }
+        }
+
+        if importedCount > 0 {
+            selection = .library(.all)
+            persist()
+        }
+
+        if !failures.isEmpty {
+            let uniqueFailures = Array(Set(failures)).sorted().joined(separator: "\n")
+            importAlert = ImportAlert(
+                title: importedCount > 0 ? "Some Books Weren’t Imported" : "Import Failed",
+                message: uniqueFailures
+            )
+        }
     }
 
     private func matchesSearch(_ book: Book) -> Bool {
@@ -108,6 +180,14 @@ final class LibraryStore {
     private func refreshPresentedBook(id: Book.ID) {
         guard presentedBook?.id == id else { return }
         presentedBook = books.first(where: { $0.id == id })
+    }
+
+    private func persist() {
+        guard !isPreview else { return }
+        let snapshot = books
+        Task {
+            try? await repository.save(snapshot)
+        }
     }
 }
 

@@ -2,8 +2,18 @@ import Foundation
 import GlassleafDomain
 
 extension LibraryStore {
+    static var initial: LibraryStore {
+#if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--library-preview") || arguments.contains("--reader-preview") {
+            return preview
+        }
+#endif
+        return LibraryStore()
+    }
+
     static var preview: LibraryStore {
-        let store = LibraryStore(books: PreviewLibrary.books)
+        let store = LibraryStore(books: PreviewLibrary.books, isPreview: true)
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--reader-preview") {
             if var previewBook = store.books.first {

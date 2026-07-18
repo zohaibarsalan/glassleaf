@@ -1,7 +1,8 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AppRootView: View {
-    @State private var store = LibraryStore.preview
+    @State private var store = LibraryStore.initial
 
     @ViewBuilder
     var body: some View {
@@ -38,6 +39,40 @@ struct AppRootView: View {
             BookDetailView(book: book, store: store)
         }
         .modifier(ReaderPresentationModifier(store: store))
+        .fileImporter(
+            isPresented: $store.showsImporter,
+            allowedContentTypes: [.epub],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                Task { await store.importBooks(from: urls) }
+            case .failure:
+                store.importAlert = .init(
+                    title: "Import Failed",
+                    message: "Glassleaf couldn’t access the selected files."
+                )
+            }
+        }
+        .alert(item: $store.importAlert) { issue in
+            Alert(
+                title: Text(issue.title),
+                message: Text(issue.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .overlay(alignment: .bottom) {
+            if store.isImporting {
+                ProgressView("Importing…")
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(.regular, in: .capsule)
+                    .padding()
+            }
+        }
+        .task {
+            await store.loadLibrary()
+        }
     }
 }
 

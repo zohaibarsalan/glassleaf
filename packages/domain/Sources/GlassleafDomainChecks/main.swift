@@ -56,6 +56,17 @@ check(preferences.fontScale == 2, "font scale has a legible maximum")
 check(preferences.lineSpacing == 2, "line spacing has a legible minimum")
 check(preferences.horizontalMargin == 72, "reader margins have a useful maximum")
 
+let asset = BookAsset(
+    contentHash: String(repeating: "a", count: 64),
+    byteCount: 1_024,
+    originalFilename: "Example.epub",
+    localRelativePath: "Books/example/Example.epub"
+)
+let assetBook = Book(title: "Example", author: "A", asset: asset)
+let encodedBook = try JSONEncoder().encode(assetBook)
+let decodedBook = try JSONDecoder().decode(Book.self, from: encodedBook)
+check(decodedBook.asset == asset, "book assets survive portable encoding")
+
 guard failureCount == 0 else {
     fatalError("\(failureCount) domain checks failed")
 }

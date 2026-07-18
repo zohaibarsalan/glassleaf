@@ -16,7 +16,20 @@ struct LibraryView: View {
     var body: some View {
         Group {
             if visibleBooks.isEmpty {
-                ContentUnavailableView.search(text: store.searchText)
+                if store.books.isEmpty {
+                    ContentUnavailableView {
+                        Label("No books yet", systemImage: "books.vertical")
+                    } description: {
+                        Text("Import a DRM-free EPUB to build your library.")
+                    } actions: {
+                        Button("Import EPUBs", systemImage: "plus") {
+                            store.requestImport()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                } else {
+                    ContentUnavailableView.search(text: store.searchText)
+                }
             } else {
                 switch store.layout {
                 case .grid:
@@ -31,7 +44,9 @@ struct LibraryView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 layoutPicker
-                Button("Import", systemImage: "plus") {}
+                Button("Import", systemImage: "plus") {
+                    store.requestImport()
+                }
                     .help("Import an EPUB")
             }
         }
