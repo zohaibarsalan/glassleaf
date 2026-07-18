@@ -31,6 +31,7 @@
 		F5434F5552F620E975D552E1 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39227AA8AC817E87BBFDC357 /* LibraryView.swift */; };
 		F7357CD22B5F58D51741031D /* PreviewLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */; };
 		F7B887ED000A8066D110FFA9 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72621FB648D03F473EE63DD5 /* AppRootView.swift */; };
+		FAD7924B32B15871DCE0C095 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CF3D331842071606C4343085 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +54,7 @@
 		C2D6F4C17159F612F6D59CF9 /* BookMetadataEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookMetadataEditor.swift; sourceTree = "<group>"; };
 		C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBParser.swift; sourceTree = "<group>"; };
 		C9E0572DB334A4316351219C /* PublicationSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicationSearchService.swift; sourceTree = "<group>"; };
+		CF3D331842071606C4343085 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalBookImporter.swift; sourceTree = "<group>"; };
 		D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchive.swift; sourceTree = "<group>"; };
 		D4353F25B9511ACB2A6A8144 /* Glassleaf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glassleaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -95,6 +97,14 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		239C6A0FD89452F5475A862E /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				CF3D331842071606C4343085 /* Assets.xcassets */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
 		54951888CE3558C11C62880E /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -126,6 +136,7 @@
 			children = (
 				818B966C9188B81F2AC8F5DD /* Packages */,
 				A9CCAE4BEEBDADB3468D84EE /* Sources */,
+				239C6A0FD89452F5475A862E /* Support */,
 				593E4C3A8E7E0ED08476CBE8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -192,6 +203,7 @@
 			buildConfigurationList = 0B1F28707D297CDB350CB3A9 /* Build configuration list for PBXNativeTarget "Glassleaf" */;
 			buildPhases = (
 				A1178C4E3EF1A5EBDD6830DB /* Sources */,
+				B4EC9738D02C0BA5F33B8D50 /* Resources */,
 				EE44B088F56E2663FAE5FCDF /* Frameworks */,
 			);
 			buildRules = (
@@ -238,6 +250,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B4EC9738D02C0BA5F33B8D50 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FAD7924B32B15871DCE0C095 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A1178C4E3EF1A5EBDD6830DB /* Sources */ = {

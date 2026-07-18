@@ -21,6 +21,7 @@ targets:
       - macOS
     sources:
       - Sources
+      - Support/Assets.xcassets
     info:
       path: Support/Info.plist
       properties:

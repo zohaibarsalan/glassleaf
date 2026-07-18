@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Glassleaf symbol for light surfaces</title>
+  <desc id="desc">Two translucent pages form an open book and leaf.</desc>
+  <defs>
+    <linearGradient id="left" x1="164" y1="188" x2="540" y2="832" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BEE9F3"/>
+      <stop offset="1" stop-color="#5C95A3"/>
+    </linearGradient>
+    <linearGradient id="right" x1="860" y1="188" x2="484" y2="832" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BDEFD5"/>
+      <stop offset="1" stop-color="#579A7C"/>
+    </linearGradient>
+    <linearGradient id="center" x1="512" y1="350" x2="512" y2="850" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FFFC" stop-opacity=".86"/>
+      <stop offset="1" stop-color="#A8DCC9" stop-opacity=".42"/>
+    </linearGradient>
+  </defs>
+  <path d="M512 850C454 708 350 614 164 520V188c164 37 289 128 348 248v414Z" fill="url(#left)" fill-opacity=".9" stroke="#315E69" stroke-opacity=".42" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M512 850c58-142 162-236 348-330V188c-164 37-289 128-348 248v414Z" fill="url(#right)" fill-opacity=".9" stroke="#315F50" stroke-opacity=".42" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M512 850c-70-164-66-330 0-500 66 170 70 336 0 500Z" fill="url(#center)" stroke="#FFFFFF" stroke-opacity=".7" stroke-width="10"/>
+  <path d="M512 834C454 694 356 606 212 534M512 834C570 694 668 606 812 534" fill="none" stroke="#F4FFFC" stroke-opacity=".78" stroke-width="12" stroke-linecap="round"/>
+</svg>

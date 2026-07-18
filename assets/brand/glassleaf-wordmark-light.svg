@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 512" role="img" aria-labelledby="title desc">
+  <title id="title">Glassleaf horizontal logo for light surfaces</title>
+  <desc id="desc">Glassleaf book and leaf symbol beside the Glassleaf name.</desc>
+  <defs>
+    <linearGradient id="left" x1="82" y1="60" x2="270" y2="382" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BEE9F3"/>
+      <stop offset="1" stop-color="#5C95A3"/>
+    </linearGradient>
+    <linearGradient id="right" x1="430" y1="60" x2="242" y2="382" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BDEFD5"/>
+      <stop offset="1" stop-color="#579A7C"/>
+    </linearGradient>
+    <linearGradient id="center" x1="256" y1="141" x2="256" y2="391" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FFFC" stop-opacity=".86"/>
+      <stop offset="1" stop-color="#A8DCC9" stop-opacity=".42"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M256 425c-29-71-81-118-174-165V94c82 18.5 144.5 64 174 124v207Z" fill="url(#left)" fill-opacity=".9" stroke="#315E69" stroke-opacity=".42" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M256 425c29-71 81-118 174-165V94c-82 18.5-144.5 64-174 124v207Z" fill="url(#right)" fill-opacity=".9" stroke="#315F50" stroke-opacity=".42" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M256 425c-35-82-33-165 0-250 33 85 35 168 0 250Z" fill="url(#center)" stroke="#FFFFFF" stroke-opacity=".7" stroke-width="5"/>
+    <path d="M256 417c-29-70-78-114-150-150M256 417c29-70 78-114 150-150" fill="none" stroke="#F4FFFC" stroke-opacity=".78" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="510" y="340" fill="#163D34" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif" font-size="232" font-weight="450" letter-spacing="-9">glassleaf</text>
+</svg>
