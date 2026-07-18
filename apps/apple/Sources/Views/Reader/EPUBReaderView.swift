@@ -23,6 +23,7 @@ struct EPUBReaderView: View {
     }
 
     private var links: [PublicationLink] { book.asset?.readingOrder ?? [] }
+    private var annotations: [Annotation] { store.annotations.filter { $0.bookID == book.id } }
     private var progress: Double { navigator.overallProgress(chapterCount: links.count) }
     private var locator: String { navigator.locator(links: links) }
     private var isBookmarked: Bool { store.isBookmarked(bookID: book.id, locator: locator) }
@@ -30,7 +31,7 @@ struct EPUBReaderView: View {
     var body: some View {
         ZStack {
             preferences.theme.background.ignoresSafeArea()
-            PublicationWebView(book: book, preferences: preferences, navigator: navigator)
+            PublicationWebView(book: book, preferences: preferences, annotations: annotations, navigator: navigator)
                 .ignoresSafeArea()
 
             if !navigator.isReady {
@@ -178,14 +179,22 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     @ObservationIgnored private weak var webView: WKWebView?
     @ObservationIgnored private var book: Book?
     @ObservationIgnored private var preferences = ReaderPreferences()
+    @ObservationIgnored private var annotations: [Annotation] = []
     @ObservationIgnored private var pendingProgress = 0.0
     @ObservationIgnored private var isWaitingForWebView = false
 
-    func attach(_ webView: WKWebView, book: Book, preferences: ReaderPreferences) {
-        guard self.webView !== webView else { apply(preferences: preferences); return }
+    func attach(_ webView: WKWebView, book: Book, preferences: ReaderPreferences, annotations: [Annotation]) {
+        guard self.webView !== webView else {
+            let annotationsChanged = self.annotations != annotations
+            self.annotations = annotations
+            apply(preferences: preferences)
+            if annotationsChanged { renderAnnotations() }
+            return
+        }
         self.webView = webView
         self.book = book
         self.preferences = preferences
+        self.annotations = annotations
         webView.navigationDelegate = self
         if isWaitingForWebView {
             isWaitingForWebView = false
@@ -263,6 +272,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         isReady = true
         evaluate(Self.bootstrapScript(preferences: preferences, progress: pendingProgress))
+        renderAnnotations()
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -287,6 +297,91 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
 
     private func evaluate(_ script: String, completion: ((Any?) -> Void)? = nil) {
         webView?.evaluateJavaScript(script) { value, _ in completion?(value) }
+    }
+
+    private func renderAnnotations() {
+        guard isReady, let href = book?.asset?.readingOrder[safe: chapterIndex]?.href else { return }
+        let values: [[String: Any]] = annotations.compactMap { annotation in
+            guard annotation.locator.split(separator: "#", maxSplits: 1).first.map(String.init) == href,
+                  let text = annotation.selectedText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+            let progress = annotation.locator.components(separatedBy: "#progress=").last.flatMap(Double.init) ?? 0
+            return [
+                "id": annotation.id.uuidString.lowercased(),
+                "text": text,
+                "progress": min(max(progress, 0), 1),
+                "color": annotation.color.cssHighlight,
+            ]
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: values), let json = String(data: data, encoding: .utf8) else { return }
+        evaluate(Self.highlightScript(json: json))
+    }
+
+    private static func highlightScript(json: String) -> String {
+        """
+        (() => {
+          const annotations = \(json);
+          const styleID = 'glassleaf-highlights';
+          let style = document.getElementById(styleID);
+          if (!style) { style = document.createElement('style'); style.id = styleID; document.head.appendChild(style); }
+          style.textContent = '[data-glassleaf-highlight] { color: inherit; border-radius: .14em; box-decoration-break: clone; -webkit-box-decoration-break: clone; }';
+          for (const highlight of Array.from(document.querySelectorAll('[data-glassleaf-highlight]'))) {
+            highlight.replaceWith(document.createTextNode(highlight.textContent || ''));
+          }
+          document.body.normalize();
+
+          const collectText = () => {
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+              acceptNode: node => node.parentElement?.closest('script, style, noscript') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+            });
+            const segments = [];
+            let full = '';
+            while (walker.nextNode()) {
+              const node = walker.currentNode;
+              const start = full.length;
+              full += node.data;
+              segments.push({node, start, end: full.length});
+            }
+            return {full, segments};
+          };
+          const point = (segments, offset) => {
+            for (const segment of segments) {
+              if (offset >= segment.start && offset <= segment.end) {
+                return {node: segment.node, offset: Math.min(offset - segment.start, segment.node.length)};
+              }
+            }
+            return null;
+          };
+
+          let rendered = 0;
+          for (const item of annotations) {
+            const textMap = collectText();
+            const occurrences = [];
+            let from = 0;
+            while (from < textMap.full.length) {
+              const index = textMap.full.indexOf(item.text, from);
+              if (index < 0) break;
+              occurrences.push(index);
+              from = index + Math.max(item.text.length, 1);
+            }
+            if (!occurrences.length) continue;
+            const expected = item.progress * textMap.full.length;
+            const startIndex = occurrences.reduce((best, value) => Math.abs(value - expected) < Math.abs(best - expected) ? value : best);
+            const start = point(textMap.segments, startIndex);
+            const end = point(textMap.segments, startIndex + item.text.length);
+            if (!start || !end) continue;
+            const range = new Range();
+            range.setStart(start.node, start.offset);
+            range.setEnd(end.node, end.offset);
+            const highlight = document.createElement('span');
+            highlight.dataset.glassleafHighlight = item.id;
+            highlight.style.backgroundColor = item.color;
+            highlight.appendChild(range.extractContents());
+            range.insertNode(highlight);
+            rendered += 1;
+          }
+          return {annotations: annotations.length, rendered};
+        })();
+        """
     }
 
     private static func bootstrapScript(preferences: ReaderPreferences, progress: Double) -> String {
@@ -346,10 +441,11 @@ private enum PublicationLocation {
 private struct PublicationWebView: NSViewRepresentable {
     let book: Book
     let preferences: ReaderPreferences
+    let annotations: [Annotation]
     let navigator: PublicationNavigator
 
     func makeNSView(context: Context) -> WKWebView { makeWebView() }
-    func updateNSView(_ webView: WKWebView, context: Context) { navigator.attach(webView, book: book, preferences: preferences) }
+    func updateNSView(_ webView: WKWebView, context: Context) { navigator.attach(webView, book: book, preferences: preferences, annotations: annotations) }
 
     private func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -365,10 +461,11 @@ private struct PublicationWebView: NSViewRepresentable {
 private struct PublicationWebView: UIViewRepresentable {
     let book: Book
     let preferences: ReaderPreferences
+    let annotations: [Annotation]
     let navigator: PublicationNavigator
 
     func makeUIView(context: Context) -> WKWebView { makeWebView() }
-    func updateUIView(_ webView: WKWebView, context: Context) { navigator.attach(webView, book: book, preferences: preferences) }
+    func updateUIView(_ webView: WKWebView, context: Context) { navigator.attach(webView, book: book, preferences: preferences, annotations: annotations) }
 
     private func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -415,4 +512,22 @@ private extension ReaderTheme {
 
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
+private extension AnnotationColor {
+    var cssHighlight: String {
+        switch self {
+        case .yellow: "rgba(255, 214, 64, .48)"
+        case .green: "rgba(92, 214, 126, .42)"
+        case .blue: "rgba(80, 170, 255, .42)"
+        case .pink: "rgba(255, 105, 180, .40)"
+        case .purple: "rgba(175, 120, 255, .42)"
+        }
+    }
 }
