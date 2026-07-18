@@ -8,31 +8,34 @@ struct LibraryView: View {
     @State private var showsBatchTagEditor = false
     @State private var confirmsEmptyTrash = false
 
-    private var visibleBooks: [Book] {
-        store.books(matching: destination)
-    }
-
     private let columns = [
         GridItem(.adaptive(minimum: 138, maximum: 196), spacing: 24, alignment: .top),
     ]
 
     var body: some View {
+        let visibleBooks = store.books(matching: destination)
+
         Group {
-            if store.isSearching {
-                ProgressView("Searching…")
-                    .controlSize(.small)
-            } else if visibleBooks.isEmpty {
+            if visibleBooks.isEmpty {
                 emptyState
             } else {
                 switch store.layout {
-                case .grid: grid
-                case .list: list
+                case .grid: grid(visibleBooks)
+                case .list: list(visibleBooks)
                 }
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if store.isSearching {
+                ProgressView()
+                    .controlSize(.small)
+                    .padding(12)
+                    .accessibilityLabel("Searching")
             }
         }
         .navigationTitle(destination.title(in: store))
         .searchable(text: $store.searchText, prompt: "Title, author, series, folder, collection, or tag")
-        .toolbar { libraryToolbar }
+        .toolbar { libraryToolbar(hasVisibleBooks: !visibleBooks.isEmpty) }
         .safeAreaInset(edge: .bottom) {
             if store.isSelecting { batchBar }
         }
@@ -65,7 +68,7 @@ struct LibraryView: View {
         }
     }
 
-    private var grid: some View {
+    private func grid(_ visibleBooks: [Book]) -> some View {
         ScrollView {
             LazyVGrid(columns: columns, alignment: .leading, spacing: 30) {
                 ForEach(visibleBooks) { book in
@@ -90,7 +93,7 @@ struct LibraryView: View {
         .contentMargins(.top, 22, for: .scrollContent)
     }
 
-    private var list: some View {
+    private func list(_ visibleBooks: [Book]) -> some View {
         List(visibleBooks) { book in
             BookRow(book: book, seriesName: store.seriesName(for: book)) { activate(book) }
                 .overlay(alignment: .trailing) {
@@ -116,7 +119,7 @@ struct LibraryView: View {
     }
 
     @ToolbarContentBuilder
-    private var libraryToolbar: some ToolbarContent {
+    private func libraryToolbar(hasVisibleBooks: Bool) -> some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button(store.isSelecting ? "Done" : "Select", systemImage: store.isSelecting ? "checkmark" : "checkmark.circle") {
                 store.isSelecting ? store.endSelecting() : (store.isSelecting = true)
@@ -149,7 +152,7 @@ struct LibraryView: View {
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
 
-                if destination == .trash && !visibleBooks.isEmpty {
+                if destination == .trash && hasVisibleBooks {
                     Divider()
                     Button("Empty Trash", systemImage: "trash.slash", role: .destructive) {
                         confirmsEmptyTrash = true

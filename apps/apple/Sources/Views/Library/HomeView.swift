@@ -4,24 +4,23 @@ import SwiftUI
 struct HomeView: View {
     @Bindable var store: LibraryStore
 
-    private var activeBooks: [Book] {
-        store.books.filter { $0.deletedAt == nil }
-    }
-
-    private var currentlyReading: [Book] {
-        Array(store.books(matching: .library(.reading)).prefix(4))
-    }
-
-    private var recentlyAdded: [Book] {
-        Array(activeBooks.sorted { $0.dateAdded > $1.dateAdded }.prefix(6))
-    }
-
     var body: some View {
+        let activeBooks = store.books.filter { $0.deletedAt == nil }
+        let currentlyReading = activeBooks
+            .filter { $0.readingState == .reading }
+            .sorted { ($0.lastOpened ?? .distantPast) > ($1.lastOpened ?? .distantPast) }
+        let recentlyAdded = Array(activeBooks.sorted { $0.dateAdded > $1.dateAdded }.prefix(6))
+        let favorites = Array(activeBooks.lazy.filter(\.isFavorite).prefix(6))
+
         Group {
             if activeBooks.isEmpty {
                 emptyLibrary
             } else {
-                populatedHome
+                populatedHome(
+                    leadBook: currentlyReading.first,
+                    recentlyAdded: recentlyAdded,
+                    favorites: favorites
+                )
             }
         }
         .navigationTitle("Home")
@@ -36,12 +35,12 @@ struct HomeView: View {
         }
     }
 
-    private var populatedHome: some View {
+    private func populatedHome(leadBook: Book?, recentlyAdded: [Book], favorites: [Book]) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 34) {
                 welcome
 
-                if let leadBook = currentlyReading.first {
+                if let leadBook {
                     ContinueReadingCard(book: leadBook) {
                         store.showDetails(for: leadBook)
                     }
@@ -57,7 +56,7 @@ struct HomeView: View {
                 BookShelf(
                     title: "Favorites",
                     subtitle: "The books you want close by",
-                    books: Array(activeBooks.filter(\.isFavorite).prefix(6)),
+                    books: favorites,
                     onSelect: store.showDetails
                 )
             }

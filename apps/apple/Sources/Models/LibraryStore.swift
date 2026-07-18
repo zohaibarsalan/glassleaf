@@ -62,7 +62,12 @@ final class LibraryStore {
     private let importer: LocalBookImporter
     private let exporter = LibraryExportService()
     private var searchResultIDs: [UUID]?
+    private var searchResultQuery = ""
     private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var foldersByID: [UUID: Folder] = [:]
+    @ObservationIgnored private var tagNamesByID: [UUID: String] = [:]
+    @ObservationIgnored private var collectionNamesByID: [UUID: String] = [:]
+    @ObservationIgnored private var seriesNamesByID: [UUID: String] = [:]
 
     init(
         books: [Book] = [],
@@ -100,6 +105,7 @@ final class LibraryStore {
         self.isPreview = isPreview
         self.repository = repository
         self.importer = importer
+        rebuildLookupCaches()
     }
 
     func books(matching destination: SidebarDestination) -> [Book] {
@@ -108,20 +114,21 @@ final class LibraryStore {
         if !query.isEmpty {
             if isPreview {
                 candidates = candidates.filter { Self.matchesSearch($0, query: query, store: self) }
-            } else if let searchResultIDs {
+            } else if searchResultQuery == query, let searchResultIDs {
                 let rank = Dictionary(uniqueKeysWithValues: searchResultIDs.enumerated().map { ($0.element, $0.offset) })
                 candidates = candidates.filter { rank[$0.id] != nil }
                 if sort == .recentlyAdded {
                     return candidates.sorted { rank[$0.id, default: .max] < rank[$1.id, default: .max] }
                 }
             } else {
-                return []
+                candidates = candidates.filter { Self.matchesSearch($0, query: query, store: self) }
             }
         }
         if sort == .series {
+            let seriesNamesByID = seriesNamesByID
             return candidates.sorted { lhs, rhs in
-                let left = seriesName(for: lhs) ?? ""
-                let right = seriesName(for: rhs) ?? ""
+                let left = lhs.seriesID.flatMap { seriesNamesByID[$0] } ?? ""
+                let right = rhs.seriesID.flatMap { seriesNamesByID[$0] } ?? ""
                 if left.localizedStandardCompare(right) == .orderedSame {
                     return (lhs.seriesIndex ?? 0) < (rhs.seriesIndex ?? 0)
                 }
@@ -135,8 +142,30 @@ final class LibraryStore {
         books.lazy.filter { destination.includes($0, store: self) }.count
     }
 
+    func sidebarCounts() -> [SidebarDestination: Int] {
+        var counts: [SidebarDestination: Int] = [:]
+        for book in books {
+            guard book.deletedAt == nil else {
+                counts[.trash, default: 0] += 1
+                continue
+            }
+            counts[.library(.all), default: 0] += 1
+            if book.isInInbox { counts[.inbox, default: 0] += 1 }
+            counts[.library(book.readingState.libraryFilter), default: 0] += 1
+            if book.isFavorite { counts[.library(.favorites), default: 0] += 1 }
+            if let id = book.folderID { counts[.folder(id), default: 0] += 1 }
+            if let id = book.seriesID { counts[.series(id), default: 0] += 1 }
+            for id in book.tagIDs { counts[.tag(id), default: 0] += 1 }
+            for id in book.collectionIDs { counts[.collection(id), default: 0] += 1 }
+            for collection in smartCollections where collection.rule.includes(book, tags: tags, series: series) {
+                counts[.smartCollection(collection.id), default: 0] += 1
+            }
+        }
+        return counts
+    }
+
     func tagName(for id: UUID) -> String? {
-        tags.first(where: { $0.id == id })?.name
+        tagNamesByID[id]
     }
 
     func tagNames(for book: Book) -> [String] {
@@ -144,7 +173,7 @@ final class LibraryStore {
     }
 
     func seriesName(for book: Book) -> String? {
-        book.seriesID.flatMap { id in series.first(where: { $0.id == id })?.name }
+        book.seriesID.flatMap { seriesNamesByID[$0] }
     }
 
     func folderPath(for id: UUID) -> String {
@@ -153,7 +182,7 @@ final class LibraryStore {
         var visited: Set<UUID> = []
         while let value = currentID,
               visited.insert(value).inserted,
-              let folder = folders.first(where: { $0.id == value }) {
+              let folder = foldersByID[value] {
             components.append(folder.name)
             currentID = folder.parentID
         }
@@ -162,6 +191,17 @@ final class LibraryStore {
 
     var foldersByPath: [Folder] {
         folders.sorted { folderPath(for: $0.id).localizedStandardCompare(folderPath(for: $1.id)) == .orderedAscending }
+    }
+
+    func folderDepth(for id: UUID) -> Int {
+        var depth = 0
+        var currentID = foldersByID[id]?.parentID
+        var visited: Set<UUID> = []
+        while let value = currentID, visited.insert(value).inserted, let folder = foldersByID[value] {
+            depth += 1
+            currentID = folder.parentID
+        }
+        return depth
     }
 
     func toggleFavorite(for id: Book.ID) {
@@ -277,6 +317,7 @@ final class LibraryStore {
                 book = migrated.books[0]
                 tags = migrated.tags
                 series = migrated.series
+                rebuildLookupCaches()
                 books.insert(book, at: 0)
                 if let hash = book.asset?.contentHash { existingHashes.insert(hash) }
                 existingIdentifiers.formUnion(book.identifiers.map {
@@ -461,6 +502,7 @@ final class LibraryStore {
             books[index].updatedAt = .now
         }
         if selection == .series(id) { selection = .inbox }
+        rebuildLookupCaches()
         Task { await persistSnapshot() }
     }
 
@@ -494,6 +536,7 @@ final class LibraryStore {
         tags.removeAll { $0.id == id }
         for index in books.indices { books[index].tagIDs.remove(id) }
         if selection == .tag(id) { selection = .inbox }
+        rebuildLookupCaches()
         Task { await persistSnapshot() }
     }
 
@@ -507,6 +550,7 @@ final class LibraryStore {
         collections.removeAll { $0.id == id }
         for index in books.indices { books[index].collectionIDs.remove(id) }
         if selection == .collection(id) { selection = .inbox }
+        rebuildLookupCaches()
         Task { await persistSnapshot() }
     }
 
@@ -570,6 +614,7 @@ final class LibraryStore {
         smartCollections = migrated.smartCollections
         bookmarks = migrated.bookmarks
         annotations = migrated.annotations
+        rebuildLookupCaches()
         scheduleSearch()
     }
 
@@ -578,17 +623,18 @@ final class LibraryStore {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty, !isPreview else {
             searchResultIDs = nil
+            searchResultQuery = ""
             isSearching = false
             return
         }
-        searchResultIDs = nil
-        isSearching = true
         searchTask = Task { [weak self, repository] in
-            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(90))
             guard !Task.isCancelled else { return }
+            self?.isSearching = true
             let ids = try? await repository.searchBookIDs(query, limit: 5_000)
             guard !Task.isCancelled, self?.searchText.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
             self?.searchResultIDs = ids ?? []
+            self?.searchResultQuery = query
             self?.isSearching = false
         }
     }
@@ -598,16 +644,16 @@ final class LibraryStore {
             || book.author.localizedStandardContains(query)
             || store.seriesName(for: book)?.localizedStandardContains(query) == true
             || store.tagNames(for: book).contains(where: { $0.localizedStandardContains(query) })
-            || book.folderID.flatMap { id in store.folders.first(where: { $0.id == id })?.name.localizedStandardContains(query) } == true
-            || book.collectionIDs.contains { id in store.collections.first(where: { $0.id == id })?.name.localizedStandardContains(query) == true }
+            || book.folderID.flatMap { store.foldersByID[$0]?.name.localizedStandardContains(query) } == true
+            || book.collectionIDs.contains { store.collectionNamesByID[$0]?.localizedStandardContains(query) == true }
     }
 
     private func searchContext(for book: Book) -> LocalLibraryRepository.SearchContext {
         .init(
             seriesName: seriesName(for: book) ?? "",
             tagNames: tagNames(for: book).joined(separator: " "),
-            folderName: book.folderID.flatMap { id in folders.first(where: { $0.id == id })?.name } ?? "",
-            collectionNames: book.collectionIDs.compactMap { id in collections.first(where: { $0.id == id })?.name }.joined(separator: " ")
+            folderName: book.folderID.flatMap { foldersByID[$0]?.name } ?? "",
+            collectionNames: book.collectionIDs.compactMap { collectionNamesByID[$0] }.joined(separator: " ")
         )
     }
 
@@ -655,6 +701,7 @@ final class LibraryStore {
 
     private func persistOrganization() {
         guard !isPreview else { return }
+        rebuildLookupCaches()
         let value = snapshot()
         Task {
             do {
@@ -708,6 +755,23 @@ final class LibraryStore {
     private func validatedName(_ value: String) -> String? {
         let cleanName = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return cleanName.isEmpty ? nil : cleanName
+    }
+
+    private func rebuildLookupCaches() {
+        foldersByID = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
+        tagNamesByID = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0.name) })
+        collectionNamesByID = Dictionary(uniqueKeysWithValues: collections.map { ($0.id, $0.name) })
+        seriesNamesByID = Dictionary(uniqueKeysWithValues: series.map { ($0.id, $0.name) })
+    }
+}
+
+private extension ReadingState {
+    var libraryFilter: LibraryFilter {
+        switch self {
+        case .unread: .unread
+        case .reading: .reading
+        case .finished: .finished
+        }
     }
 }
 

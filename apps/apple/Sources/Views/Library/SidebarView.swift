@@ -10,26 +10,28 @@ struct SidebarView: View {
     @State private var organizerSheet: OrganizerSheet?
 
     var body: some View {
+        let counts = store.sidebarCounts()
+
         List(selection: selectionBinding) {
             Section {
                 row(.home, icon: "house", title: "Home")
-                row(.library(.all), icon: "books.vertical", title: "Library")
-                if store.count(for: .inbox) > 0 {
-                    row(.inbox, icon: "tray", count: store.count(for: .inbox))
+                row(.library(.all), icon: "books.vertical", title: "Library", count: counts[.library(.all)])
+                if counts[.inbox, default: 0] > 0 {
+                    row(.inbox, icon: "tray", count: counts[.inbox])
                 }
             }
 
             Section("Reading") {
-                row(.library(.reading), icon: "bookmark", title: "Reading", count: store.count(for: .library(.reading)))
-                row(.library(.unread), icon: "circle", count: store.count(for: .library(.unread)))
-                row(.library(.finished), icon: "checkmark.circle", count: store.count(for: .library(.finished)))
-                row(.library(.favorites), icon: "star", count: store.count(for: .library(.favorites)))
+                row(.library(.reading), icon: "bookmark", title: "Reading", count: counts[.library(.reading)])
+                row(.library(.unread), icon: "circle", count: counts[.library(.unread)])
+                row(.library(.finished), icon: "checkmark.circle", count: counts[.library(.finished)])
+                row(.library(.favorites), icon: "star", count: counts[.library(.favorites)])
             }
 
-            organizationSection
+            organizationSection(counts: counts)
 
             Section {
-                row(.trash, icon: "trash", count: store.count(for: .trash))
+                row(.trash, icon: "trash", count: counts[.trash])
             }
         }
         .listStyle(.sidebar)
@@ -73,12 +75,12 @@ struct SidebarView: View {
         )
     }
 
-    private var organizationSection: some View {
+    private func organizationSection(counts: [SidebarDestination: Int]) -> some View {
         Section("Organize") {
             Label("Folders", systemImage: "folder")
                 .foregroundStyle(.secondary)
-            ForEach(store.folders.sorted(by: folderOrder)) { folder in
-                row(.folder(folder.id), icon: "folder", count: store.count(for: .folder(folder.id)), indentation: folderDepth(folder))
+            ForEach(store.foldersByPath) { folder in
+                row(.folder(folder.id), icon: "folder", count: counts[.folder(folder.id)], indentation: min(store.folderDepth(for: folder.id), 4))
                     .dropDestination(for: String.self) { values, _ in
                         store.moveBooks(Set(values.compactMap(UUID.init(uuidString:))), to: folder.id)
                         return !values.isEmpty
@@ -94,7 +96,7 @@ struct SidebarView: View {
             Label("Collections", systemImage: "rectangle.stack")
                 .foregroundStyle(.secondary)
             ForEach(store.collections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
-                row(.collection(collection.id), icon: "rectangle.stack", count: store.count(for: .collection(collection.id)))
+                row(.collection(collection.id), icon: "rectangle.stack", count: counts[.collection(collection.id)])
                     .dropDestination(for: String.self) { values, _ in
                         store.assignCollection(collection.id, to: Set(values.compactMap(UUID.init(uuidString:))))
                         return !values.isEmpty
@@ -108,7 +110,7 @@ struct SidebarView: View {
             Label("Tags", systemImage: "tag")
                 .foregroundStyle(.secondary)
             ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
-                row(.tag(tag.id), icon: "tag", count: store.count(for: .tag(tag.id)))
+                row(.tag(tag.id), icon: "tag", count: counts[.tag(tag.id)])
                     .dropDestination(for: String.self) { values, _ in
                         store.assignTag(tag.id, to: Set(values.compactMap(UUID.init(uuidString:))))
                         return !values.isEmpty
@@ -122,7 +124,7 @@ struct SidebarView: View {
             Label("Series", systemImage: "square.stack.3d.up")
                 .foregroundStyle(.secondary)
             ForEach(store.series.sorted(by: { $0.sortOrder < $1.sortOrder })) { item in
-                row(.series(item.id), icon: "square.stack.3d.up", count: store.count(for: .series(item.id)))
+                row(.series(item.id), icon: "square.stack.3d.up", count: counts[.series(item.id)])
                     .dropDestination(for: String.self) { values, _ in
                         store.assignSeries(item.id, to: Set(values.compactMap(UUID.init(uuidString:))))
                         return !values.isEmpty
@@ -140,7 +142,7 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(store.smartCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
-                row(.smartCollection(collection.id), icon: "gearshape.2", count: store.count(for: .smartCollection(collection.id)))
+                row(.smartCollection(collection.id), icon: "gearshape.2", count: counts[.smartCollection(collection.id)])
                     .contextMenu {
                         Button("Edit Rules…", systemImage: "slider.horizontal.3") { organizerSheet = .smartCollection(collection) }
                         Button("Delete Smart Collection", systemImage: "trash", role: .destructive) { pendingDeletion = .smartCollection(collection.id) }
@@ -201,34 +203,6 @@ struct SidebarView: View {
         .padding(.vertical, 10)
     }
 #endif
-
-    private func folderDepth(_ folder: Folder) -> Int {
-        var depth = 0
-        var parentID = folder.parentID
-        var visited: Set<UUID> = []
-        while let id = parentID, visited.insert(id).inserted, let parent = store.folders.first(where: { $0.id == id }) {
-            depth += 1
-            parentID = parent.parentID
-        }
-        return min(depth, 4)
-    }
-
-    private func folderOrder(_ lhs: Folder, _ rhs: Folder) -> Bool {
-        let lhsPath = folderPath(lhs)
-        let rhsPath = folderPath(rhs)
-        return lhsPath.localizedStandardCompare(rhsPath) == .orderedAscending
-    }
-
-    private func folderPath(_ folder: Folder) -> String {
-        var names = [folder.name]
-        var parentID = folder.parentID
-        var visited: Set<UUID> = []
-        while let id = parentID, visited.insert(id).inserted, let parent = store.folders.first(where: { $0.id == id }) {
-            names.insert(parent.name, at: 0)
-            parentID = parent.parentID
-        }
-        return names.joined(separator: "/")
-    }
 
     private var creationBinding: Binding<Bool> {
         Binding(get: { creationKind != nil }, set: { if !$0 { resetEditor() } })
