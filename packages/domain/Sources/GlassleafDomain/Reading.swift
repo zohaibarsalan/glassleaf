@@ -72,3 +72,55 @@ public enum ReadingMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     public var id: Self { self }
 }
+
+public struct Bookmark: Identifiable, Codable, Hashable, Sendable {
+    public let id: UUID
+    public let bookID: UUID
+    public var locator: String
+    public var label: String?
+    public var createdAt: Date
+
+    public init(id: UUID = UUID(), bookID: UUID, locator: String, label: String? = nil, createdAt: Date = .now) {
+        self.id = id
+        self.bookID = bookID
+        self.locator = locator
+        self.label = label
+        self.createdAt = createdAt
+    }
+}
+
+public struct Annotation: Identifiable, Codable, Hashable, Sendable {
+    public let id: UUID
+    public let bookID: UUID
+    public var locator: String
+    public var selectedText: String?
+    public var note: String
+    public var color: AnnotationColor
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        bookID: UUID,
+        locator: String,
+        selectedText: String? = nil,
+        note: String = "",
+        color: AnnotationColor = .yellow,
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.bookID = bookID
+        self.locator = locator
+        self.selectedText = selectedText
+        self.note = note
+        self.color = color
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+public enum AnnotationColor: String, Codable, CaseIterable, Identifiable, Sendable {
+    case yellow, green, blue, pink, purple
+    public var id: Self { self }
+}

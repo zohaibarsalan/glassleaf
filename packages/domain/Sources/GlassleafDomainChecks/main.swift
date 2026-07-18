@@ -67,6 +67,27 @@ let encodedBook = try JSONEncoder().encode(assetBook)
 let decodedBook = try JSONDecoder().decode(Book.self, from: encodedBook)
 check(decodedBook.asset == asset, "book assets survive portable encoding")
 
+let folder = Folder(name: "Research")
+let collection = BookCollection(name: "Summer")
+let organized = Book(
+    title: "Organized",
+    author: "Writer",
+    tags: ["Reference"],
+    folderID: folder.id,
+    collectionIDs: [collection.id]
+)
+check(SmartCollectionRule.tag("reference").includes(organized), "smart tag rules ignore case")
+check(SmartCollectionRule.folder(folder.id).includes(organized), "smart folder rules match membership")
+check(SmartCollectionRule.collection(collection.id).includes(organized), "smart collection rules match membership")
+check(!organized.isInInbox, "organized books leave the inbox")
+check(Book(title: "New", author: "Writer").isInInbox, "unclassified books appear in the inbox")
+
+let snapshot = LibrarySnapshot(books: [organized], folders: [folder], collections: [collection])
+let snapshotData = try JSONEncoder().encode(snapshot)
+let decodedSnapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: snapshotData)
+check(decodedSnapshot.books == [organized], "portable snapshots preserve organized books")
+check(decodedSnapshot.folders == [folder], "portable snapshots preserve folders")
+
 guard failureCount == 0 else {
     fatalError("\(failureCount) domain checks failed")
 }
