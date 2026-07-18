@@ -44,6 +44,15 @@ Glassleaf is not an ebook store. It is a reader and personal library manager.
 
 Build these as a universal SwiftUI application where practical. Use platform-specific layouts and interactions instead of forcing identical interfaces everywhere.
 
+### Platform baseline
+
+- iOS 26 or later.
+- iPadOS 26 or later.
+- macOS 26 or later.
+- Build with the latest stable Xcode and Apple SDKs available to the project.
+
+These are intentionally the first platform releases with Liquid Glass. Glassleaf does not carry pre-Liquid-Glass compatibility code in its initial implementation; standard SwiftUI navigation and controls should provide the material by default, with custom glass reserved for floating, interactive chrome.
+
 ### Web companion
 
 - Responsive browser library and reader.
@@ -361,11 +370,9 @@ The benchmark is **Apple Books, but calmer and substantially better organized**.
 
 ## Decisions still open
 
-- Minimum supported iOS, iPadOS, and macOS versions.
 - Exact local persistence stack and whether CloudKit integration uses a custom sync layer or framework-assisted persistence.
 - Final web EPUB rendering engine.
 - Whether Google Drive content encryption is default, optional, or deferred.
 - Native app distribution strategy: private device install, TestFlight, unlisted App Store, or public App Store.
 - Business model and which features, if any, are paid.
 - Final brand, icon, domain, and trademark clearance for Glassleaf.
-
