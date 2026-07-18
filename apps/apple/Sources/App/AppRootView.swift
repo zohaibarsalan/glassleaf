@@ -1,5 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 struct AppRootView: View {
     @State private var store = LibraryStore.initial
@@ -97,6 +100,7 @@ struct AppRootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .modifier(LibraryInitialFocusModifier())
         .dropDestination(for: URL.self) { urls, _ in
             let books = urls.filter { $0.pathExtension.lowercased() == "epub" }
             guard !books.isEmpty else { return false }
@@ -108,3 +112,30 @@ struct AppRootView: View {
         }
     }
 }
+
+private struct LibraryInitialFocusModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+#if os(macOS)
+        content.background(InitialFocusClearer().frame(width: 0, height: 0))
+#else
+        content
+#endif
+    }
+}
+
+#if os(macOS)
+private struct InitialFocusClearer: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { FocusClearingView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class FocusClearingView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            DispatchQueue.main.async { [weak self] in
+                self?.window?.makeFirstResponder(nil)
+            }
+        }
+    }
+}
+#endif
