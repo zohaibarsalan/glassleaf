@@ -289,6 +289,12 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         switch message.name {
         case "glassleafTap": onTap?()
+        case "glassleafPage":
+            switch message.body as? String {
+            case "next": next()
+            case "previous": previous()
+            default: break
+            }
         case "glassleafProgress":
             if let value = message.body as? NSNumber { chapterProgress = min(max(value.doubleValue, 0), 1) }
         case "glassleafSelection": selectedText = message.body as? String ?? ""
@@ -410,6 +416,27 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
           window.glassleafSeek = value => { scrollTo(horizontal() ? value * maxScroll() : 0, horizontal() ? 0 : value * maxScroll()); setTimeout(report, 40); };
           window.glassleafNext = () => { if (position() >= maxScroll() - 4) return false; scrollBy({left: horizontal() ? innerWidth : 0, top: horizontal() ? 0 : innerHeight * .86, behavior: 'smooth'}); return true; };
           window.glassleafPrevious = () => { if (position() <= 4) return false; scrollBy({left: horizontal() ? -innerWidth : 0, top: horizontal() ? 0 : -innerHeight * .86, behavior: 'smooth'}); return true; };
+          let wheelDistance = 0;
+          let wheelLocked = false;
+          addEventListener('wheel', event => {
+            if (!horizontal() || Math.abs(event.deltaX) <= Math.abs(event.deltaY) || Math.abs(event.deltaX) < 1) return;
+            event.preventDefault();
+            if (wheelLocked) return;
+            wheelDistance += event.deltaX;
+            if (Math.abs(wheelDistance) < 54) return;
+            wheelLocked = true;
+            webkit.messageHandlers.glassleafPage.postMessage(wheelDistance > 0 ? 'next' : 'previous');
+            wheelDistance = 0;
+            setTimeout(() => { wheelLocked = false; }, 320);
+          }, {passive: false});
+          addEventListener('keydown', event => {
+            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+            if (event.key === 'ArrowRight' || event.key === 'PageDown') {
+              event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('next');
+            } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+              event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('previous');
+            }
+          });
           addEventListener('scroll', report, {passive: true});
           addEventListener('click', event => { if (!event.target.closest('a')) webkit.messageHandlers.glassleafTap.postMessage('tap'); });
           document.addEventListener('selectionchange', () => webkit.messageHandlers.glassleafSelection.postMessage(String(getSelection()).slice(0, 10000)));
@@ -461,6 +488,7 @@ private struct PublicationWebView: NSViewRepresentable {
     private func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(navigator, name: "glassleafTap")
+        configuration.userContentController.add(navigator, name: "glassleafPage")
         configuration.userContentController.add(navigator, name: "glassleafProgress")
         configuration.userContentController.add(navigator, name: "glassleafSelection")
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -481,6 +509,7 @@ private struct PublicationWebView: UIViewRepresentable {
     private func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(navigator, name: "glassleafTap")
+        configuration.userContentController.add(navigator, name: "glassleafPage")
         configuration.userContentController.add(navigator, name: "glassleafProgress")
         configuration.userContentController.add(navigator, name: "glassleafSelection")
         let webView = WKWebView(frame: .zero, configuration: configuration)
