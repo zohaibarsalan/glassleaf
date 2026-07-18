@@ -17,6 +17,8 @@ struct EPUBContentsView: View {
     let selectedChapter: Int
     let onSelect: (ReaderDestination) -> Void
     let onClose: () -> Void
+    let onBookmarkCurrent: () -> Void
+    let onAddNote: () -> Void
     @State private var section = ReaderSection.contents
     @State private var searchText = ""
     @State private var searchResults: [PublicationSearchResult] = []
@@ -25,6 +27,12 @@ struct EPUBContentsView: View {
 
     private var links: [PublicationLink] { book.asset?.tableOfContents.isEmpty == false ? book.asset!.tableOfContents : book.asset?.readingOrder ?? [] }
     private var readingOrder: [PublicationLink] { book.asset?.readingOrder ?? [] }
+    private var bookmarks: [Bookmark] {
+        store.bookmarks.filter { $0.bookID == book.id }.sorted { $0.createdAt > $1.createdAt }
+    }
+    private var notes: [Annotation] {
+        store.annotations.filter { $0.bookID == book.id }.sorted { $0.updatedAt > $1.updatedAt }
+    }
     private var contentEntries: [ReaderContentEntry] {
         let tableEntries = links.compactMap { link -> ReaderContentEntry? in
             guard let chapterIndex = indexForReadingOrder(link) else { return nil }
@@ -50,7 +58,7 @@ struct EPUBContentsView: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.bottom, 14)
 
             if section == .contents {
                 searchField
@@ -58,7 +66,7 @@ struct EPUBContentsView: View {
                     .padding(.bottom, 10)
             }
 
-            Divider()
+            Divider().opacity(0.65)
 
             switch section {
             case .contents: contentsList
@@ -67,17 +75,19 @@ struct EPUBContentsView: View {
             }
         }
         .frame(minWidth: 320, idealWidth: 360, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(.regularMaterial)
         .onExitCommand(perform: onClose)
         .task(id: searchText) { await performSearch() }
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Book Navigation")
-                    .font(.headline)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(book.title)
-                    .font(.subheadline)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                Text(section.summary(chapterCount: contentEntries.count, bookmarkCount: bookmarks.count, noteCount: notes.count))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -85,11 +95,13 @@ struct EPUBContentsView: View {
             Button("Close", systemImage: "xmark", action: onClose)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
-                .font(.body.weight(.semibold))
-                .frame(width: 32, height: 32)
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 34, height: 34)
                 .contentShape(.circle)
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 14)
     }
 
     private var searchField: some View {
@@ -105,109 +117,99 @@ struct EPUBContentsView: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 34)
-        .background(.quaternary.opacity(0.65), in: .rect(cornerRadius: 9))
+        .padding(.horizontal, 11)
+        .frame(height: 36)
+        .background(.quaternary.opacity(0.75), in: .rect(cornerRadius: 10))
     }
 
     private var contentsList: some View {
         Group {
             if searchText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
                 if isSearching {
-                    ProgressView("Searching book…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ProgressView("Searching book…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if searchResults.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
+                    ReaderPaneEmptyState(
+                        title: "No Results",
+                        description: "Try a different title, phrase, or character name.",
+                        systemImage: "magnifyingglass"
+                    )
                 } else {
                     List(searchResults) { result in
                         Button { onSelect(ReaderDestination(chapterIndex: result.chapterIndex)) } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(result.title).font(.headline)
-                                Text(result.snippet).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
-                            }
-                            .contentShape(.rect)
+                            ReaderSearchResultRow(result: result)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ReaderPaneRowButtonStyle())
+                        .readerPaneListRow()
                     }
+                    .readerPaneListStyle()
                 }
             } else {
                 List(contentEntries) { entry in
                     Button { onSelect(ReaderDestination(chapterIndex: entry.chapterIndex)) } label: {
-                        HStack(spacing: 14) {
-                            Text(entry.chapterIndex + 1, format: .number).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28)
-                            Text(entry.link.title ?? "Chapter \(entry.chapterIndex + 1)")
-                            Spacer()
-                            if entry.chapterIndex == selectedChapter {
-                                Image(systemName: "location.fill").foregroundStyle(.secondary).accessibilityLabel("Current chapter")
-                            }
-                        }
-                        .contentShape(.rect)
+                        ReaderChapterRow(entry: entry, isCurrent: entry.chapterIndex == selectedChapter)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ReaderPaneRowButtonStyle())
+                    .readerPaneListRow()
                 }
+                .readerPaneListStyle()
             }
         }
     }
 
     private var bookmarksList: some View {
-        let values = store.bookmarks.filter { $0.bookID == book.id }.sorted { $0.createdAt > $1.createdAt }
-        return Group {
-            if values.isEmpty {
-                ContentUnavailableView("No Bookmarks", systemImage: "bookmark", description: Text("Bookmark a page from the reader to find it here."))
+        Group {
+            if bookmarks.isEmpty {
+                ReaderPaneEmptyState(
+                    title: "No Bookmarks Yet",
+                    description: "Save the current page so you can return to it instantly.",
+                    systemImage: "bookmark",
+                    actionTitle: "Bookmark Current Page",
+                    actionSystemImage: "bookmark.fill",
+                    action: onBookmarkCurrent
+                )
             } else {
-                List(values) { bookmark in
+                List(bookmarks) { bookmark in
                     Button { if let destination = destination(locator: bookmark.locator) { onSelect(destination) } } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "bookmark.fill")
-                                .foregroundStyle(.secondary)
-                            VStack(alignment: .leading, spacing: 3) {
-                            Text(bookmark.label ?? chapterTitle(locator: bookmark.locator))
-                            Text(bookmark.createdAt, style: .date).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                        .contentShape(.rect)
+                        ReaderBookmarkRow(
+                            title: bookmark.label ?? chapterTitle(locator: bookmark.locator),
+                            date: bookmark.createdAt
+                        )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ReaderPaneRowButtonStyle())
+                    .readerPaneListRow()
+                    .swipeActions {
+                        Button("Delete", systemImage: "trash", role: .destructive) { store.deleteBookmark(bookmark.id) }
+                    }
+                    .contextMenu {
+                        Button("Delete Bookmark", systemImage: "trash", role: .destructive) { store.deleteBookmark(bookmark.id) }
+                    }
                 }
+                .readerPaneListStyle()
             }
         }
     }
 
     private var notesList: some View {
-        let values = store.annotations.filter { $0.bookID == book.id }.sorted { $0.updatedAt > $1.updatedAt }
-        return Group {
-            if values.isEmpty {
-                ContentUnavailableView("No Notes", systemImage: "highlighter", description: Text("Select text or add a note from the reader."))
+        Group {
+            if notes.isEmpty {
+                ReaderPaneEmptyState(
+                    title: "No Notes Yet",
+                    description: "Capture a thought or highlight something worth remembering.",
+                    systemImage: "pencil.and.scribble",
+                    actionTitle: "Add a Note",
+                    actionSystemImage: "pencil.tip",
+                    action: onAddNote
+                )
             } else {
-                List(values) { annotation in
+                List(notes) { annotation in
                     Button {
                         if let destination = destination(locator: annotation.locator) { onSelect(destination) }
                     } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: "highlighter")
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 2)
-                            VStack(alignment: .leading, spacing: 5) {
-                                if let selected = annotation.selectedText, !selected.isEmpty {
-                                    Text(selected).font(.subheadline).lineLimit(3)
-                                }
-                                if !annotation.note.isEmpty { Text(annotation.note).foregroundStyle(.secondary).lineLimit(3) }
-                                Text(chapterTitle(locator: annotation.locator))
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                                .padding(.top, 3)
-                        }
-                        .contentShape(.rect)
+                        ReaderNoteRow(annotation: annotation, chapterTitle: chapterTitle(locator: annotation.locator))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ReaderPaneRowButtonStyle())
+                    .readerPaneListRow()
                     .swipeActions {
                         Button("Delete", systemImage: "trash", role: .destructive) { store.deleteAnnotation(annotation.id) }
                     }
@@ -215,6 +217,7 @@ struct EPUBContentsView: View {
                         Button("Delete Note", systemImage: "trash", role: .destructive) { store.deleteAnnotation(annotation.id) }
                     }
                 }
+                .readerPaneListStyle()
             }
         }
     }
@@ -247,7 +250,8 @@ struct EPUBContentsView: View {
 
     private func chapterIndex(locator: String) -> Int? {
         let href = locator.split(separator: "#", maxSplits: 1).first.map(String.init) ?? locator
-        return readingOrder.firstIndex { $0.href == href }
+        let resource = normalizedResourcePath(href)
+        return readingOrder.firstIndex { normalizedResourcePath($0.href) == resource }
     }
 
     private func destination(locator: String) -> ReaderDestination? {
@@ -264,12 +268,245 @@ struct EPUBContentsView: View {
 
 private enum ReaderSection: Hashable {
     case contents, bookmarks, notes
+
+    func summary(chapterCount: Int, bookmarkCount: Int, noteCount: Int) -> String {
+        switch self {
+        case .contents:
+            "\(chapterCount) \(chapterCount == 1 ? "chapter" : "chapters")"
+        case .bookmarks:
+            "\(bookmarkCount) \(bookmarkCount == 1 ? "bookmark" : "bookmarks")"
+        case .notes:
+            "\(noteCount) \(noteCount == 1 ? "note" : "notes")"
+        }
+    }
 }
 
 private struct ReaderContentEntry: Identifiable {
     let link: PublicationLink
     let chapterIndex: Int
     var id: String { "\(chapterIndex):\(link.href)" }
+}
+
+private struct ReaderChapterRow: View {
+    let entry: ReaderContentEntry
+    let isCurrent: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(entry.chapterIndex + 1, format: .number)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: 28, alignment: .trailing)
+
+            Text(entry.link.title ?? "Chapter \(entry.chapterIndex + 1)")
+                .font(.subheadline.weight(isCurrent ? .semibold : .regular))
+                .lineLimit(2)
+
+            Spacer(minLength: 8)
+
+            if isCurrent {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.tint)
+                    .accessibilityLabel("Current chapter")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(minHeight: 42)
+        .background(isCurrent ? Color.accentColor.opacity(0.14) : .clear, in: .rect(cornerRadius: 9))
+        .contentShape(.rect)
+    }
+}
+
+private struct ReaderSearchResultRow: View {
+    let result: PublicationSearchResult
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(result.title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+            Text(result.snippet)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+        .contentShape(.rect)
+    }
+}
+
+private struct ReaderBookmarkRow: View {
+    let title: String
+    let date: Date
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bookmark.fill")
+                .font(.subheadline)
+                .foregroundStyle(.tint)
+                .frame(width: 28, height: 28)
+                .background(Color.accentColor.opacity(0.13), in: .rect(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                Text(date, format: .dateTime.month(.abbreviated).day().year())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(minHeight: 54)
+        .contentShape(.rect)
+    }
+}
+
+private struct ReaderNoteRow: View {
+    let annotation: Annotation
+    let chapterTitle: String
+
+    private var primaryText: String {
+        if let selectedText = annotation.selectedText?.trimmingCharacters(in: .whitespacesAndNewlines), !selectedText.isEmpty {
+            return selectedText
+        }
+        let note = annotation.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return note.isEmpty ? "Untitled note" : note
+    }
+
+    private var secondaryText: String? {
+        guard annotation.selectedText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else { return nil }
+        let note = annotation.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return note.isEmpty ? nil : note
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "highlighter")
+                .font(.subheadline)
+                .foregroundStyle(annotation.color.readerColor)
+                .frame(width: 28, height: 28)
+                .background(annotation.color.readerColor.opacity(0.14), in: .rect(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(primaryText)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(3)
+                if let secondaryText {
+                    Text(secondaryText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Text("\(chapterTitle) · \(annotation.updatedAt.formatted(.dateTime.month(.abbreviated).day()))")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .padding(.top, 5)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(minHeight: 62)
+        .contentShape(.rect)
+    }
+}
+
+private struct ReaderPaneEmptyState: View {
+    let title: String
+    let description: String
+    let systemImage: String
+    var actionTitle: String?
+    var actionSystemImage: String?
+    var action: (() -> Void)?
+
+    init(
+        title: String,
+        description: String,
+        systemImage: String,
+        actionTitle: String? = nil,
+        actionSystemImage: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.description = description
+        self.systemImage = systemImage
+        self.actionTitle = actionTitle
+        self.actionSystemImage = actionSystemImage
+        self.action = action
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.system(size: 30, weight: .regular))
+                .foregroundStyle(.secondary)
+                .frame(height: 36)
+            Text(title)
+                .font(.headline)
+            Text(description)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 250)
+
+            if let actionTitle, let action {
+                Button(actionTitle, systemImage: actionSystemImage ?? "plus", action: action)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .padding(.top, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(32)
+    }
+}
+
+private struct ReaderPaneRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.65 : 1)
+    }
+}
+
+private extension View {
+    func readerPaneListRow() -> some View {
+        listRowInsets(.init(top: 2, leading: 8, bottom: 2, trailing: 8))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+    }
+
+    func readerPaneListStyle() -> some View {
+        listStyle(.plain)
+            .scrollContentBackground(.hidden)
+    }
+}
+
+private extension AnnotationColor {
+    var readerColor: Color {
+        switch self {
+        case .yellow: .yellow
+        case .green: .green
+        case .blue: .blue
+        case .pink: .pink
+        case .purple: .purple
+        }
+    }
 }
 
 struct ReaderNoteEditor: View {

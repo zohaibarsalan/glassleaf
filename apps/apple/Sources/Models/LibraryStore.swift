@@ -209,6 +209,12 @@ final class LibraryStore {
         persistReading(bookID: bookID)
     }
 
+    func deleteBookmark(_ id: UUID) {
+        guard let bookmark = bookmarks.first(where: { $0.id == id }) else { return }
+        bookmarks.removeAll { $0.id == id }
+        persistReading(bookID: bookmark.bookID)
+    }
+
     func addAnnotation(bookID: UUID, locator: String, selectedText: String? = nil, note: String, color: AnnotationColor = .yellow) {
         annotations.append(Annotation(bookID: bookID, locator: locator, selectedText: selectedText, note: note, color: color))
         persistReading(bookID: bookID)

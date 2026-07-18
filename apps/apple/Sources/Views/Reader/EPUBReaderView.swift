@@ -98,6 +98,16 @@ struct EPUBReaderView: View {
                 onClose: {
                     showsContents = false
                     revealControls()
+                },
+                onBookmarkCurrent: {
+                    if !isBookmarked {
+                        store.toggleBookmark(bookID: book.id, locator: locator, label: currentChapterTitle)
+                    }
+                    revealControls()
+                },
+                onAddNote: {
+                    showsNoteEditor = true
+                    revealControls()
                 }
             )
             .inspectorColumnWidth(min: 320, ideal: 360, max: 440)
