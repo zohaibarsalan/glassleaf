@@ -1,5 +1,6 @@
 import GlassleafDomain
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct BookMetadataEditor: View {
     let book: Book
@@ -17,6 +18,8 @@ struct BookMetadataEditor: View {
     @State private var tagNames: Set<String>
     @State private var newTag = ""
     @State private var coverStyle: CoverStyle
+    @State private var showsCoverImporter = false
+    @State private var replacementCover: (data: Data, filename: String)?
 
     init(book: Book, store: LibraryStore) {
         self.book = book
@@ -43,6 +46,11 @@ struct BookMetadataEditor: View {
                     Picker("Cover style", selection: $coverStyle) {
                         ForEach(CoverStyle.allCases, id: \.self) { style in
                             Text(style.title).tag(style)
+                        }
+                    }
+                    LabeledContent("Cover image") {
+                        Button(replacementCover?.filename ?? "Choose Image…") {
+                            showsCoverImporter = true
                         }
                     }
                     TextField("Description", text: $summary, axis: .vertical)
@@ -98,6 +106,13 @@ struct BookMetadataEditor: View {
             }
         }
         .frame(minWidth: 420, idealWidth: 520, minHeight: 560, idealHeight: 720)
+        .fileImporter(isPresented: $showsCoverImporter, allowedContentTypes: [.image]) { result in
+            guard case .success(let url) = result else { return }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return }
+            replacementCover = (data, url.lastPathComponent)
+        }
     }
 
     private var allTagNames: [String] {
@@ -142,6 +157,11 @@ struct BookMetadataEditor: View {
             value.collectionIDs = collectionIDs
             value.tags = tagNames
             value.coverStyle = coverStyle
+        }
+        if let replacementCover {
+            Task {
+                await store.replaceCover(for: book.id, data: replacementCover.data, filename: replacementCover.filename)
+            }
         }
         dismiss()
     }

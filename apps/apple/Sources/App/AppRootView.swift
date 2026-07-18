@@ -39,6 +39,10 @@ struct AppRootView: View {
                 )
             }
         }
+        .onOpenURL { url in
+            guard url.pathExtension.lowercased() == "epub" else { return }
+            Task { await store.importBooks(from: [url]) }
+        }
         .fileExporter(
             isPresented: $store.showsExporter,
             document: store.exportDocument,
@@ -93,6 +97,12 @@ struct AppRootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .dropDestination(for: URL.self) { urls, _ in
+            let books = urls.filter { $0.pathExtension.lowercased() == "epub" }
+            guard !books.isEmpty else { return false }
+            Task { await store.importBooks(from: books) }
+            return true
+        }
         .sheet(item: $store.presentedBook) { book in
             BookDetailView(book: book, store: store)
         }

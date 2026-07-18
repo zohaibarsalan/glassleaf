@@ -1,6 +1,8 @@
 import CryptoKit
 import Foundation
 import GlassleafDomain
+import ImageIO
+import UniformTypeIdentifiers
 
 actor LocalBookImporter {
     enum ImportError: LocalizedError {
@@ -8,6 +10,8 @@ actor LocalBookImporter {
         case emptyFile
         case invalidEPUB
         case duplicate
+        case invalidCover
+        case coverTooLarge
 
         var errorDescription: String? {
             switch self {
@@ -19,6 +23,10 @@ actor LocalBookImporter {
                 "The selected file doesn’t appear to be a valid EPUB."
             case .duplicate:
                 "This EPUB is already in the library."
+            case .invalidCover:
+                "The selected cover isn’t a readable image."
+            case .coverTooLarge:
+                "Cover images must be smaller than 50 MB."
             }
         }
     }
@@ -126,6 +134,30 @@ actor LocalBookImporter {
                 try fileManager.removeItem(at: directory)
             }
         }
+    }
+
+    func storeCover(data: Data, filename: String, for bookID: UUID) throws -> CoverAsset {
+        guard data.count <= 50 * 1_024 * 1_024 else { throw ImportError.coverTooLarge }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) > 0 else {
+            throw ImportError.invalidCover
+        }
+
+        let suppliedExtension = (filename as NSString).pathExtension.lowercased()
+        let type = UTType(filenameExtension: suppliedExtension)
+        guard let type, type.conforms(to: .image) else { throw ImportError.invalidCover }
+
+        let directory = try libraryRoot().appending(path: "Books/\(bookID.uuidString)", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let oldCover = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .first(where: { $0.lastPathComponent.hasPrefix("CustomCover.") }) {
+            try fileManager.removeItem(at: oldCover)
+        }
+
+        let fileExtension = type.preferredFilenameExtension ?? suppliedExtension
+        let relativePath = "Books/\(bookID.uuidString)/CustomCover.\(fileExtension)"
+        let destination = try libraryRoot().appending(path: relativePath)
+        try data.write(to: destination, options: [.atomic, .completeFileProtection])
+        return CoverAsset(localRelativePath: relativePath, mediaType: type.preferredMIMEType ?? "application/octet-stream")
     }
 
     private func hashFile(at url: URL) throws -> String {

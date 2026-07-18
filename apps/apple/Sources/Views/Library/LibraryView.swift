@@ -135,8 +135,10 @@ struct LibraryView: View {
             Button("Export Library", systemImage: "square.and.arrow.up") {
                 Task { await store.prepareExport() }
             }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
             .help("Export original EPUBs, metadata, and reading data")
             Button("Import", systemImage: "plus") { store.requestImport() }
+                .keyboardShortcut("o", modifiers: .command)
                 .help("Import an EPUB")
         }
     }

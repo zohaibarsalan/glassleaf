@@ -230,6 +230,15 @@ final class LibraryStore {
         }
     }
 
+    func replaceCover(for bookID: UUID, data: Data, filename: String) async {
+        do {
+            let cover = try await importer.storeCover(data: data, filename: filename, for: bookID)
+            updateBook(id: bookID) { $0.cover = cover }
+        } catch {
+            importAlert = ImportAlert(title: "Cover Couldn’t Be Updated", message: error.localizedDescription)
+        }
+    }
+
     func updateBook(id: UUID, mutation: (inout Book) -> Void) {
         guard let index = books.firstIndex(where: { $0.id == id }) else { return }
         mutation(&books[index])
