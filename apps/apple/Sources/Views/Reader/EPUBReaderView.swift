@@ -760,6 +760,7 @@ private final class TrackpadAwareWebView: WKWebView {
     private var horizontalDistance: CGFloat = 0
     private var verticalDistance: CGFloat = 0
     private var gestureAxis: GestureAxis = .undecided
+    private var didCommitGesture = false
     private var suppressesMomentum = false
 
     override func scrollWheel(with event: NSEvent) {
@@ -773,6 +774,7 @@ private final class TrackpadAwareWebView: WKWebView {
             horizontalDistance = 0
             verticalDistance = 0
             gestureAxis = .undecided
+            didCommitGesture = false
             suppressesMomentum = false
         }
 
@@ -786,23 +788,20 @@ private final class TrackpadAwareWebView: WKWebView {
         resolveGestureAxisIfNeeded()
 
         let gestureEnded = event.phase.contains(.ended) || event.phase.contains(.cancelled)
-        if gestureEnded {
-            defer { resetGesture() }
-            guard gestureAxis == .horizontal else {
-                super.scrollWheel(with: event)
-                return
-            }
-
+        if gestureAxis == .horizontal {
             suppressesMomentum = true
-            guard abs(horizontalDistance) >= commitDistance else { return }
-
-            // NSEvent's horizontal delta is the inverse of the DOM scroll direction.
-            onHorizontalSwipe?(horizontalDistance < 0)
+            if !didCommitGesture, abs(horizontalDistance) >= commitDistance {
+                didCommitGesture = true
+                // NSEvent's horizontal delta is the inverse of the DOM scroll direction.
+                onHorizontalSwipe?(horizontalDistance < 0)
+            }
+            if gestureEnded { resetGesture() }
             return
         }
 
-        if gestureAxis == .horizontal {
-            suppressesMomentum = true
+        if gestureEnded {
+            resetGesture()
+            super.scrollWheel(with: event)
             return
         }
 
@@ -810,7 +809,7 @@ private final class TrackpadAwareWebView: WKWebView {
     }
 
     private var commitDistance: CGFloat {
-        min(max(bounds.width * 0.075, 82), 120)
+        min(max(bounds.width * 0.035, 44), 58)
     }
 
     private func resolveGestureAxisIfNeeded() {
@@ -828,6 +827,7 @@ private final class TrackpadAwareWebView: WKWebView {
         horizontalDistance = 0
         verticalDistance = 0
         gestureAxis = .undecided
+        didCommitGesture = false
     }
 
     private enum GestureAxis {
