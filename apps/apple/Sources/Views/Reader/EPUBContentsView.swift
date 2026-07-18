@@ -23,7 +23,7 @@ struct EPUBContentsView: View {
     @State private var searchText = ""
     @State private var searchResults: [PublicationSearchResult] = []
     @State private var isSearching = false
-    private let searchService = PublicationSearchService()
+    private let searchService = PublicationSearchService.shared
 
     private var links: [PublicationLink] { book.asset?.tableOfContents.isEmpty == false ? book.asset!.tableOfContents : book.asset?.readingOrder ?? [] }
     private var readingOrder: [PublicationLink] { book.asset?.readingOrder ?? [] }
@@ -118,6 +118,11 @@ struct EPUBContentsView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.tertiary)
             }
+            if isSearching {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Searching book")
+            }
         }
         .padding(.horizontal, 11)
         .frame(height: 36)
@@ -127,7 +132,7 @@ struct EPUBContentsView: View {
     private var contentsList: some View {
         Group {
             if searchText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
-                if isSearching {
+                if isSearching && searchResults.isEmpty {
                     ProgressView("Searching book…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if searchResults.isEmpty {
@@ -232,11 +237,23 @@ struct EPUBContentsView: View {
             isSearching = false
             return
         }
+        do {
+            try await Task.sleep(for: .milliseconds(120))
+        } catch {
+            return
+        }
+        guard !Task.isCancelled else { return }
         isSearching = true
         let root = support.appending(path: "Glassleaf").appending(path: path)
-        let result = try? await searchService.search(query, rootURL: root, links: readingOrder)
+        let result: [PublicationSearchResult]
+        do {
+            result = try await searchService.search(query, rootURL: root, links: readingOrder)
+        } catch {
+            guard !Task.isCancelled else { return }
+            result = []
+        }
         guard !Task.isCancelled, searchText.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
-        searchResults = result ?? []
+        searchResults = result
         isSearching = false
     }
 
