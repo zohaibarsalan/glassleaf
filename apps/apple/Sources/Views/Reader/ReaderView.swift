@@ -50,6 +50,13 @@ private struct PrototypeReaderView: View {
         return Double(currentPage) / Double(max(pageCount - 1, 1))
     }
 
+    private var readerColorScheme: ColorScheme {
+        switch preferences.theme.resolved(for: colorScheme) {
+        case .night, .black: .dark
+        case .automatic, .paper, .sepia: .light
+        }
+    }
+
     var body: some View {
         ZStack {
             preferences.theme.background(for: colorScheme)
@@ -63,6 +70,7 @@ private struct PrototypeReaderView: View {
             }
         }
         .foregroundStyle(preferences.theme.foreground(for: colorScheme))
+        .preferredColorScheme(readerColorScheme)
         .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: controlsVisible)
         .modifier(ReaderSystemChromeModifier(controlsVisible: controlsVisible))
         .onAppear {
@@ -115,8 +123,14 @@ private struct PrototypeReaderView: View {
                         .lineSpacing(preferences.lineSpacing)
                         .textSelection(.enabled)
                 }
-                .frame(maxWidth: min(720, proxy.size.width - 32), maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, preferences.horizontalMargin)
+                .frame(
+                    maxWidth: min(
+                        900 - (preferences.horizontalMargin * 2),
+                        proxy.size.width - (preferences.horizontalMargin * 2)
+                    ),
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
                 .padding(.top, 24)
 
                 Spacer(minLength: controlsVisible ? 96 : 50)
@@ -147,8 +161,7 @@ private struct PrototypeReaderView: View {
                     .id(index)
                 }
             }
-            .frame(maxWidth: 720, alignment: .leading)
-            .padding(.horizontal, preferences.horizontalMargin)
+            .frame(maxWidth: 900 - (preferences.horizontalMargin * 2), alignment: .leading)
             .padding(.top, controlsVisible ? 110 : 52)
             .padding(.bottom, controlsVisible ? 120 : 60)
             .frame(maxWidth: .infinity)
@@ -161,12 +174,12 @@ private struct PrototypeReaderView: View {
     private var readerChrome: some View {
         VStack {
             topControls
-                .padding(.horizontal, macOSTitleBarControlClearance)
             Spacer()
             bottomControls
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
         .foregroundStyle(.primary)
     }
 
@@ -179,14 +192,35 @@ private struct PrototypeReaderView: View {
     }
 
     private var topControls: some View {
-        HStack(alignment: .top) {
-            ReaderControlCluster {
-                ReaderChromeButton("Close", systemImage: "xmark") {
-                    store.closeReader(at: progress)
+        ZStack(alignment: .top) {
+            HStack(alignment: .top) {
+                ReaderControlCluster {
+                    ReaderChromeButton("Back to Library", systemImage: "chevron.left") {
+                        store.closeReader(at: progress)
+                    }
+                }
+
+                Spacer(minLength: 12)
+
+                ReaderControlCluster {
+                    ReaderChromeButton("Contents", systemImage: "list.bullet.rectangle") {
+                        showsContents = true
+                        revealControls()
+                    }
+                    ReaderChromeButton("Appearance", systemImage: "textformat.size") {
+                        showsSettings = true
+                        revealControls()
+                    }
+                    ReaderChromeButton(
+                        isBookmarked ? "Remove Bookmark" : "Add Bookmark",
+                        systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
+                    ) {
+                        isBookmarked.toggle()
+                        revealControls()
+                    }
                 }
             }
-
-            Spacer(minLength: 12)
+            .padding(.leading, macOSTitleBarControlClearance)
 
             if horizontalSizeClass != .compact {
                 VStack(spacing: 2) {
@@ -198,30 +232,9 @@ private struct PrototypeReaderView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                .padding(.horizontal, 18)
-                .frame(height: 44)
-                .glassEffect(.regular, in: .capsule)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: 300, minHeight: 44)
                 .accessibilityElement(children: .combine)
-            }
-
-            Spacer(minLength: 12)
-
-            ReaderControlCluster {
-                ReaderChromeButton("Contents", systemImage: "list.bullet") {
-                    showsContents = true
-                    revealControls()
-                }
-                ReaderChromeButton("Appearance", systemImage: "textformat") {
-                    showsSettings = true
-                    revealControls()
-                }
-                ReaderChromeButton(
-                    isBookmarked ? "Remove Bookmark" : "Add Bookmark",
-                    systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
-                ) {
-                    isBookmarked.toggle()
-                    revealControls()
-                }
             }
         }
     }
@@ -261,7 +274,7 @@ private struct PrototypeReaderView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .frame(maxWidth: 680)
+        .frame(maxWidth: 620)
         .glassEffect(.regular.interactive(), in: .capsule)
     }
 
@@ -356,10 +369,10 @@ private struct ReaderControlCluster<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             content
         }
-        .padding(4)
+        .padding(3)
         .glassEffect(.regular.interactive(), in: .capsule)
     }
 }
@@ -379,7 +392,7 @@ private struct ReaderChromeButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.body.weight(.medium))
-                .frame(width: 36, height: 36)
+                .frame(width: 40, height: 40)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)

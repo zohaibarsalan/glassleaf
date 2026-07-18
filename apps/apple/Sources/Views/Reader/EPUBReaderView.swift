@@ -33,6 +33,12 @@ struct EPUBReaderView: View {
         value.theme = preferences.theme.resolved(for: colorScheme)
         return value
     }
+    private var readerColorScheme: ColorScheme {
+        switch resolvedPreferences.theme {
+        case .night, .black: .dark
+        case .automatic, .paper, .sepia: .light
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -50,6 +56,7 @@ struct EPUBReaderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(preferences.theme.background(for: colorScheme))
+        .preferredColorScheme(readerColorScheme)
         .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: controlsVisible)
         .modifier(ReaderSystemChromeModifier(controlsVisible: controlsVisible))
         .onAppear {
@@ -86,42 +93,47 @@ struct EPUBReaderView: View {
 
     private var readerChrome: some View {
         VStack {
-            topControls.padding(.horizontal, macOSTitleBarControlClearance)
+            topControls
             Spacer()
             bottomControls
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
         .foregroundStyle(.primary)
     }
 
     private var topControls: some View {
-        HStack(alignment: .top) {
-            EPUBControlCluster {
-                EPUBChromeButton("Close", systemImage: "xmark") {
-                    store.closeReader(at: progress, locator: locator)
+        ZStack(alignment: .top) {
+            HStack(alignment: .top) {
+                EPUBControlCluster {
+                    EPUBChromeButton("Back to Library", systemImage: "chevron.left") {
+                        store.closeReader(at: progress, locator: locator)
+                    }
+                }
+
+                Spacer(minLength: 12)
+
+                EPUBControlCluster {
+                    EPUBChromeButton("Contents and Search", systemImage: "list.bullet.rectangle") { showsContents = true; revealControls() }
+                    EPUBChromeButton("Appearance", systemImage: "textformat.size") { showsSettings = true; revealControls() }
+                    EPUBChromeButton("Add Note", systemImage: "pencil.tip") { showsNoteEditor = true; revealControls() }
+                    EPUBChromeButton(isBookmarked ? "Remove Bookmark" : "Add Bookmark", systemImage: isBookmarked ? "bookmark.fill" : "bookmark") {
+                        store.toggleBookmark(bookID: book.id, locator: locator, label: currentChapterTitle)
+                        revealControls()
+                    }
                 }
             }
-            Spacer(minLength: 12)
+            .padding(.leading, macOSTitleBarControlClearance)
+
             if horizontalSizeClass != .compact {
                 VStack(spacing: 2) {
                     Text(book.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                     Text(currentChapterTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
-                .padding(.horizontal, 18)
-                .frame(height: 44)
-                .glassEffect(.regular, in: .capsule)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: 300, minHeight: 44)
                 .accessibilityElement(children: .combine)
-            }
-            Spacer(minLength: 12)
-            EPUBControlCluster {
-                EPUBChromeButton("Contents and Search", systemImage: "list.bullet") { showsContents = true; revealControls() }
-                EPUBChromeButton("Appearance", systemImage: "textformat") { showsSettings = true; revealControls() }
-                EPUBChromeButton("Add Note", systemImage: "highlighter") { showsNoteEditor = true; revealControls() }
-                EPUBChromeButton(isBookmarked ? "Remove Bookmark" : "Add Bookmark", systemImage: isBookmarked ? "bookmark.fill" : "bookmark") {
-                    store.toggleBookmark(bookID: book.id, locator: locator, label: currentChapterTitle)
-                    revealControls()
-                }
             }
         }
     }
@@ -143,7 +155,7 @@ struct EPUBReaderView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .frame(maxWidth: 680)
+        .frame(maxWidth: 620)
         .glassEffect(.regular.interactive(), in: .capsule)
     }
 
@@ -457,11 +469,11 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
           if (!style) { style = document.createElement('style'); style.id = 'glassleaf-style'; document.head.appendChild(style); }
           style.textContent = `
             html { background: \(preferences.theme.cssBackground) !important; color: \(preferences.theme.cssForeground) !important; }
-            body { box-sizing: border-box; max-width: none !important; font-family: \(font) !important; font-size: \(19 * preferences.fontScale)px !important; line-height: \(1.35 + preferences.lineSpacing / 20) !important; text-align: \(preferences.alignment == .justified ? "justify" : "start") !important; color: \(preferences.theme.cssForeground) !important; background: transparent !important; }
+            body { box-sizing: border-box; max-width: none !important; font-family: \(font) !important; font-size: \(19 * preferences.fontScale)px !important; line-height: \(1.35 + preferences.lineSpacing / 20) !important; text-align: \(preferences.alignment == .justified ? "justify" : "start") !important; color: \(preferences.theme.cssForeground) !important; background: transparent !important; hyphens: auto; orphans: 2; widows: 2; }
             img, svg, video { max-width: 100% !important; height: auto !important; }
             a { color: inherit !important; }
             ::selection { background: rgba(255, 204, 64, .45); }
-            \(preferences.mode == .paginated ? "html { overflow: hidden !important; } body { height: calc(100vh - 64px); margin: 32px \(preferences.horizontalMargin)px !important; padding: 0 !important; column-width: calc(100vw - \(preferences.horizontalMargin * 2)px); column-gap: \(preferences.horizontalMargin * 2)px; overflow: visible !important; }" : "html { overflow-y: auto !important; } body { max-width: 720px !important; margin: 0 auto !important; padding: 96px \(preferences.horizontalMargin)px 110px !important; }")
+            \(preferences.mode == .paginated ? "html { overflow: hidden !important; } body { --glassleaf-side: max(\(preferences.horizontalMargin)px, calc((100vw - 900px) / 2 + \(preferences.horizontalMargin)px)); height: calc(100vh - 176px); margin: 88px var(--glassleaf-side) !important; padding: 0 !important; column-width: calc(100vw - var(--glassleaf-side) - var(--glassleaf-side)); column-gap: calc(var(--glassleaf-side) + var(--glassleaf-side)); overflow: visible !important; }" : "html { overflow-y: auto !important; } body { max-width: 900px !important; margin: 0 auto !important; padding: 104px \(preferences.horizontalMargin)px 124px !important; }")
           `;
         })();
         """
@@ -523,7 +535,7 @@ private struct PublicationWebView: UIViewRepresentable {
 
 private struct EPUBControlCluster<Content: View>: View {
     @ViewBuilder let content: Content
-    var body: some View { HStack(spacing: 2) { content }.padding(4).glassEffect(.regular.interactive(), in: .capsule) }
+    var body: some View { HStack(spacing: 0) { content }.padding(3).glassEffect(.regular.interactive(), in: .capsule) }
 }
 
 private struct EPUBChromeButton: View {
@@ -533,7 +545,7 @@ private struct EPUBChromeButton: View {
     init(_ title: String, systemImage: String, action: @escaping () -> Void) { self.title = title; self.systemImage = systemImage; self.action = action }
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage).font(.body.weight(.medium)).frame(width: 36, height: 36).contentShape(.circle)
+            Image(systemName: systemImage).font(.body.weight(.medium)).frame(width: 40, height: 40).contentShape(.circle)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
