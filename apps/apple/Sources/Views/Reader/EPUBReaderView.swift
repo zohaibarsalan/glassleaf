@@ -2,6 +2,9 @@ import GlassleafDomain
 import Observation
 import SwiftUI
 import WebKit
+#if os(macOS)
+import AppKit
+#endif
 
 struct EPUBReaderView: View {
     let book: Book
@@ -260,6 +263,15 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
         }
     }
 
+    func navigateWithTrackpad(forward: Bool) {
+        switch preferences.mode {
+        case .paginated:
+            forward ? next() : previous()
+        case .scrolling:
+            goToChapter(chapterIndex + (forward ? 1 : -1), progress: forward ? 0 : 1)
+        }
+    }
+
     func seek(to fraction: Double, chapterCount: Int) {
         guard chapterCount > 0 else { return }
         let scaled = min(max(fraction, 0), 0.999_999) * Double(chapterCount)
@@ -449,28 +461,6 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
             scrollBy({top: -innerHeight * .86, behavior: 'smooth'});
             return true;
           };
-          let wheelDistance = 0;
-          let wheelCommitted = false;
-          let wheelEndTimer = 0;
-          addEventListener('wheel', event => {
-            if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) || Math.abs(event.deltaX) < 1) return;
-            event.preventDefault();
-            clearTimeout(wheelEndTimer);
-            wheelEndTimer = setTimeout(() => {
-              wheelDistance = 0;
-              wheelCommitted = false;
-            }, 180);
-            if (wheelCommitted) return;
-            if (wheelDistance !== 0 && Math.sign(wheelDistance) !== Math.sign(event.deltaX)) wheelDistance = 0;
-            wheelDistance += event.deltaX;
-            if (Math.abs(wheelDistance) < 72) return;
-            wheelCommitted = true;
-            const forward = wheelDistance > 0;
-            const action = horizontal()
-              ? (forward ? 'next' : 'previous')
-              : (forward ? 'nextChapter' : 'previousChapter');
-            webkit.messageHandlers.glassleafPage.postMessage(action);
-          }, {passive: false});
           addEventListener('keydown', event => {
             if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
             if (event.key === 'ArrowRight' || event.key === 'PageDown') {
@@ -533,9 +523,97 @@ private struct PublicationWebView: NSViewRepresentable {
         configuration.userContentController.add(navigator, name: "glassleafPage")
         configuration.userContentController.add(navigator, name: "glassleafProgress")
         configuration.userContentController.add(navigator, name: "glassleafSelection")
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = TrackpadAwareWebView(frame: .zero, configuration: configuration)
+        webView.onHorizontalSwipe = { [weak navigator] forward in
+            navigator?.navigateWithTrackpad(forward: forward)
+        }
         webView.setValue(false, forKey: "drawsBackground")
         return webView
+    }
+}
+
+private final class TrackpadAwareWebView: WKWebView {
+    var onHorizontalSwipe: ((Bool) -> Void)?
+
+    private var horizontalDistance: CGFloat = 0
+    private var verticalDistance: CGFloat = 0
+    private var gestureAxis: GestureAxis = .undecided
+    private var suppressesMomentum = false
+
+    override func scrollWheel(with event: NSEvent) {
+        if !event.momentumPhase.isEmpty {
+            if suppressesMomentum { return }
+            super.scrollWheel(with: event)
+            return
+        }
+
+        if event.phase.contains(.began) {
+            horizontalDistance = 0
+            verticalDistance = 0
+            gestureAxis = .undecided
+            suppressesMomentum = false
+        }
+
+        guard !event.phase.isEmpty else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        horizontalDistance += event.scrollingDeltaX
+        verticalDistance += event.scrollingDeltaY
+        resolveGestureAxisIfNeeded()
+
+        let gestureEnded = event.phase.contains(.ended) || event.phase.contains(.cancelled)
+        if gestureEnded {
+            defer { resetGesture() }
+            guard gestureAxis == .horizontal else {
+                super.scrollWheel(with: event)
+                return
+            }
+
+            suppressesMomentum = true
+            guard abs(horizontalDistance) >= commitDistance else { return }
+
+            // NSEvent's horizontal delta is the inverse of the DOM scroll direction.
+            onHorizontalSwipe?(horizontalDistance < 0)
+            return
+        }
+
+        if gestureAxis == .horizontal {
+            suppressesMomentum = true
+            return
+        }
+
+        super.scrollWheel(with: event)
+    }
+
+    private var commitDistance: CGFloat {
+        min(max(bounds.width * 0.12, 120), 180)
+    }
+
+    private func resolveGestureAxisIfNeeded() {
+        guard gestureAxis == .undecided else { return }
+        let horizontal = abs(horizontalDistance)
+        let vertical = abs(verticalDistance)
+        guard max(horizontal, vertical) >= 8 else { return }
+
+        if horizontal > vertical * 1.15 {
+            gestureAxis = .horizontal
+        } else if vertical > horizontal * 1.15 {
+            gestureAxis = .vertical
+        }
+    }
+
+    private func resetGesture() {
+        horizontalDistance = 0
+        verticalDistance = 0
+        gestureAxis = .undecided
+    }
+
+    private enum GestureAxis {
+        case undecided
+        case horizontal
+        case vertical
     }
 }
 #else
