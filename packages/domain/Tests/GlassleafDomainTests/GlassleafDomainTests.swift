@@ -15,6 +15,11 @@ func legacyReaderPreferencesDecode() throws {
     #expect(preferences.alignment == .leading)
 }
 
+@Test
+func readerPreferencesDefaultToScrolling() {
+    #expect(ReaderPreferences().mode == .scrolling)
+}
+
 @Test("Nested smart-collection predicates honor all and any groups")
 func nestedSmartCollectionRules() {
     let book = Book(title: "Field Notes", author: "Ada", isFavorite: true, tags: ["Research"])

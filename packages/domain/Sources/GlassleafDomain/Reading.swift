@@ -40,7 +40,7 @@ public struct ReaderPreferences: Codable, Hashable, Sendable {
         horizontalMargin: Double = 28,
         alignment: ReaderTextAlignment = .leading,
         theme: ReaderTheme = .automatic,
-        mode: ReadingMode = .paginated
+        mode: ReadingMode = .scrolling
     ) {
         self.fontFamily = fontFamily
         self.fontScale = min(max(fontScale, 0.8), 2)
@@ -64,7 +64,7 @@ public struct ReaderPreferences: Codable, Hashable, Sendable {
             horizontalMargin: try values.decodeIfPresent(Double.self, forKey: .horizontalMargin) ?? 28,
             alignment: try values.decodeIfPresent(ReaderTextAlignment.self, forKey: .alignment) ?? .leading,
             theme: try values.decodeIfPresent(ReaderTheme.self, forKey: .theme) ?? .automatic,
-            mode: try values.decodeIfPresent(ReadingMode.self, forKey: .mode) ?? .paginated
+            mode: try values.decodeIfPresent(ReadingMode.self, forKey: .mode) ?? .scrolling
         )
     }
 
