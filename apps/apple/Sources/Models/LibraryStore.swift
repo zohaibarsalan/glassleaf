@@ -340,6 +340,14 @@ final class LibraryStore {
         for id in ids { updateBook(id: id) { $0.collectionIDs.remove(collectionID) } }
     }
 
+    func removeAllCollections(from ids: Set<UUID>) {
+        for id in ids { updateBook(id: id) { $0.collectionIDs.removeAll() } }
+    }
+
+    func removeAllTags(from ids: Set<UUID>) {
+        for id in ids { updateBook(id: id) { $0.tagIDs.removeAll() } }
+    }
+
     func createFolder(name: String, parentID: UUID? = nil) {
         guard let cleanName = validatedName(name) else { return }
         folders.append(Folder(name: cleanName, parentID: parentID, sortOrder: folders.count))
@@ -425,8 +433,9 @@ final class LibraryStore {
         series[index].coverBookID = coverBookID
         series[index].updatedAt = .now
         let memberIDs = Set(orderedBookIDs)
-        for book in books where book.seriesID == id && !memberIDs.contains(book.id) {
-            updateBook(id: book.id) { value in
+        let removedBookIDs = books.filter { $0.seriesID == id && !memberIDs.contains($0.id) }.map(\.id)
+        for bookID in removedBookIDs {
+            updateBook(id: bookID) { value in
                 value.seriesID = nil
                 value.seriesIndex = nil
             }

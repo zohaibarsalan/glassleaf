@@ -16,6 +16,7 @@ struct SmartCollectionEditor: View {
     @State private var seriesID: UUID?
     @State private var author: String
     @State private var seriesQuery: String
+    @State private var preservedAdvancedRules: [SmartCollectionRule]
 
     init(store: LibraryStore, collection: SmartCollection? = nil) {
         self.store = store
@@ -32,6 +33,7 @@ struct SmartCollectionEditor: View {
         _seriesID = State(initialValue: state.seriesID)
         _author = State(initialValue: state.author)
         _seriesQuery = State(initialValue: state.seriesQuery)
+        _preservedAdvancedRules = State(initialValue: state.preservedAdvancedRules)
     }
 
     var body: some View {
@@ -90,6 +92,13 @@ struct SmartCollectionEditor: View {
                 Section("Metadata") {
                     TextField("Author contains", text: $author)
                 }
+
+                if !preservedAdvancedRules.isEmpty {
+                    Section("Advanced Rules") {
+                        Text("\(preservedAdvancedRules.count) nested exclusion rule(s) will be preserved unchanged.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .formStyle(.grouped)
             .navigationTitle(collection == nil ? "New Smart Collection" : "Edit Smart Collection")
@@ -105,7 +114,7 @@ struct SmartCollectionEditor: View {
     }
 
     private var rules: [SmartCollectionRule] {
-        var values: [SmartCollectionRule] = []
+        var values = preservedAdvancedRules
         switch favoriteRule {
         case .any: break
         case .favorites: values.append(.favorite(true))
@@ -159,6 +168,7 @@ private struct SmartRuleEditorState {
     var seriesID: UUID?
     var author = ""
     var seriesQuery = ""
+    var preservedAdvancedRules: [SmartCollectionRule] = []
 
     init(rule: SmartCollectionRule?) {
         guard var rule else { return }
@@ -182,9 +192,10 @@ private struct SmartRuleEditorState {
 
     private mutating func absorb(_ rule: SmartCollectionRule) {
         switch rule {
-        case .all(let rules), .any(let rules): rules.forEach { absorb($0) }
-        case .not: break
-        case .tag: break
+        case .all(let rules), .any(let rules):
+            for child in rules { absorb(child) }
+        case .not: preservedAdvancedRules.append(rule)
+        case .tag: preservedAdvancedRules.append(rule)
         case .tagID(let id): tagIDs.insert(id)
         case .folder(let id): folderID = id
         case .collection(let id): collectionIDs.insert(id)

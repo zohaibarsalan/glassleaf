@@ -180,30 +180,40 @@ struct LibraryView: View {
                 }
             }
             Menu("Collect", systemImage: "rectangle.stack") {
-                ForEach(store.collections) { collection in
-                    Button {
-                        if selectedBooksAllContain(collectionID: collection.id) {
-                            store.removeCollection(collection.id, from: store.selectedBookIDs)
-                        } else {
-                            store.assignCollection(collection.id, to: store.selectedBookIDs)
+                Section("Toggle Membership") {
+                    ForEach(store.collections) { collection in
+                        Button {
+                            if selectedBooksAllContain(collectionID: collection.id) {
+                                store.removeCollection(collection.id, from: store.selectedBookIDs)
+                            } else {
+                                store.assignCollection(collection.id, to: store.selectedBookIDs)
+                            }
+                        } label: {
+                            Label(collection.name, systemImage: selectedBooksAllContain(collectionID: collection.id) ? "checkmark" : "plus")
                         }
-                    } label: {
-                        Label(collection.name, systemImage: selectedBooksAllContain(collectionID: collection.id) ? "checkmark" : "plus")
                     }
+                }
+                Button("Remove from All Collections", systemImage: "minus.circle") {
+                    store.removeAllCollections(from: store.selectedBookIDs)
                 }
             }
             Menu("Tag", systemImage: "tag") {
                 Button("New Tag…", systemImage: "plus") { showsBatchTagEditor = true }
-                ForEach(store.tags) { tag in
-                    Button {
-                        if selectedBooksAllContain(tagID: tag.id) {
-                            store.removeTag(tag.id, from: store.selectedBookIDs)
-                        } else {
-                            store.assignTag(tag.id, to: store.selectedBookIDs)
+                Section("Toggle Membership") {
+                    ForEach(store.tags) { tag in
+                        Button {
+                            if selectedBooksAllContain(tagID: tag.id) {
+                                store.removeTag(tag.id, from: store.selectedBookIDs)
+                            } else {
+                                store.assignTag(tag.id, to: store.selectedBookIDs)
+                            }
+                        } label: {
+                            Label(tag.name, systemImage: selectedBooksAllContain(tagID: tag.id) ? "checkmark" : "plus")
                         }
-                    } label: {
-                        Label(tag.name, systemImage: selectedBooksAllContain(tagID: tag.id) ? "checkmark" : "plus")
                     }
+                }
+                Button("Remove All Tags", systemImage: "minus.circle") {
+                    store.removeAllTags(from: store.selectedBookIDs)
                 }
             }
             Menu("Series", systemImage: "square.stack.3d.up") {
