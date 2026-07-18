@@ -98,16 +98,45 @@ struct EPUBReaderView: View {
     }
 
     private var readerChrome: some View {
-        VStack {
-            topControls
-            Spacer()
-            bottomControls
+        ZStack {
+            VStack {
+                topControls
+                Spacer()
+                bottomControls
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .padding(.bottom, 14)
+
+#if os(macOS)
+            if horizontalSizeClass != .compact {
+                edgeNavigationControls
+            }
+#endif
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
         .foregroundStyle(.primary)
     }
+
+#if os(macOS)
+    private var edgeNavigationControls: some View {
+        HStack {
+            EPUBEdgeNavigationButton("Previous Page", systemImage: "chevron.left") {
+                navigator.previous()
+                revealControls()
+            }
+            .disabled(navigator.chapterIndex == 0 && navigator.chapterProgress <= 0.001)
+
+            Spacer()
+
+            EPUBEdgeNavigationButton("Next Page", systemImage: "chevron.right") {
+                navigator.next()
+                revealControls()
+            }
+            .disabled(navigator.chapterIndex == max(links.count - 1, 0) && navigator.chapterProgress >= 0.999)
+        }
+        .padding(.horizontal, 8)
+    }
+#endif
 
     private var topControls: some View {
         ZStack(alignment: .top) {
@@ -747,6 +776,32 @@ private struct EPUBChromeButton: View {
         .help(title)
     }
 }
+
+#if os(macOS)
+private struct EPUBEdgeNavigationButton: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    init(_ title: String, systemImage: String, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 24, weight: .medium))
+                .frame(width: 48, height: 76)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .help(title)
+    }
+}
+#endif
 
 private extension ReaderTheme {
     var cssBackground: String {
