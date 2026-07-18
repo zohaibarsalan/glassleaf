@@ -714,6 +714,7 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
     private var preloadedResource: URL?
     private var isPreloadedChapterReady = false
     private let pageClickGesture = NSClickGestureRecognizer()
+    private var chapterKeyMonitor: Any?
 
     init(navigator: PublicationNavigator) {
         let primary = Self.makeWebView(navigator: navigator)
@@ -736,6 +737,15 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
         secondaryWebView.frame = bounds
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil {
+            removeChapterKeyMonitor()
+        } else {
+            installChapterKeyMonitorIfNeeded()
+        }
+    }
+
     private func configureReadingClick() {
         pageClickGesture.target = self
         pageClickGesture.action = #selector(handlePageClick)
@@ -747,6 +757,43 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
 
     @objc private func handlePageClick() {
         navigator?.onTap?()
+    }
+
+    private func installChapterKeyMonitorIfNeeded() {
+        guard chapterKeyMonitor == nil else { return }
+        chapterKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.shouldHandleChapterKey(event) else { return event }
+            switch event.specialKey {
+            case .rightArrow:
+                self.navigator?.navigateChapter(forward: true)
+                return nil
+            case .leftArrow:
+                self.navigator?.navigateChapter(forward: false)
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func removeChapterKeyMonitor() {
+        guard let chapterKeyMonitor else { return }
+        NSEvent.removeMonitor(chapterKeyMonitor)
+        self.chapterKeyMonitor = nil
+    }
+
+    private func shouldHandleChapterKey(_ event: NSEvent) -> Bool {
+        let navigationModifiers: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        guard event.window === window,
+              !event.isARepeat,
+              event.modifierFlags.intersection(navigationModifiers).isEmpty,
+              event.specialKey == .leftArrow || event.specialKey == .rightArrow
+        else { return false }
+
+        guard let responder = window?.firstResponder else { return true }
+        if let textView = responder as? NSTextView, textView.isFieldEditor { return false }
+        guard let responderView = responder as? NSView else { return true }
+        return responderView === self || responderView.isDescendant(of: self)
     }
 
     func gestureRecognizer(
