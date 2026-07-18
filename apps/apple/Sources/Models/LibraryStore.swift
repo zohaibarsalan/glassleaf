@@ -517,14 +517,25 @@ final class LibraryStore {
 }
 
 private enum ReaderPreferenceStore {
-    private static let key = "reader-preferences-v1"
+    private static let key = "reader-preferences-v2"
+    private static let legacyKey = "reader-preferences-v1"
 
     static func load() -> ReaderPreferences {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let value = try? JSONDecoder().decode(ReaderPreferences.self, from: data) else {
+        if let data = UserDefaults.standard.data(forKey: key),
+           let value = try? JSONDecoder().decode(ReaderPreferences.self, from: data) {
+            return value
+        }
+
+        guard let data = UserDefaults.standard.data(forKey: legacyKey),
+              var legacyValue = try? JSONDecoder().decode(ReaderPreferences.self, from: data) else {
             return ReaderPreferences()
         }
-        return value
+
+        // Paper used to be the implicit default, so existing installs should
+        // gain system-aware behavior without having to find the new setting.
+        if legacyValue.theme == .paper { legacyValue.theme = .automatic }
+        save(legacyValue)
+        return legacyValue
     }
 
     static func save(_ preferences: ReaderPreferences) {
