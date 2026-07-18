@@ -4,6 +4,7 @@ import SwiftUI
 struct ReaderSettingsView: View {
     @Binding var preferences: ReaderPreferences
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -84,13 +85,17 @@ struct ReaderSettingsView: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(theme.background)
+                    .fill(theme.background(for: colorScheme))
                 Circle()
                     .strokeBorder(.primary.opacity(0.18), lineWidth: 1)
                 if preferences.theme == theme {
                     Image(systemName: "checkmark")
                         .font(.body.weight(.bold))
-                        .foregroundStyle(theme.foreground)
+                        .foregroundStyle(theme.foreground(for: colorScheme))
+                } else if theme == .automatic {
+                    Image(systemName: "circle.lefthalf.filled")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(theme.foreground(for: colorScheme))
                 }
             }
             .frame(width: 44, height: 44)
@@ -98,12 +103,14 @@ struct ReaderSettingsView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(theme.accessibilityName)
         .accessibilityAddTraits(preferences.theme == theme ? .isSelected : [])
+        .help(theme.accessibilityName)
     }
 }
 
 private extension ReaderTheme {
     var accessibilityName: String {
         switch self {
+        case .automatic: "Automatic theme"
         case .paper: "Paper theme"
         case .sepia: "Sepia theme"
         case .night: "Night theme"

@@ -55,6 +55,7 @@ let preferences = ReaderPreferences(
 check(preferences.fontScale == 2, "font scale has a legible maximum")
 check(preferences.lineSpacing == 2, "line spacing has a legible minimum")
 check(preferences.horizontalMargin == 72, "reader margins have a useful maximum")
+check(preferences.theme == .automatic, "reader theme follows the system by default")
 
 let legacyPreferences = try JSONDecoder().decode(
     ReaderPreferences.self,

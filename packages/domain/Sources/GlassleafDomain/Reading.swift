@@ -39,7 +39,7 @@ public struct ReaderPreferences: Codable, Hashable, Sendable {
         lineSpacing: Double = 8,
         horizontalMargin: Double = 28,
         alignment: ReaderTextAlignment = .leading,
-        theme: ReaderTheme = .paper,
+        theme: ReaderTheme = .automatic,
         mode: ReadingMode = .paginated
     ) {
         self.fontFamily = fontFamily
@@ -63,7 +63,7 @@ public struct ReaderPreferences: Codable, Hashable, Sendable {
             lineSpacing: try values.decodeIfPresent(Double.self, forKey: .lineSpacing) ?? 8,
             horizontalMargin: try values.decodeIfPresent(Double.self, forKey: .horizontalMargin) ?? 28,
             alignment: try values.decodeIfPresent(ReaderTextAlignment.self, forKey: .alignment) ?? .leading,
-            theme: try values.decodeIfPresent(ReaderTheme.self, forKey: .theme) ?? .paper,
+            theme: try values.decodeIfPresent(ReaderTheme.self, forKey: .theme) ?? .automatic,
             mode: try values.decodeIfPresent(ReadingMode.self, forKey: .mode) ?? .paginated
         )
     }
@@ -89,6 +89,7 @@ public enum ReaderFont: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 public enum ReaderTheme: String, Codable, CaseIterable, Identifiable, Sendable {
+    case automatic
     case paper
     case sepia
     case night

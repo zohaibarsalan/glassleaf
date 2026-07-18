@@ -14,6 +14,7 @@ struct EPUBReaderView: View {
     @State private var showsNoteEditor = false
     @State private var hideControlsTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(book: Book, store: LibraryStore) {
@@ -27,11 +28,16 @@ struct EPUBReaderView: View {
     private var progress: Double { navigator.overallProgress(chapterCount: links.count) }
     private var locator: String { navigator.locator(links: links) }
     private var isBookmarked: Bool { store.isBookmarked(bookID: book.id, locator: locator) }
+    private var resolvedPreferences: ReaderPreferences {
+        var value = preferences
+        value.theme = preferences.theme.resolved(for: colorScheme)
+        return value
+    }
 
     var body: some View {
         ZStack {
-            preferences.theme.background.ignoresSafeArea()
-            PublicationWebView(book: book, preferences: preferences, annotations: annotations, navigator: navigator)
+            preferences.theme.background(for: colorScheme).ignoresSafeArea()
+            PublicationWebView(book: book, preferences: resolvedPreferences, annotations: annotations, navigator: navigator)
                 .ignoresSafeArea()
 
             if !navigator.isReady {
@@ -43,7 +49,7 @@ struct EPUBReaderView: View {
             if controlsVisible { readerChrome.transition(.opacity) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(preferences.theme.background)
+        .background(preferences.theme.background(for: colorScheme))
         .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: controlsVisible)
         .modifier(ReaderSystemChromeModifier(controlsVisible: controlsVisible))
         .onAppear {
@@ -54,7 +60,12 @@ struct EPUBReaderView: View {
         .onDisappear { hideControlsTask?.cancel() }
         .onChange(of: preferences) { _, value in
             store.updateReaderPreferences(value)
-            navigator.apply(preferences: value)
+            var resolved = value
+            resolved.theme = value.theme.resolved(for: colorScheme)
+            navigator.apply(preferences: resolved)
+        }
+        .onChange(of: colorScheme) { _, _ in
+            navigator.apply(preferences: resolvedPreferences)
         }
         .sheet(isPresented: $showsContents) {
             EPUBContentsView(book: book, store: store, selectedChapter: navigator.chapterIndex) { index in
@@ -503,10 +514,10 @@ private struct EPUBChromeButton: View {
 
 private extension ReaderTheme {
     var cssBackground: String {
-        switch self { case .paper: "#F2EFE6"; case .sepia: "#E3D1AD"; case .night: "#1A1C21"; case .black: "#000000" }
+        switch self { case .automatic, .paper: "#F2EFE6"; case .sepia: "#E3D1AD"; case .night: "#1A1C21"; case .black: "#000000" }
     }
     var cssForeground: String {
-        switch self { case .paper: "#24211C"; case .sepia: "#332619"; case .night: "#DBDBD6"; case .black: "#D6D6D1" }
+        switch self { case .automatic, .paper: "#24211C"; case .sepia: "#332619"; case .night: "#DBDBD6"; case .black: "#D6D6D1" }
     }
 }
 

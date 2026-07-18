@@ -19,9 +19,10 @@ private struct PrototypeReaderView: View {
     @Bindable var store: LibraryStore
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    @State private var preferences = ReaderPreferences()
+    @State private var preferences: ReaderPreferences
     @State private var chapterIndex = 0
     @State private var pageIndex = 0
     @State private var controlsVisible = true
@@ -29,6 +30,12 @@ private struct PrototypeReaderView: View {
     @State private var showsContents = false
     @State private var showsSettings = false
     @State private var hideControlsTask: Task<Void, Never>?
+
+    init(book: Book, store: LibraryStore) {
+        self.book = book
+        self.store = store
+        _preferences = State(initialValue: store.readerPreferences)
+    }
 
     private var chapter: ReaderChapter {
         ReaderSample.chapters[chapterIndex]
@@ -45,7 +52,7 @@ private struct PrototypeReaderView: View {
 
     var body: some View {
         ZStack {
-            preferences.theme.background
+            preferences.theme.background(for: colorScheme)
                 .ignoresSafeArea()
 
             readingCanvas
@@ -55,7 +62,7 @@ private struct PrototypeReaderView: View {
                     .transition(.opacity)
             }
         }
-        .foregroundStyle(preferences.theme.foreground)
+        .foregroundStyle(preferences.theme.foreground(for: colorScheme))
         .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: controlsVisible)
         .modifier(ReaderSystemChromeModifier(controlsVisible: controlsVisible))
         .onAppear {
@@ -64,6 +71,9 @@ private struct PrototypeReaderView: View {
         }
         .onDisappear {
             hideControlsTask?.cancel()
+        }
+        .onChange(of: preferences) { _, value in
+            store.updateReaderPreferences(value)
         }
         .sheet(isPresented: $showsContents) {
             ReaderContentsView(selectedChapter: chapterIndex) { index in
@@ -389,8 +399,22 @@ private extension ReaderFont {
 }
 
 extension ReaderTheme {
+    func resolved(for colorScheme: ColorScheme) -> ReaderTheme {
+        guard self == .automatic else { return self }
+        return colorScheme == .dark ? .night : .paper
+    }
+
+    func background(for colorScheme: ColorScheme) -> Color {
+        resolved(for: colorScheme).background
+    }
+
+    func foreground(for colorScheme: ColorScheme) -> Color {
+        resolved(for: colorScheme).foreground
+    }
+
     var background: Color {
         switch self {
+        case .automatic: Color(red: 0.95, green: 0.94, blue: 0.90)
         case .paper: Color(red: 0.95, green: 0.94, blue: 0.90)
         case .sepia: Color(red: 0.89, green: 0.82, blue: 0.68)
         case .night: Color(red: 0.10, green: 0.11, blue: 0.13)
@@ -400,6 +424,7 @@ extension ReaderTheme {
 
     var foreground: Color {
         switch self {
+        case .automatic: Color(red: 0.14, green: 0.13, blue: 0.11)
         case .paper: Color(red: 0.14, green: 0.13, blue: 0.11)
         case .sepia: Color(red: 0.20, green: 0.15, blue: 0.10)
         case .night: Color(red: 0.86, green: 0.86, blue: 0.84)
