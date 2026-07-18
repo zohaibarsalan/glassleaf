@@ -1,0 +1,22 @@
+# Apple build products and local Xcode state
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Credentials and user content
+*.epub
+*.p12
+*.mobileprovision
+.env
+.env.*
+!.env.example

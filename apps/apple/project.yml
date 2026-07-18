@@ -1,0 +1,50 @@
+name: Glassleaf
+
+options:
+  minimumXcodeGenVersion: 2.45.0
+  bundleIdPrefix: app.glassleaf
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+
+packages:
+  GlassleafDomain:
+    path: ../../packages/domain
+
+targets:
+  Glassleaf:
+    type: application
+    platform: auto
+    supportedDestinations:
+      - iOS
+      - macOS
+    sources:
+      - Sources
+    dependencies:
+      - package: GlassleafDomain
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.glassleaf.reader
+        PRODUCT_NAME: Glassleaf
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: 6.0
+        SWIFT_STRICT_CONCURRENCY: complete
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_CFBundleDisplayName: Glassleaf
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.books
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
+    scheme:
+      gatherCoverageData: true
+
+schemes:
+  Glassleaf:
+    build:
+      targets:
+        Glassleaf: all
+    run:
+      config: Debug
+    test:
+      config: Debug
