@@ -4,9 +4,20 @@ This file is the canonical starting point for AI agents and contributors working
 
 ## Project status
 
-Glassleaf is in product-definition and repository-bootstrap stage. No application code or deployment exists yet.
+Glassleaf is in an early local-native prototype stage. Application code exists; no deployment or cloud infrastructure exists.
 
 The working product name is **Glassleaf**. The repository name is `glassleaf`.
+
+### Implementation snapshot
+
+- The universal SwiftUI project is generated from `apps/apple/project.yml` and targets iPhone, iPad, and Mac.
+- `packages/domain` contains the provider-neutral Swift model and executable behavior checks.
+- The application has an adaptive library shell and a visually validated Liquid Glass reader prototype.
+- Local EPUB import preserves original files, streams SHA-256 hashes for duplicate detection, and persists an atomic JSON catalog.
+- Imported EPUB metadata and covers are not extracted yet.
+- Reader content is generated fixture text; Readium rendering has not been integrated or verified.
+- iPhone and iPad builds have not been run because the current development machine does not have a full Xcode installation.
+- CloudKit, Google Drive, web, synchronization, migration, and deployment have not started.
 
 ## Product vision
 

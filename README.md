@@ -4,7 +4,28 @@ Glassleaf is a private, native-feeling EPUB library and reader for iPhone, iPad,
 
 The goal is straightforward: deliver the simplicity and polish of Apple Books with substantially better organization, user-controlled storage, and no lock-in.
 
-> Status: product definition and repository bootstrap. Application code has not been scaffolded yet.
+> Status: early local-native prototype. The universal SwiftUI project, provider-neutral domain, persistent local catalog, EPUB import path, adaptive library, and reader experience are scaffolded. Real EPUB rendering is not integrated yet.
+
+## Current implementation
+
+- One SwiftUI application target for iPhone, iPad, and Mac, beginning at iOS 26, iPadOS 26, and macOS 26.
+- Adaptive home, sidebar, library grid/list, search, reading-state filters, favorites, details, and empty states.
+- A Liquid Glass reader prototype with paginated/scrolling modes, chapter search, progress, bookmarks, themes, and typography controls.
+- Local EPUB selection, format preflight, streamed SHA-256 duplicate detection, original-file preservation, and atomic catalog persistence.
+- A pure Swift domain package with executable behavior checks.
+
+The reader currently uses generated fixture text. Readium integration, EPUB metadata/cover extraction, production pagination, annotations, and cloud providers remain future work.
+
+## Local development
+
+Generate the Xcode project and run the checks:
+
+```sh
+./scripts/check-apple.sh
+open apps/apple/Glassleaf.xcodeproj
+```
+
+The check script works with the macOS command-line SDK plus XcodeGen. Building iPhone and iPad destinations, using SwiftUI previews, signing, and simulator testing require a full current Xcode installation.
 
 ## Product direction
 
@@ -57,24 +78,23 @@ Vercel hosts only the web application shell and minimal secure endpoints. EPUB f
 - Users retain complete export access to original EPUBs and library metadata.
 - Optional device authentication and privacy mode are planned.
 
-## Repository plan
+## Repository layout
 
-The exact code layout will be established after the technical spikes, but the intended shape is:
+The current layout is:
 
 ```text
 glassleaf/
 ├── apps/
-│   ├── apple/          # Universal SwiftUI app
-│   └── web/            # Vercel-hosted web companion
+│   └── apple/          # Universal SwiftUI app and generated Xcode project
 ├── packages/
-│   ├── domain/         # Provider-neutral schemas and rules
-│   └── sync-spec/      # Portable manifest and sync fixtures
-├── docs/
+│   └── domain/         # Provider-neutral schemas and checks
+├── docs/decisions/     # Accepted architecture decisions
+├── scripts/            # Repeatable verification
 ├── CONTEXT.md
 └── README.md
 ```
 
-Native and web implementations may use different languages, but they must share a versioned domain and sync specification.
+The planned web app and portable sync-spec package will be added only when their delivery phases begin. Native and web implementations may use different languages, but they must share a versioned domain and sync specification.
 
 ## Planned technical spikes
 
@@ -85,9 +105,11 @@ Native and web implementations may use different languages, but they must share 
 5. Exercise interrupted, duplicate, offline, migration, and conflict scenarios.
 6. Prototype the core Liquid Glass library and reader surfaces.
 
+Spike 6 has a visually checked macOS prototype. The other spikes, production EPUB rendering, and iPhone/iPad runtime validation remain open.
+
 ## Development prerequisites
 
-Expected later, once implementation begins:
+Current and future prerequisites:
 
 - Current Xcode and Apple SDKs.
 - An active Apple Developer Program membership for CloudKit entitlements and durable iPhone deployment.
@@ -100,4 +122,3 @@ Do not add credentials, provisioning profiles, private keys, OAuth secrets, or u
 ## Contributor guidance
 
 Read [CONTEXT.md](./CONTEXT.md) before working on the project. It contains the current product specification, architecture boundaries, privacy requirements, UI direction, sync semantics, non-goals, and unresolved decisions.
-
