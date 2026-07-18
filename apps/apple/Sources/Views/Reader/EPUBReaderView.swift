@@ -49,8 +49,13 @@ struct EPUBReaderView: View {
     var body: some View {
         ZStack {
             preferences.theme.background(for: colorScheme).ignoresSafeArea()
+#if os(macOS)
+            PublicationWebView(book: book, preferences: resolvedPreferences, annotations: annotations, navigator: navigator)
+                .ignoresSafeArea(.container, edges: [.top, .bottom, .leading])
+#else
             PublicationWebView(book: book, preferences: resolvedPreferences, annotations: annotations, navigator: navigator)
                 .ignoresSafeArea()
+#endif
 
             if !navigator.hasLoadedContent {
                 ProgressView("Opening \(book.title)…")
@@ -317,8 +322,13 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
         case .paginated:
             forward ? next() : previous()
         case .scrolling:
-            goToChapter(chapterIndex + (forward ? 1 : -1))
+            navigateChapter(forward: forward)
         }
+    }
+
+    func navigateChapter(forward: Bool) {
+        guard !isTransitioning else { return }
+        goToChapter(chapterIndex + (forward ? 1 : -1))
     }
 
     func seek(to fraction: Double, chapterCount: Int) {
@@ -520,6 +530,23 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     private static func bootstrapScript(preferences: ReaderPreferences, progress: Double) -> String {
+#if os(macOS)
+        let keyboardNavigation = """
+          if (event.key === 'PageDown') {
+            event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('next');
+          } else if (event.key === 'PageUp') {
+            event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('previous');
+          }
+        """
+#else
+        let keyboardNavigation = """
+          if (event.key === 'ArrowRight' || event.key === 'PageDown') {
+            event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('next');
+          } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+            event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('previous');
+          }
+        """
+#endif
         return """
         (() => {
           let viewport = document.querySelector('meta[name="viewport"]');
@@ -554,11 +581,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
           };
           addEventListener('keydown', event => {
             if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-            if (event.key === 'ArrowRight' || event.key === 'PageDown') {
-              event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('next');
-            } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-              event.preventDefault(); webkit.messageHandlers.glassleafPage.postMessage('previous');
-            }
+            \(keyboardNavigation)
           });
           addEventListener('scroll', report, {passive: true});
           document.addEventListener('selectionchange', () => webkit.messageHandlers.glassleafSelection.postMessage(String(getSelection()).slice(0, 10000)));
@@ -830,6 +853,7 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
         let webView = TrackpadAwareWebView(frame: .zero, configuration: makePublicationConfiguration(for: navigator))
         webView.navigationDelegate = navigator
         webView.onHorizontalSwipe = { [weak navigator] forward in navigator?.navigateWithTrackpad(forward: forward) }
+        webView.onChapterKeyNavigation = { [weak navigator] forward in navigator?.navigateChapter(forward: forward) }
         webView.setValue(false, forKey: "drawsBackground")
         return webView
     }
@@ -837,12 +861,30 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
 
 private final class TrackpadAwareWebView: WKWebView {
     var onHorizontalSwipe: ((Bool) -> Void)?
+    var onChapterKeyNavigation: ((Bool) -> Void)?
 
     private var horizontalDistance: CGFloat = 0
     private var verticalDistance: CGFloat = 0
     private var gestureAxis: GestureAxis = .undecided
     private var didCommitGesture = false
     private var suppressesMomentum = false
+
+    override func keyDown(with event: NSEvent) {
+        let navigationModifiers: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        guard !event.isARepeat, event.modifierFlags.intersection(navigationModifiers).isEmpty else {
+            super.keyDown(with: event)
+            return
+        }
+
+        switch event.specialKey {
+        case .rightArrow:
+            onChapterKeyNavigation?(true)
+        case .leftArrow:
+            onChapterKeyNavigation?(false)
+        default:
+            super.keyDown(with: event)
+        }
+    }
 
     override func scrollWheel(with event: NSEvent) {
         if !event.momentumPhase.isEmpty {
