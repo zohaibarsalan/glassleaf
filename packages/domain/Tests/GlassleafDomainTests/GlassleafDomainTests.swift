@@ -22,13 +22,14 @@ func readerPreferencesDefaultToScrolling() {
 
 @Test("Nested smart-collection predicates honor all and any groups")
 func nestedSmartCollectionRules() {
-    let book = Book(title: "Field Notes", author: "Ada", isFavorite: true, tags: ["Research"])
+    let tag = Tag(name: "Research")
+    let book = Book(title: "Field Notes", author: "Ada", isFavorite: true, tagIDs: [tag.id])
     let rule = SmartCollectionRule.all([
         .favorite(true),
-        .any([.tag("research"), .authorContains("nobody")]),
+        .any([.tagID(tag.id), .authorContains("nobody")]),
     ])
     #expect(rule.includes(book))
-    #expect(!SmartCollectionRule.all([.favorite(false), .tag("research")]).includes(book))
+    #expect(!SmartCollectionRule.all([.favorite(false), .tagID(tag.id)]).includes(book))
 }
 
 @Test("Portable snapshots preserve the complete organization graph")
@@ -36,12 +37,15 @@ func portableSnapshotRoundTrip() throws {
     let parent = Folder(name: "Reference")
     let child = Folder(name: "Design", parentID: parent.id)
     let collection = BookCollection(name: "Favorites")
+    let uiTag = Tag(name: "UI")
+    let researchTag = Tag(name: "Research")
+    let series = Series(name: "Craft")
     let book = Book(
         title: "Interfaces",
         author: "Ada",
-        series: "Craft",
+        seriesID: series.id,
         seriesIndex: 2,
-        tags: ["UI", "Research"],
+        tagIDs: [uiTag.id, researchTag.id],
         folderID: child.id,
         collectionIDs: [collection.id]
     )
@@ -50,9 +54,10 @@ func portableSnapshotRoundTrip() throws {
     let original = LibrarySnapshot(
         books: [book],
         folders: [parent, child],
-        tags: [Tag(name: "UI"), Tag(name: "Research")],
+        tags: [uiTag, researchTag],
         collections: [collection],
-        smartCollections: [SmartCollection(name: "UI books", rule: .tag("ui"))],
+        series: [series],
+        smartCollections: [SmartCollection(name: "UI books", rule: .tagID(uiTag.id))],
         bookmarks: [bookmark],
         annotations: [note]
     )
@@ -60,6 +65,41 @@ func portableSnapshotRoundTrip() throws {
     let data = try JSONEncoder().encode(original)
     let restored = try JSONDecoder().decode(LibrarySnapshot.self, from: data)
     #expect(restored == original)
+}
+
+@Test("Legacy names migrate to canonical tag and series IDs")
+func legacyOrganizationIdentityMigration() {
+    let existingTag = Tag(name: "Research")
+    let legacyBook = Book(
+        title: "Legacy",
+        author: "Ada",
+        series: "Field Notes",
+        tags: ["research", "Reference"]
+    )
+    let snapshot = LibrarySnapshot(
+        schemaVersion: 2,
+        books: [legacyBook],
+        tags: [existingTag, Tag(name: "RESEARCH")],
+        smartCollections: [SmartCollection(name: "Research", rule: .tag("research"))]
+    )
+
+    let migrated = snapshot.migratingOrganizationIdentity()
+    let book = migrated.books[0]
+    #expect(migrated.schemaVersion == 3)
+    #expect(migrated.tags.filter { $0.normalizedName == existingTag.normalizedName }.count == 1)
+    #expect(book.tagIDs.count == 2)
+    #expect(book.seriesID == migrated.series.first?.id)
+    #expect(!book.hasLegacyOrganizationIdentity)
+    #expect(migrated.smartCollections[0].rule.includes(book, tags: migrated.tags, series: migrated.series))
+}
+
+@Test("Older series records receive cover and timestamp defaults")
+func legacySeriesDecode() throws {
+    let id = UUID()
+    let data = Data(#"{"id":"\#(id.uuidString)","name":"Field Notes","sortOrder":2}"#.utf8)
+    let decoded = try JSONDecoder().decode(Series.self, from: data)
+    #expect(decoded.coverBookID == nil)
+    #expect(decoded.updatedAt == .distantPast)
 }
 
 @Test("Every library sort can order equal-looking records without losing them")

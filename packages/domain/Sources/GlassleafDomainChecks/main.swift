@@ -95,20 +95,24 @@ check(decodedPublicationAsset == publicationAsset, "publication navigation survi
 
 let folder = Folder(name: "Research")
 let collection = BookCollection(name: "Summer")
+let tag = Tag(name: "Reference")
+let series = Series(name: "Field Notes")
 let organized = Book(
     title: "Organized",
     author: "Writer",
-    tags: ["Reference"],
+    seriesID: series.id,
+    tagIDs: [tag.id],
     folderID: folder.id,
     collectionIDs: [collection.id]
 )
-check(SmartCollectionRule.tag("reference").includes(organized), "smart tag rules ignore case")
+check(SmartCollectionRule.tagID(tag.id).includes(organized), "smart tag rules use stable identity")
+check(SmartCollectionRule.series(series.id).includes(organized), "smart series rules use stable identity")
 check(SmartCollectionRule.folder(folder.id).includes(organized), "smart folder rules match membership")
 check(SmartCollectionRule.collection(collection.id).includes(organized), "smart collection rules match membership")
 check(!organized.isInInbox, "organized books leave the inbox")
 check(Book(title: "New", author: "Writer").isInInbox, "unclassified books appear in the inbox")
 
-let snapshot = LibrarySnapshot(books: [organized], folders: [folder], collections: [collection])
+let snapshot = LibrarySnapshot(books: [organized], folders: [folder], tags: [tag], collections: [collection], series: [series])
 let snapshotData = try JSONEncoder().encode(snapshot)
 let decodedSnapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: snapshotData)
 check(decodedSnapshot.books == [organized], "portable snapshots preserve organized books")

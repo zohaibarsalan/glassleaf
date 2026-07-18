@@ -30,11 +30,12 @@ struct LocalLibraryCheck {
         let repository = LocalLibraryRepository(rootURL: library)
         let folder = Folder(name: "Research")
         let collection = BookCollection(name: "Reference Shelf")
+        let tag = Tag(name: "Generated")
         var organized = book
         organized.folderID = folder.id
         organized.collectionIDs = [collection.id]
-        organized.tags = ["Generated"]
-        try await repository.save(LibrarySnapshot(books: [organized], folders: [folder], collections: [collection]))
+        organized.tagIDs = [tag.id]
+        try await repository.save(LibrarySnapshot(books: [organized], folders: [folder], tags: [tag], collections: [collection]))
         let restored = try await repository.load()
         let metadataMatches = try await repository.searchBookIDs("generated")
         let folderMatches = try await repository.searchBookIDs("rese")
