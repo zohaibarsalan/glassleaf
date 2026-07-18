@@ -35,7 +35,9 @@ struct SidebarView: View {
         .listStyle(.sidebar)
         .contentMargins(.top, 8, for: .scrollContent)
         .navigationTitle("Glassleaf")
+#if os(macOS)
         .safeAreaInset(edge: .bottom) { storageStatus }
+#endif
         .alert(creationKind?.title ?? "New Item", isPresented: creationBinding) {
             TextField("Name", text: $draftName)
             Button("Cancel", role: .cancel) { resetEditor() }
@@ -159,6 +161,7 @@ struct SidebarView: View {
         .tag(destination)
     }
 
+#if os(macOS)
     private var storageStatus: some View {
         HStack(spacing: 10) {
             Image(systemName: "internaldrive")
@@ -173,6 +176,7 @@ struct SidebarView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
+#endif
 
     private var seriesNames: [String] {
         Array(Set(store.books.compactMap(\.series))).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
