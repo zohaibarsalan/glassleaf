@@ -31,6 +31,7 @@ struct LibraryView: View {
             }
         }
         .navigationTitle(destination.title(in: store))
+        .searchable(text: $store.searchText, prompt: "Title, author, series, folder, collection, or tag")
         .toolbar { libraryToolbar }
         .safeAreaInset(edge: .bottom) {
             if store.isSelecting { batchBar }

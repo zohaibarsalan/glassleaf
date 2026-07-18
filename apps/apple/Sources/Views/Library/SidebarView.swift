@@ -12,20 +12,18 @@ struct SidebarView: View {
     var body: some View {
         List(selection: selectionBinding) {
             Section {
-                sidebarSearch
                 row(.home, icon: "house", title: "Home")
-            }
-
-            Section("Library") {
-                row(.library(.all), icon: "books.vertical", title: "All Books", count: store.count(for: .library(.all)))
-                row(.inbox, icon: "tray", count: store.count(for: .inbox))
-                row(.library(.favorites), icon: "star", count: store.count(for: .library(.favorites)))
+                row(.library(.all), icon: "books.vertical", title: "Library")
+                if store.count(for: .inbox) > 0 {
+                    row(.inbox, icon: "tray", count: store.count(for: .inbox))
+                }
             }
 
             Section("Reading") {
-                row(.library(.reading), icon: "book.closed", title: "In Progress", count: store.count(for: .library(.reading)))
+                row(.library(.reading), icon: "bookmark", title: "Reading", count: store.count(for: .library(.reading)))
                 row(.library(.unread), icon: "circle", count: store.count(for: .library(.unread)))
                 row(.library(.finished), icon: "checkmark.circle", count: store.count(for: .library(.finished)))
+                row(.library(.favorites), icon: "star", count: store.count(for: .library(.favorites)))
             }
 
             organizationSection
@@ -35,7 +33,6 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .environment(\.defaultMinListRowHeight, 38)
         .navigationTitle("Glassleaf")
         .safeAreaInset(edge: .bottom) { storageStatus }
         .alert(creationKind?.title ?? "New Item", isPresented: creationBinding) {
@@ -69,10 +66,9 @@ struct SidebarView: View {
     }
 
     private var organizationSection: some View {
-        Section {
-            if !store.folders.isEmpty {
-                organizerLabel("Folders")
-            }
+        Section("Organize") {
+            Label("Folders", systemImage: "folder")
+                .foregroundStyle(.secondary)
             ForEach(store.folders.sorted(by: folderOrder)) { folder in
                 row(.folder(folder.id), icon: "folder", count: store.count(for: .folder(folder.id)), indentation: folderDepth(folder))
                     .dropDestination(for: String.self) { values, _ in
@@ -87,9 +83,8 @@ struct SidebarView: View {
                     }
             }
 
-            if !store.collections.isEmpty {
-                organizerLabel("Collections")
-            }
+            Label("Collections", systemImage: "rectangle.stack")
+                .foregroundStyle(.secondary)
             ForEach(store.collections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 row(.collection(collection.id), icon: "rectangle.stack", count: store.count(for: .collection(collection.id)))
                     .contextMenu {
@@ -98,9 +93,8 @@ struct SidebarView: View {
                     }
             }
 
-            if !store.tags.isEmpty {
-                organizerLabel("Tags")
-            }
+            Label("Tags", systemImage: "tag")
+                .foregroundStyle(.secondary)
             ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
                 row(.tag(tag.name), icon: "tag", count: store.count(for: .tag(tag.name)))
                     .contextMenu {
@@ -109,15 +103,15 @@ struct SidebarView: View {
                     }
             }
 
-            if !seriesNames.isEmpty {
-                organizerLabel("Series")
-            }
+            Label("Series", systemImage: "square.stack.3d.up")
+                .foregroundStyle(.secondary)
             ForEach(seriesNames, id: \.self) { name in
                 row(.series(name), icon: "square.stack.3d.up", count: store.count(for: .series(name)))
             }
 
             if !store.smartCollections.isEmpty {
-                organizerLabel("Smart Collections")
+                Label("Smart Collections", systemImage: "gearshape.2")
+                    .foregroundStyle(.secondary)
             }
             ForEach(store.smartCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 row(.smartCollection(collection.id), icon: "gearshape.2", count: store.count(for: .smartCollection(collection.id)))
@@ -140,32 +134,7 @@ struct SidebarView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .listRowInsets(.init(top: 2, leading: 12, bottom: 2, trailing: 12))
-        } header: {
-            Text("Organize")
         }
-    }
-
-    private var sidebarSearch: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Search", text: $store.searchText)
-                .textFieldStyle(.plain)
-            if !store.searchText.isEmpty {
-                Button("Clear Search", systemImage: "xmark.circle.fill") {
-                    store.searchText = ""
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 34)
-        .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 9))
-        .listRowInsets(.init(top: 5, leading: 8, bottom: 8, trailing: 8))
-        .accessibilityElement(children: .contain)
     }
 
     private func row(
@@ -175,13 +144,8 @@ struct SidebarView: View {
         count: Int? = nil,
         indentation: Int = 0
     ) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
-            Text(title ?? destination.title(in: store))
-                .lineLimit(1)
+        HStack {
+            Label(title ?? destination.title(in: store), systemImage: icon)
             Spacer()
             if let count {
                 Text(count, format: .number)
@@ -190,20 +154,8 @@ struct SidebarView: View {
             }
         }
         .padding(.leading, CGFloat(indentation * 14))
-        .frame(minHeight: 34)
         .contentShape(.rect)
-        .listRowInsets(.init(top: 2, leading: 12, bottom: 2, trailing: 12))
         .tag(destination)
-    }
-
-    private func organizerLabel(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.caption2.weight(.semibold))
-            .tracking(0.55)
-            .foregroundStyle(.tertiary)
-            .padding(.top, 7)
-            .listRowInsets(.init(top: 2, leading: 13, bottom: 0, trailing: 12))
-            .accessibilityAddTraits(.isHeader)
     }
 
     private var storageStatus: some View {
@@ -212,13 +164,13 @@ struct SidebarView: View {
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
                 Text("On This Device").font(.caption.weight(.medium))
-                Text("Indexed and available offline").font(.caption2).foregroundStyle(.secondary)
+                Text("Local library").font(.caption2).foregroundStyle(.secondary)
             }
             Spacer()
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     private var seriesNames: [String] {
