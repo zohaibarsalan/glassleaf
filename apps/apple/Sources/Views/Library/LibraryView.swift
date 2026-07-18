@@ -31,7 +31,6 @@ struct LibraryView: View {
             }
         }
         .navigationTitle(destination.title(in: store))
-        .searchable(text: $store.searchText, prompt: "Title, author, series, folder, collection, or tag")
         .toolbar { libraryToolbar }
         .safeAreaInset(edge: .bottom) {
             if store.isSelecting { batchBar }
@@ -118,38 +117,60 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if destination == .trash && !visibleBooks.isEmpty {
-                Button("Empty Trash", systemImage: "trash.slash", role: .destructive) { confirmsEmptyTrash = true }
-            }
             Button(store.isSelecting ? "Done" : "Select", systemImage: store.isSelecting ? "checkmark" : "checkmark.circle") {
                 store.isSelecting ? store.endSelecting() : (store.isSelecting = true)
             }
-            Menu("Sort", systemImage: "arrow.up.arrow.down") {
-                Picker("Sort", selection: $store.sort) {
-                    ForEach(LibrarySort.allCases) { option in
-                        Label(option.title, systemImage: option.systemImage).tag(option)
+            .labelStyle(.iconOnly)
+            .font(.body.weight(.semibold))
+            .frame(width: 32, height: 32)
+            .contentShape(.circle)
+            .focusEffectDisabled()
+
+            Menu("View Options", systemImage: "slider.horizontal.3") {
+                Section("Sort By") {
+                    Picker("Sort", selection: $store.sort) {
+                        ForEach(LibrarySort.allCases) { option in
+                            Label(option.title, systemImage: option.systemImage).tag(option)
+                        }
+                    }
+                }
+
+                Section("Layout") {
+                    Picker("Layout", selection: $store.layout) {
+                        Label("Grid", systemImage: "square.grid.2x2").tag(LibraryLayout.grid)
+                        Label("List", systemImage: "list.bullet").tag(LibraryLayout.list)
                     }
                 }
             }
-            layoutPicker
-            Button("Export Library", systemImage: "square.and.arrow.up") {
-                Task { await store.prepareExport() }
+            .labelStyle(.iconOnly)
+            .focusEffectDisabled()
+
+            Menu("More", systemImage: "ellipsis.circle") {
+                Button("Export Library", systemImage: "square.and.arrow.up") {
+                    Task { await store.prepareExport() }
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+
+                if destination == .trash && !visibleBooks.isEmpty {
+                    Divider()
+                    Button("Empty Trash", systemImage: "trash.slash", role: .destructive) {
+                        confirmsEmptyTrash = true
+                    }
+                }
             }
-            .keyboardShortcut("e", modifiers: [.command, .shift])
+            .labelStyle(.iconOnly)
+            .focusEffectDisabled()
             .help("Export original EPUBs, metadata, and reading data")
+
             Button("Import", systemImage: "plus") { store.requestImport() }
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                .frame(width: 32, height: 32)
+                .contentShape(.circle)
+                .focusEffectDisabled()
                 .keyboardShortcut("o", modifiers: .command)
                 .help("Import an EPUB")
         }
-    }
-
-    private var layoutPicker: some View {
-        Picker("Layout", selection: $store.layout) {
-            Label("Grid", systemImage: "square.grid.2x2").tag(LibraryLayout.grid)
-            Label("List", systemImage: "list.bullet").tag(LibraryLayout.list)
-        }
-        .pickerStyle(.segmented)
-        .fixedSize()
     }
 
     private var batchBar: some View {

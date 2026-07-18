@@ -1,5 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 struct AppRootView: View {
     @State private var store = LibraryStore.initial
@@ -85,7 +88,7 @@ struct AppRootView: View {
 
         return NavigationSplitView {
             SidebarView(store: store)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 248, max: 300)
+                .navigationSplitViewColumnWidth(min: 236, ideal: 264, max: 320)
         } detail: {
             Group {
                 switch store.selection {
@@ -97,6 +100,7 @@ struct AppRootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .modifier(LibraryWindowToolbarModifier())
         .dropDestination(for: URL.self) { urls, _ in
             let books = urls.filter { $0.pathExtension.lowercased() == "epub" }
             guard !books.isEmpty else { return false }
@@ -106,5 +110,34 @@ struct AppRootView: View {
         .sheet(item: $store.presentedBook) { book in
             BookDetailView(book: book, store: store)
         }
+    }
+}
+
+private struct LibraryWindowToolbarModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+#if os(macOS)
+        content
+            .toolbar(removing: .sidebarToggle)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button("Toggle Sidebar", systemImage: "sidebar.left") {
+                        NSApp.sendAction(
+                            #selector(NSSplitViewController.toggleSidebar(_:)),
+                            to: nil,
+                            from: nil
+                        )
+                    }
+                    .labelStyle(.iconOnly)
+                    .font(.body.weight(.semibold))
+                    .frame(width: 32, height: 32)
+                    .contentShape(.circle)
+                    .focusEffectDisabled()
+                    .help("Show or hide the sidebar")
+                }
+            }
+#else
+        content
+#endif
     }
 }

@@ -26,6 +26,11 @@ struct HomeView: View {
                 Button("Import", systemImage: "plus") {
                     store.requestImport()
                 }
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                .frame(width: 32, height: 32)
+                .contentShape(.circle)
+                .focusEffectDisabled()
                 .help("Import an EPUB")
             }
         }

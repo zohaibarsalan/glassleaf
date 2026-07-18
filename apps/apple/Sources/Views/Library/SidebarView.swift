@@ -12,16 +12,20 @@ struct SidebarView: View {
     var body: some View {
         List(selection: selectionBinding) {
             Section {
-                row(.home, icon: "house")
-                row(.library(.all), icon: "books.vertical", count: store.count(for: .library(.all)))
+                sidebarSearch
+                row(.home, icon: "house", title: "Home")
+            }
+
+            Section("Library") {
+                row(.library(.all), icon: "books.vertical", title: "All Books", count: store.count(for: .library(.all)))
                 row(.inbox, icon: "tray", count: store.count(for: .inbox))
+                row(.library(.favorites), icon: "star", count: store.count(for: .library(.favorites)))
             }
 
             Section("Reading") {
-                row(.library(.reading), icon: "bookmark", count: store.count(for: .library(.reading)))
+                row(.library(.reading), icon: "book.closed", title: "In Progress", count: store.count(for: .library(.reading)))
                 row(.library(.unread), icon: "circle", count: store.count(for: .library(.unread)))
                 row(.library(.finished), icon: "checkmark.circle", count: store.count(for: .library(.finished)))
-                row(.library(.favorites), icon: "star", count: store.count(for: .library(.favorites)))
             }
 
             organizationSection
@@ -30,6 +34,8 @@ struct SidebarView: View {
                 row(.trash, icon: "trash", count: store.count(for: .trash))
             }
         }
+        .listStyle(.sidebar)
+        .environment(\.defaultMinListRowHeight, 38)
         .navigationTitle("Glassleaf")
         .safeAreaInset(edge: .bottom) { storageStatus }
         .alert(creationKind?.title ?? "New Item", isPresented: creationBinding) {
@@ -64,6 +70,9 @@ struct SidebarView: View {
 
     private var organizationSection: some View {
         Section {
+            if !store.folders.isEmpty {
+                organizerLabel("Folders")
+            }
             ForEach(store.folders.sorted(by: folderOrder)) { folder in
                 row(.folder(folder.id), icon: "folder", count: store.count(for: .folder(folder.id)), indentation: folderDepth(folder))
                     .dropDestination(for: String.self) { values, _ in
@@ -78,6 +87,9 @@ struct SidebarView: View {
                     }
             }
 
+            if !store.collections.isEmpty {
+                organizerLabel("Collections")
+            }
             ForEach(store.collections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 row(.collection(collection.id), icon: "rectangle.stack", count: store.count(for: .collection(collection.id)))
                     .contextMenu {
@@ -86,6 +98,9 @@ struct SidebarView: View {
                     }
             }
 
+            if !store.tags.isEmpty {
+                organizerLabel("Tags")
+            }
             ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
                 row(.tag(tag.name), icon: "tag", count: store.count(for: .tag(tag.name)))
                     .contextMenu {
@@ -94,10 +109,16 @@ struct SidebarView: View {
                     }
             }
 
+            if !seriesNames.isEmpty {
+                organizerLabel("Series")
+            }
             ForEach(seriesNames, id: \.self) { name in
                 row(.series(name), icon: "square.stack.3d.up", count: store.count(for: .series(name)))
             }
 
+            if !store.smartCollections.isEmpty {
+                organizerLabel("Smart Collections")
+            }
             ForEach(store.smartCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 row(.smartCollection(collection.id), icon: "gearshape.2", count: store.count(for: .smartCollection(collection.id)))
                     .contextMenu {
@@ -105,27 +126,62 @@ struct SidebarView: View {
                         Button("Delete Smart Collection", systemImage: "trash", role: .destructive) { pendingDeletion = .smartCollection(collection.id) }
                     }
             }
-        } header: {
-            HStack {
-                Text("Organize")
-                Spacer()
-                Menu("Add organizer", systemImage: "plus") {
+
+            Menu {
+                Section("New Organizer") {
                     Button("Folder", systemImage: "folder.badge.plus") { beginCreation(.folder) }
                     Button("Collection", systemImage: "rectangle.stack.badge.plus") { beginCreation(.collection) }
                     Button("Tag", systemImage: "tag") { beginCreation(.tag) }
                     Button("Smart Collection…", systemImage: "gearshape.2") { showsSmartCollectionEditor = true }
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add organizer")
+            } label: {
+                Label("New Organizer…", systemImage: "plus")
+                    .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .listRowInsets(.init(top: 2, leading: 12, bottom: 2, trailing: 12))
+        } header: {
+            Text("Organize")
         }
     }
 
-    private func row(_ destination: SidebarDestination, icon: String, count: Int? = nil, indentation: Int = 0) -> some View {
-        HStack {
-            Label(destination.title(in: store), systemImage: icon)
-                .padding(.leading, CGFloat(indentation * 14))
+    private var sidebarSearch: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search", text: $store.searchText)
+                .textFieldStyle(.plain)
+            if !store.searchText.isEmpty {
+                Button("Clear Search", systemImage: "xmark.circle.fill") {
+                    store.searchText = ""
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(minHeight: 34)
+        .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 9))
+        .listRowInsets(.init(top: 5, leading: 8, bottom: 8, trailing: 8))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func row(
+        _ destination: SidebarDestination,
+        icon: String,
+        title: String? = nil,
+        count: Int? = nil,
+        indentation: Int = 0
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            Text(title ?? destination.title(in: store))
+                .lineLimit(1)
             Spacer()
             if let count {
                 Text(count, format: .number)
@@ -133,7 +189,21 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.leading, CGFloat(indentation * 14))
+        .frame(minHeight: 34)
+        .contentShape(.rect)
+        .listRowInsets(.init(top: 2, leading: 12, bottom: 2, trailing: 12))
         .tag(destination)
+    }
+
+    private func organizerLabel(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.semibold))
+            .tracking(0.55)
+            .foregroundStyle(.tertiary)
+            .padding(.top, 7)
+            .listRowInsets(.init(top: 2, leading: 13, bottom: 0, trailing: 12))
+            .accessibilityAddTraits(.isHeader)
     }
 
     private var storageStatus: some View {
@@ -147,8 +217,8 @@ struct SidebarView: View {
             Spacer()
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
     }
 
     private var seriesNames: [String] {
