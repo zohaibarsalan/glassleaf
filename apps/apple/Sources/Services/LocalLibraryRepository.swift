@@ -24,6 +24,7 @@ actor LocalLibraryRepository {
     private let rootOverride: URL?
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private var connection: SQLiteConnection?
 
     init(fileManager: FileManager = .default, rootURL: URL? = nil) {
         self.fileManager = fileManager
@@ -85,6 +86,20 @@ actor LocalLibraryRepository {
                 try execute(database, sql: "DELETE FROM book_search WHERE book_id = ?", values: [.text(book.id.uuidString)])
                 guard book.deletedAt == nil else { return }
                 try insertSearchRecord(book, context: context, database: database)
+            }
+        }
+    }
+
+    func upsert(_ books: [Book], contexts: [UUID: SearchContext]) throws {
+        guard !books.isEmpty else { return }
+        try withDatabase { database in
+            try transaction(database) {
+                for book in books {
+                    try upsertRecord(book, table: "books", database: database)
+                    try execute(database, sql: "DELETE FROM book_search WHERE book_id = ?", values: [.text(book.id.uuidString)])
+                    guard book.deletedAt == nil else { continue }
+                    try insertSearchRecord(book, context: contexts[book.id] ?? SearchContext(), database: database)
+                }
             }
         }
     }
@@ -156,21 +171,33 @@ actor LocalLibraryRepository {
     }
 
     private func withDatabase<T>(_ operation: (OpaquePointer) throws -> T) throws -> T {
+        let database = try databaseConnection()
+        return try operation(database)
+    }
+
+    private func databaseConnection() throws -> OpaquePointer {
+        if let database = connection?.pointer { return database }
+
         let url = try databaseURL()
-        var database: OpaquePointer?
+        var openedDatabase: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
-        guard sqlite3_open_v2(url.path, &database, flags, nil) == SQLITE_OK, let database else {
-            let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "Unknown error"
-            if let database { sqlite3_close(database) }
+        guard sqlite3_open_v2(url.path, &openedDatabase, flags, nil) == SQLITE_OK, let openedDatabase else {
+            let message = openedDatabase.map { String(cString: sqlite3_errmsg($0)) } ?? "Unknown error"
+            if let openedDatabase { sqlite3_close(openedDatabase) }
             throw RepositoryError.open(message)
         }
-        defer { sqlite3_close(database) }
 
-        sqlite3_busy_timeout(database, 5_000)
-        try execute(database, sql: "PRAGMA foreign_keys = ON")
-        try execute(database, sql: "PRAGMA journal_mode = WAL")
-        try createSchema(database)
-        return try operation(database)
+        do {
+            sqlite3_busy_timeout(openedDatabase, 5_000)
+            try execute(openedDatabase, sql: "PRAGMA foreign_keys = ON")
+            try execute(openedDatabase, sql: "PRAGMA journal_mode = WAL")
+            try createSchema(openedDatabase)
+            connection = SQLiteConnection(openedDatabase)
+            return openedDatabase
+        } catch {
+            sqlite3_close(openedDatabase)
+            throw error
+        }
     }
 
     private func createSchema(_ database: OpaquePointer) throws {
@@ -381,5 +408,17 @@ actor LocalLibraryRepository {
         ).appending(path: "Glassleaf", directoryHint: .isDirectory)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         return root
+    }
+}
+
+private final class SQLiteConnection: @unchecked Sendable {
+    let pointer: OpaquePointer
+
+    init(_ pointer: OpaquePointer) {
+        self.pointer = pointer
+    }
+
+    deinit {
+        sqlite3_close(pointer)
     }
 }

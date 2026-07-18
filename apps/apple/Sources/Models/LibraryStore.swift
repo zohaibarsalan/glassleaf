@@ -318,7 +318,7 @@ final class LibraryStore {
     }
 
     func moveBooks(_ ids: Set<UUID>, to folderID: UUID?) {
-        for id in ids { updateBook(id: id) { $0.folderID = folderID } }
+        updateBooks(ids: ids) { $0.folderID = folderID }
         selectedBookIDs.removeAll()
     }
 
@@ -331,27 +331,27 @@ final class LibraryStore {
 
     func assignTag(_ tagID: UUID, to ids: Set<UUID>) {
         guard tags.contains(where: { $0.id == tagID }) else { return }
-        for id in ids { updateBook(id: id) { $0.tagIDs.insert(tagID) } }
+        updateBooks(ids: ids) { $0.tagIDs.insert(tagID) }
     }
 
     func removeTag(_ tagID: UUID, from ids: Set<UUID>) {
-        for id in ids { updateBook(id: id) { $0.tagIDs.remove(tagID) } }
+        updateBooks(ids: ids) { $0.tagIDs.remove(tagID) }
     }
 
     func assignCollection(_ collectionID: UUID, to ids: Set<UUID>) {
-        for id in ids { updateBook(id: id) { $0.collectionIDs.insert(collectionID) } }
+        updateBooks(ids: ids) { $0.collectionIDs.insert(collectionID) }
     }
 
     func removeCollection(_ collectionID: UUID, from ids: Set<UUID>) {
-        for id in ids { updateBook(id: id) { $0.collectionIDs.remove(collectionID) } }
+        updateBooks(ids: ids) { $0.collectionIDs.remove(collectionID) }
     }
 
     func removeAllCollections(from ids: Set<UUID>) {
-        for id in ids { updateBook(id: id) { $0.collectionIDs.removeAll() } }
+        updateBooks(ids: ids) { $0.collectionIDs.removeAll() }
     }
 
     func removeAllTags(from ids: Set<UUID>) {
-        for id in ids { updateBook(id: id) { $0.tagIDs.removeAll() } }
+        updateBooks(ids: ids) { $0.tagIDs.removeAll() }
     }
 
     func createFolder(name: String, parentID: UUID? = nil) {
@@ -414,11 +414,9 @@ final class LibraryStore {
     }
 
     func assignSeries(_ seriesID: UUID?, to ids: Set<UUID>) {
-        for id in ids {
-            updateBook(id: id) { book in
-                book.seriesID = seriesID
-                if seriesID == nil { book.seriesIndex = nil }
-            }
+        updateBooks(ids: ids) { book in
+            book.seriesID = seriesID
+            if seriesID == nil { book.seriesIndex = nil }
         }
     }
 
@@ -513,12 +511,12 @@ final class LibraryStore {
     }
 
     func trashBooks(_ ids: Set<UUID>) {
-        for id in ids { updateBook(id: id) { $0.deletedAt = .now } }
+        updateBooks(ids: ids) { $0.deletedAt = .now }
         selectedBookIDs.removeAll()
     }
 
     func restoreBooks(_ ids: Set<UUID>) {
-        for id in ids { updateBook(id: id) { $0.deletedAt = nil } }
+        updateBooks(ids: ids) { $0.deletedAt = nil }
         selectedBookIDs.removeAll()
     }
 
@@ -528,9 +526,10 @@ final class LibraryStore {
         Task {
             do {
                 try await importer.removeAssets(for: discarded)
+                let discardedIDs = Set(discarded.map(\.id))
                 books.removeAll { $0.deletedAt != nil }
-                bookmarks.removeAll { bookmark in discarded.contains { $0.id == bookmark.bookID } }
-                annotations.removeAll { annotation in discarded.contains { $0.id == annotation.bookID } }
+                bookmarks.removeAll { discardedIDs.contains($0.bookID) }
+                annotations.removeAll { discardedIDs.contains($0.bookID) }
                 selectedBookIDs.removeAll()
                 await persistSnapshot()
             } catch {
@@ -618,6 +617,36 @@ final class LibraryStore {
         Task {
             do {
                 try await repository.upsert(book, context: context)
+            } catch {
+                reportPersistenceFailure(error)
+            }
+        }
+    }
+
+    private func updateBooks(ids: Set<UUID>, mutation: (inout Book) -> Void) {
+        guard !ids.isEmpty else { return }
+        var updatedLibrary = books
+        var changedBooks: [Book] = []
+        changedBooks.reserveCapacity(ids.count)
+        for index in updatedLibrary.indices where ids.contains(updatedLibrary[index].id) {
+            mutation(&updatedLibrary[index])
+            updatedLibrary[index].updatedAt = .now
+            changedBooks.append(updatedLibrary[index])
+        }
+        guard !changedBooks.isEmpty else { return }
+        books = updatedLibrary
+        if let presentedID = presentedBook?.id, ids.contains(presentedID) {
+            refreshPresentedBook(id: presentedID)
+        }
+        persistBooks(changedBooks)
+    }
+
+    private func persistBooks(_ changedBooks: [Book]) {
+        guard !isPreview, !changedBooks.isEmpty else { return }
+        let contexts = Dictionary(uniqueKeysWithValues: changedBooks.map { ($0.id, searchContext(for: $0)) })
+        Task {
+            do {
+                try await repository.upsert(changedBooks, contexts: contexts)
             } catch {
                 reportPersistenceFailure(error)
             }
