@@ -5,6 +5,19 @@ struct ReaderView: View {
     let book: Book
     @Bindable var store: LibraryStore
 
+    var body: some View {
+        if book.asset?.readingOrder.isEmpty == false {
+            EPUBReaderView(book: book, store: store)
+        } else {
+            PrototypeReaderView(book: book, store: store)
+        }
+    }
+}
+
+private struct PrototypeReaderView: View {
+    let book: Book
+    @Bindable var store: LibraryStore
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -214,7 +227,7 @@ struct ReaderView: View {
             Slider(
                 value: Binding(
                     get: { progress },
-                    set: seek(to:)
+                    set: { value in seek(to: value) }
                 ),
                 in: 0...1
             )
@@ -315,7 +328,7 @@ struct ReaderView: View {
     }
 }
 
-private struct ReaderSystemChromeModifier: ViewModifier {
+struct ReaderSystemChromeModifier: ViewModifier {
     let controlsVisible: Bool
 
     func body(content: Content) -> some View {

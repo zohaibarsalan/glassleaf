@@ -37,6 +37,7 @@ final class LibraryStore {
     var smartCollections: [SmartCollection]
     var bookmarks: [Bookmark]
     var annotations: [Annotation]
+    var readerPreferences: ReaderPreferences
 
     var selection: SidebarDestination = .home
     var presentedBook: Book?
@@ -68,6 +69,7 @@ final class LibraryStore {
         smartCollections: [SmartCollection] = [],
         bookmarks: [Bookmark] = [],
         annotations: [Annotation] = [],
+        readerPreferences: ReaderPreferences = ReaderPreferenceStore.load(),
         isPreview: Bool = false,
         repository: LocalLibraryRepository = LocalLibraryRepository(),
         importer: LocalBookImporter = LocalBookImporter()
@@ -80,6 +82,7 @@ final class LibraryStore {
         self.smartCollections = smartCollections
         self.bookmarks = bookmarks
         self.annotations = annotations
+        self.readerPreferences = readerPreferences
         self.isPreview = isPreview
         self.repository = repository
         self.importer = importer
@@ -121,11 +124,11 @@ final class LibraryStore {
         readerBook = book
     }
 
-    func closeReader(at fraction: Double) {
+    func closeReader(at fraction: Double, locator: String? = nil) {
         guard let id = readerBook?.id else { return }
         updateBook(id: id) { book in
             book.progress = ReadingProgress(
-                locator: "prototype:\(fraction)",
+                locator: locator ?? "prototype:\(fraction)",
                 fraction: fraction,
                 deviceID: "local",
                 isCompleted: fraction >= 0.995
@@ -133,6 +136,35 @@ final class LibraryStore {
             book.lastOpened = .now
         }
         readerBook = nil
+    }
+
+    func updateReaderPreferences(_ preferences: ReaderPreferences) {
+        readerPreferences = preferences
+        ReaderPreferenceStore.save(preferences)
+    }
+
+    func isBookmarked(bookID: UUID, locator: String) -> Bool {
+        bookmarks.contains { $0.bookID == bookID && $0.locator == locator }
+    }
+
+    func toggleBookmark(bookID: UUID, locator: String, label: String? = nil) {
+        if let index = bookmarks.firstIndex(where: { $0.bookID == bookID && $0.locator == locator }) {
+            bookmarks.remove(at: index)
+        } else {
+            bookmarks.append(Bookmark(bookID: bookID, locator: locator, label: label))
+        }
+        persistReading(bookID: bookID)
+    }
+
+    func addAnnotation(bookID: UUID, locator: String, selectedText: String? = nil, note: String, color: AnnotationColor = .yellow) {
+        annotations.append(Annotation(bookID: bookID, locator: locator, selectedText: selectedText, note: note, color: color))
+        persistReading(bookID: bookID)
+    }
+
+    func deleteAnnotation(_ id: UUID) {
+        guard let annotation = annotations.first(where: { $0.id == id }) else { return }
+        annotations.removeAll { $0.id == id }
+        persistReading(bookID: annotation.bookID)
     }
 
     func loadLibrary() async {
@@ -392,6 +424,14 @@ final class LibraryStore {
         Task { try? await repository.saveOrganization(value) }
     }
 
+    private func persistReading(bookID: UUID) {
+        guard !isPreview, let book = books.first(where: { $0.id == bookID }) else { return }
+        let bookBookmarks = bookmarks.filter { $0.bookID == bookID }
+        let bookAnnotations = annotations.filter { $0.bookID == bookID }
+        let context = searchContext(for: book)
+        Task { try? await repository.saveReading(book: book, bookmarks: bookBookmarks, annotations: bookAnnotations, context: context) }
+    }
+
     private func persistSnapshot() async {
         guard !isPreview else { return }
         try? await repository.save(snapshot())
@@ -405,6 +445,23 @@ final class LibraryStore {
     private func validatedName(_ value: String) -> String? {
         let cleanName = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return cleanName.isEmpty ? nil : cleanName
+    }
+}
+
+private enum ReaderPreferenceStore {
+    private static let key = "reader-preferences-v1"
+
+    static func load() -> ReaderPreferences {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let value = try? JSONDecoder().decode(ReaderPreferences.self, from: data) else {
+            return ReaderPreferences()
+        }
+        return value
+    }
+
+    static func save(_ preferences: ReaderPreferences) {
+        guard let data = try? JSONEncoder().encode(preferences) else { return }
+        UserDefaults.standard.set(data, forKey: key)
     }
 }
 
