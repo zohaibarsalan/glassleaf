@@ -4,6 +4,8 @@ import SwiftUI
 import WebKit
 #if os(macOS)
 import AppKit
+#else
+import UIKit
 #endif
 
 struct EPUBReaderView: View {
@@ -49,7 +51,7 @@ struct EPUBReaderView: View {
             PublicationWebView(book: book, preferences: resolvedPreferences, annotations: annotations, navigator: navigator)
                 .ignoresSafeArea()
 
-            if !navigator.isReady {
+            if !navigator.hasLoadedContent {
                 ProgressView("Opening \(book.title)…")
                     .padding(18)
                     .glassEffect(.regular, in: .rect(cornerRadius: 16))
@@ -201,6 +203,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     var chapterIndex = 0
     var chapterProgress = 0.0
     var isReady = false
+    var hasLoadedContent = false
     var selectedText = ""
     var onTap: (() -> Void)?
     @ObservationIgnored private weak var webView: WKWebView?
@@ -306,9 +309,13 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        isReady = true
-        evaluate(Self.bootstrapScript(preferences: preferences, progress: pendingProgress))
-        renderAnnotations()
+        evaluate(Self.bootstrapScript(preferences: preferences, progress: pendingProgress)) { [weak self, weak webView] _ in
+            guard let self else { return }
+            self.isReady = true
+            self.hasLoadedContent = true
+            self.renderAnnotations()
+            (webView as? ChapterTransitioningWebView)?.revealLoadedChapter()
+        }
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -336,7 +343,14 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
         chapterProgress = pendingProgress
         let publicationRoot = root.appending(path: rootPath, directoryHint: .isDirectory)
         let resource = publicationRoot.appending(path: asset.readingOrder[index].href)
-        webView.loadFileURL(resource, allowingReadAccessTo: publicationRoot)
+        let beginLoad = {
+            _ = webView.loadFileURL(resource, allowingReadAccessTo: publicationRoot)
+        }
+        if hasLoadedContent, let transitioningWebView = webView as? ChapterTransitioningWebView {
+            transitioningWebView.prepareForChapterNavigation(beginLoad)
+        } else {
+            beginLoad()
+        }
     }
 
     private func evaluate(_ script: String, completion: ((Any?) -> Void)? = nil) {
@@ -507,6 +521,12 @@ private enum PublicationLocation {
     }
 }
 
+@MainActor
+private protocol ChapterTransitioningWebView: AnyObject {
+    func prepareForChapterNavigation(_ completion: @escaping () -> Void)
+    func revealLoadedChapter()
+}
+
 #if os(macOS)
 private struct PublicationWebView: NSViewRepresentable {
     let book: Book
@@ -532,13 +552,44 @@ private struct PublicationWebView: NSViewRepresentable {
     }
 }
 
-private final class TrackpadAwareWebView: WKWebView {
+private final class TrackpadAwareWebView: WKWebView, ChapterTransitioningWebView {
     var onHorizontalSwipe: ((Bool) -> Void)?
 
+    private var transitionSnapshot: NSImageView?
     private var horizontalDistance: CGFloat = 0
     private var verticalDistance: CGFloat = 0
     private var gestureAxis: GestureAxis = .undecided
     private var suppressesMomentum = false
+
+    func prepareForChapterNavigation(_ completion: @escaping () -> Void) {
+        transitionSnapshot?.removeFromSuperview()
+        takeSnapshot(with: nil) { [weak self] image, _ in
+            guard let self, let image else {
+                completion()
+                return
+            }
+            let snapshot = PassthroughImageView(frame: self.bounds)
+            snapshot.image = image
+            snapshot.imageScaling = .scaleAxesIndependently
+            snapshot.autoresizingMask = [.width, .height]
+            self.addSubview(snapshot)
+            self.transitionSnapshot = snapshot
+            completion()
+        }
+    }
+
+    func revealLoadedChapter() {
+        guard let transitionSnapshot else { return }
+        self.transitionSnapshot = nil
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            transitionSnapshot.removeFromSuperview()
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.14
+            transitionSnapshot.animator().alphaValue = 0
+        }
+    }
 
     override func scrollWheel(with event: NSEvent) {
         if !event.momentumPhase.isEmpty {
@@ -616,6 +667,10 @@ private final class TrackpadAwareWebView: WKWebView {
         case vertical
     }
 }
+
+private final class PassthroughImageView: NSImageView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
 #else
 private struct PublicationWebView: UIViewRepresentable {
     let book: Book
@@ -632,11 +687,46 @@ private struct PublicationWebView: UIViewRepresentable {
         configuration.userContentController.add(navigator, name: "glassleafPage")
         configuration.userContentController.add(navigator, name: "glassleafProgress")
         configuration.userContentController.add(navigator, name: "glassleafSelection")
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = TransitioningWebView(frame: .zero, configuration: configuration)
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
         return webView
+    }
+}
+
+private final class TransitioningWebView: WKWebView, ChapterTransitioningWebView {
+    private var transitionSnapshot: UIImageView?
+
+    func prepareForChapterNavigation(_ completion: @escaping () -> Void) {
+        transitionSnapshot?.removeFromSuperview()
+        takeSnapshot(with: nil) { [weak self] image, _ in
+            guard let self, let image else {
+                completion()
+                return
+            }
+            let snapshot = UIImageView(image: image)
+            snapshot.frame = self.bounds
+            snapshot.contentMode = .scaleToFill
+            snapshot.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            self.addSubview(snapshot)
+            self.transitionSnapshot = snapshot
+            completion()
+        }
+    }
+
+    func revealLoadedChapter() {
+        guard let transitionSnapshot else { return }
+        self.transitionSnapshot = nil
+        guard !UIAccessibility.isReduceMotionEnabled else {
+            transitionSnapshot.removeFromSuperview()
+            return
+        }
+        UIView.animate(withDuration: 0.14, animations: {
+            transitionSnapshot.alpha = 0
+        }, completion: { _ in
+            transitionSnapshot.removeFromSuperview()
+        })
     }
 }
 #endif
