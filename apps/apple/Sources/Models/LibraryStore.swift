@@ -517,13 +517,24 @@ final class LibraryStore {
 }
 
 private enum ReaderPreferenceStore {
-    private static let key = "reader-preferences-v2"
+    private static let key = "reader-preferences-v3"
+    private static let previousKey = "reader-preferences-v2"
     private static let legacyKey = "reader-preferences-v1"
 
     static func load() -> ReaderPreferences {
         if let data = UserDefaults.standard.data(forKey: key),
            let value = try? JSONDecoder().decode(ReaderPreferences.self, from: data) {
             return value
+        }
+
+        if let data = UserDefaults.standard.data(forKey: previousKey),
+           var previousValue = try? JSONDecoder().decode(ReaderPreferences.self, from: data) {
+            // Pagination was the early-development default. Move existing
+            // installs to the new continuous-reading default once; choosing
+            // pagination again is then persisted under the v3 key.
+            if previousValue.mode == .paginated { previousValue.mode = .scrolling }
+            save(previousValue)
+            return previousValue
         }
 
         guard let data = UserDefaults.standard.data(forKey: legacyKey),
