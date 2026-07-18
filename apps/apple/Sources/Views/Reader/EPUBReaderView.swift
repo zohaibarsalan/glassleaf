@@ -556,6 +556,10 @@ private protocol ChapterTransitioningWebView: AnyObject {
     func revealLoadedChapter()
 }
 
+private enum ChapterTransitionMotion {
+    static let crossfadeDuration: TimeInterval = 0.28
+}
+
 #if os(macOS)
 private struct PublicationWebView: NSViewRepresentable {
     let book: Book
@@ -615,7 +619,7 @@ private final class TrackpadAwareWebView: WKWebView, ChapterTransitioningWebView
             return
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.14
+            context.duration = ChapterTransitionMotion.crossfadeDuration
             transitionSnapshot.animator().alphaValue = 0
         }
     }
@@ -748,11 +752,17 @@ private final class TransitioningWebView: WKWebView, ChapterTransitioningWebView
             transitionSnapshot.removeFromSuperview()
             return
         }
-        UIView.animate(withDuration: 0.14, animations: {
-            transitionSnapshot.alpha = 0
-        }, completion: { _ in
-            transitionSnapshot.removeFromSuperview()
-        })
+        UIView.animate(
+            withDuration: ChapterTransitionMotion.crossfadeDuration,
+            delay: 0,
+            options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut],
+            animations: {
+                transitionSnapshot.alpha = 0
+            },
+            completion: { _ in
+                transitionSnapshot.removeFromSuperview()
+            }
+        )
     }
 }
 #endif
