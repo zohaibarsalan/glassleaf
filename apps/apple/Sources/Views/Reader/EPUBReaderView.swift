@@ -278,9 +278,10 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
 
     fileprivate func attach(_ webHost: any PublicationWebHosting, book: Book, preferences: ReaderPreferences, annotations: [Annotation]) {
         guard self.webHost !== webHost else {
+            let preferencesChanged = self.preferences != preferences
             let annotationsChanged = self.annotations != annotations
             self.annotations = annotations
-            apply(preferences: preferences)
+            if preferencesChanged { apply(preferences: preferences) }
             if annotationsChanged { renderAnnotations() }
             return
         }
@@ -409,8 +410,15 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
             default: break
             }
         case "glassleafProgress":
-            if let value = message.body as? NSNumber { chapterProgress = min(max(value.doubleValue, 0), 1) }
-        case "glassleafSelection": selectedText = message.body as? String ?? ""
+            if let value = message.body as? NSNumber {
+                let progress = min(max(value.doubleValue, 0), 1)
+                if abs(progress - chapterProgress) >= 0.0005 || progress == 0 || progress == 1 {
+                    chapterProgress = progress
+                }
+            }
+        case "glassleafSelection":
+            let selection = message.body as? String ?? ""
+            if selection != selectedText { selectedText = selection }
         default: break
         }
     }
@@ -436,11 +444,13 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
             guard let self, let webView, let webHost, webHost.isCurrentNavigation(webView) else { return }
             self.isReady = true
             self.hasLoadedContent = true
-            self.isTransitioning = false
             self.renderAnnotations(in: webView)
-            webHost.revealLoadedChapter(webView, direction: self.transitionDirection)
+            webHost.revealLoadedChapter(webView, direction: self.transitionDirection) { [weak self] in
+                guard let self else { return }
+                self.isTransitioning = false
+                self.scheduleFollowingChapterPreload()
+            }
             self.transitionDirection = .neutral
-            self.scheduleFollowingChapterPreload()
         }
     }
 
@@ -448,7 +458,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
         preloadTask?.cancel()
         let expectedChapter = chapterIndex
         preloadTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(220))
+            try? await Task.sleep(for: .milliseconds(100))
             guard !Task.isCancelled, let self, self.chapterIndex == expectedChapter, !self.isTransitioning,
                   let webHost = self.webHost, let asset = self.book?.asset,
                   let rootPath = asset.extractedRelativePath, let root = PublicationLocation.rootURL(),
@@ -576,8 +586,16 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
           const horizontal = () => \(preferences.mode == .paginated ? "true" : "false");
           const maxScroll = () => horizontal() ? Math.max(root.scrollWidth - innerWidth, 1) : Math.max(root.scrollHeight - innerHeight, 1);
           const position = () => horizontal() ? scrollX : scrollY;
-          const report = () => webkit.messageHandlers.glassleafProgress.postMessage(Math.min(Math.max(position() / maxScroll(), 0), 1));
-          window.glassleafSeek = value => { scrollTo(horizontal() ? value * maxScroll() : 0, horizontal() ? 0 : value * maxScroll()); setTimeout(report, 40); };
+          let progressReportTimer = 0;
+          const reportNow = () => {
+            progressReportTimer = 0;
+            webkit.messageHandlers.glassleafProgress.postMessage(Math.min(Math.max(position() / maxScroll(), 0), 1));
+          };
+          const report = () => {
+            if (progressReportTimer) return;
+            progressReportTimer = setTimeout(reportNow, 80);
+          };
+          window.glassleafSeek = value => { scrollTo(horizontal() ? value * maxScroll() : 0, horizontal() ? 0 : value * maxScroll()); setTimeout(reportNow, 40); };
           const paginatedTarget = direction => {
             const page = Math.round(scrollX / innerWidth);
             const lastPage = Math.max(Math.ceil(root.scrollWidth / innerWidth) - 1, 0);
@@ -603,7 +621,11 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
             \(keyboardNavigation)
           });
           addEventListener('scroll', report, {passive: true});
-          document.addEventListener('selectionchange', () => webkit.messageHandlers.glassleafSelection.postMessage(String(getSelection()).slice(0, 10000)));
+          let selectionReportTimer = 0;
+          document.addEventListener('selectionchange', () => {
+            clearTimeout(selectionReportTimer);
+            selectionReportTimer = setTimeout(() => webkit.messageHandlers.glassleafSelection.postMessage(String(getSelection()).slice(0, 10000)), 80);
+          });
           requestAnimationFrame(() => window.glassleafSeek(\(progress)));
         })();
         """
@@ -647,7 +669,11 @@ private protocol PublicationWebHosting: AnyObject {
     func isCurrentNavigation(_ webView: WKWebView) -> Bool
     func isPreloadNavigation(_ webView: WKWebView) -> Bool
     func markPreloadedChapter(_ webView: WKWebView)
-    func revealLoadedChapter(_ webView: WKWebView, direction: ChapterNavigationDirection)
+    func revealLoadedChapter(
+        _ webView: WKWebView,
+        direction: ChapterNavigationDirection,
+        completion: @escaping @MainActor () -> Void
+    )
 }
 
 private enum ChapterNavigationDirection: Equatable {
@@ -675,8 +701,8 @@ private enum ChapterNavigationDirection: Equatable {
 }
 
 private enum ChapterTransitionMotion {
-    static let crossfadeDuration: TimeInterval = 0.18
-    static let slideDuration: TimeInterval = 0.28
+    static let crossfadeDuration: TimeInterval = 0.14
+    static let slideDuration: TimeInterval = 0.22
 }
 
 @MainActor
@@ -849,7 +875,7 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
         destination.stopLoading()
         destination.layer?.removeAllAnimations()
         destination.alphaValue = 1
-        destination.isHidden = true
+        destination.isHidden = false
         destination.frame = bounds
         addSubview(destination, positioned: .below, relativeTo: activeWebView)
 
@@ -872,10 +898,20 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
         isPreloadedChapterReady = true
     }
 
-    func revealLoadedChapter(_ webView: WKWebView, direction: ChapterNavigationDirection) {
-        guard loadingWebView === webView else { return }
+    func revealLoadedChapter(
+        _ webView: WKWebView,
+        direction: ChapterNavigationDirection,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        guard loadingWebView === webView else {
+            completion()
+            return
+        }
         loadingWebView = nil
-        guard webView !== activeWebView else { return }
+        guard webView !== activeWebView else {
+            completion()
+            return
+        }
 
         let outgoing = activeWebView
         let reducesMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -885,38 +921,66 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
         guard !reducesMotion else {
             webView.frame = bounds
             outgoing.removeFromSuperview()
+            completion()
             return
         }
 
-        guard direction != .neutral else {
-            webView.alphaValue = 0
-            webView.frame = bounds
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = ChapterTransitionMotion.crossfadeDuration
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                outgoing.animator().alphaValue = 0
-                webView.animator().alphaValue = 1
-            }, completionHandler: { [weak self, weak outgoing] in
-                guard let self, let outgoing, outgoing !== self.activeWebView else { return }
-                outgoing.alphaValue = 1
-                outgoing.removeFromSuperview()
-            })
-            return
-        }
-
-        let travel = max(bounds.width, 1)
-        webView.frame = bounds.offsetBy(dx: direction.horizontalSign * travel, dy: 0)
+        webView.wantsLayer = true
+        outgoing.wantsLayer = true
+        webView.frame = bounds
         outgoing.frame = bounds
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = ChapterTransitionMotion.slideDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            outgoing.animator().frame = self.bounds.offsetBy(dx: -direction.horizontalSign * travel, dy: 0)
-            webView.animator().frame = self.bounds
-        }, completionHandler: { [weak self, weak outgoing] in
-            guard let self, let outgoing, outgoing !== self.activeWebView else { return }
-            outgoing.frame = self.bounds
-            outgoing.removeFromSuperview()
-        })
+        let travel = direction == .neutral ? 0 : min(max(bounds.width * 0.18, 90), 180)
+        let incomingTransform = CATransform3DMakeTranslation(direction.horizontalSign * travel, 0, 0)
+        let outgoingTransform = CATransform3DMakeTranslation(-direction.horizontalSign * travel, 0, 0)
+        let duration = direction == .neutral ? ChapterTransitionMotion.crossfadeDuration : ChapterTransitionMotion.slideDuration
+        let timing = CAMediaTimingFunction(controlPoints: 0.22, 0.72, 0, 1)
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        webView.layer?.transform = CATransform3DIdentity
+        webView.layer?.opacity = 1
+        outgoing.layer?.transform = outgoingTransform
+        outgoing.layer?.opacity = 0
+        CATransaction.commit()
+
+        let incomingAnimation = CAAnimationGroup()
+        incomingAnimation.animations = [
+            Self.animation(keyPath: "transform", from: incomingTransform, to: CATransform3DIdentity),
+            Self.animation(keyPath: "opacity", from: direction == .neutral ? 0 : 0.7, to: 1),
+        ]
+        incomingAnimation.duration = duration
+        incomingAnimation.timingFunction = timing
+
+        let outgoingAnimation = CAAnimationGroup()
+        outgoingAnimation.animations = [
+            Self.animation(keyPath: "transform", from: CATransform3DIdentity, to: outgoingTransform),
+            Self.animation(keyPath: "opacity", from: 1, to: 0),
+        ]
+        outgoingAnimation.duration = duration
+        outgoingAnimation.timingFunction = timing
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self, weak outgoing] in
+            Task { @MainActor in
+                if let self, let outgoing, outgoing !== self.activeWebView {
+                    outgoing.layer?.removeAllAnimations()
+                    outgoing.layer?.transform = CATransform3DIdentity
+                    outgoing.layer?.opacity = 1
+                    outgoing.removeFromSuperview()
+                }
+                completion()
+            }
+        }
+        webView.layer?.add(incomingAnimation, forKey: "glassleafChapterIn")
+        outgoing.layer?.add(outgoingAnimation, forKey: "glassleafChapterOut")
+        CATransaction.commit()
+    }
+
+    private static func animation(keyPath: String, from: Any, to: Any) -> CABasicAnimation {
+        let animation = CABasicAnimation(keyPath: keyPath)
+        animation.fromValue = from
+        animation.toValue = to
+        return animation
     }
 
     private var inactiveWebView: WKWebView {
@@ -1155,10 +1219,20 @@ private final class PublicationWebHostView: UIView, PublicationWebHosting, UIGes
         isPreloadedChapterReady = true
     }
 
-    func revealLoadedChapter(_ webView: WKWebView, direction: ChapterNavigationDirection) {
-        guard loadingWebView === webView else { return }
+    func revealLoadedChapter(
+        _ webView: WKWebView,
+        direction: ChapterNavigationDirection,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        guard loadingWebView === webView else {
+            completion()
+            return
+        }
         loadingWebView = nil
-        guard webView !== activeWebView else { return }
+        guard webView !== activeWebView else {
+            completion()
+            return
+        }
 
         let outgoing = activeWebView
         let reducesMotion = UIAccessibility.isReduceMotionEnabled
@@ -1169,6 +1243,7 @@ private final class PublicationWebHostView: UIView, PublicationWebHosting, UIGes
         guard !reducesMotion else {
             webView.transform = .identity
             outgoing.removeFromSuperview()
+            completion()
             return
         }
 
@@ -1183,16 +1258,19 @@ private final class PublicationWebHostView: UIView, PublicationWebHosting, UIGes
                     webView.alpha = 1
                 },
                 completion: { _ in
-                    guard outgoing !== self.activeWebView else { return }
-                    outgoing.alpha = 1
-                    outgoing.removeFromSuperview()
+                    if outgoing !== self.activeWebView {
+                        outgoing.alpha = 1
+                        outgoing.removeFromSuperview()
+                    }
+                    completion()
                 }
             )
             return
         }
 
-        let travel = max(bounds.width, 1)
+        let travel = min(max(bounds.width * 0.22, 90), 180)
         webView.transform = CGAffineTransform(translationX: direction.horizontalSign * travel, y: 0)
+        webView.alpha = 0.72
         outgoing.transform = .identity
         let animator = UIViewPropertyAnimator(
             duration: ChapterTransitionMotion.slideDuration,
@@ -1203,12 +1281,17 @@ private final class PublicationWebHostView: UIView, PublicationWebHosting, UIGes
         )
         animator.addAnimations {
             outgoing.transform = CGAffineTransform(translationX: -direction.horizontalSign * travel, y: 0)
+            outgoing.alpha = 0
             webView.transform = .identity
+            webView.alpha = 1
         }
         animator.addCompletion { _ in
-                guard outgoing !== self.activeWebView else { return }
+            if outgoing !== self.activeWebView {
                 outgoing.transform = .identity
+                outgoing.alpha = 1
                 outgoing.removeFromSuperview()
+            }
+            completion()
         }
         animator.startAnimation()
     }
