@@ -87,10 +87,10 @@ struct BookDetailView: View {
             }
             .navigationTitle("Book Details")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .confirmationAction) {
                     Button("Edit", systemImage: "pencil") { showsEditor = true }
-                }
-                ToolbarItem(placement: .confirmationAction) {
+                        .labelStyle(.iconOnly)
+                        .accessibilityLabel("Edit Book")
                     Button("Done") { dismiss() }
                 }
             }
