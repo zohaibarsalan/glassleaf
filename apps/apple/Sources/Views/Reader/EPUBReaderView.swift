@@ -371,7 +371,6 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.webView === webHost?.activeWebView else { return }
         switch message.name {
-        case "glassleafTap": onTap?()
         case "glassleafPage":
             switch message.body as? String {
             case "next": next()
@@ -521,11 +520,6 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     private static func bootstrapScript(preferences: ReaderPreferences, progress: Double) -> String {
-#if os(macOS)
-        let tapHandler = "addEventListener('click', event => { if (!event.target.closest('a')) webkit.messageHandlers.glassleafTap.postMessage('tap'); });"
-#else
-        let tapHandler = ""
-#endif
         return """
         (() => {
           let viewport = document.querySelector('meta[name="viewport"]');
@@ -567,7 +561,6 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
             }
           });
           addEventListener('scroll', report, {passive: true});
-          \(tapHandler)
           document.addEventListener('selectionchange', () => webkit.messageHandlers.glassleafSelection.postMessage(String(getSelection()).slice(0, 10000)));
           requestAnimationFrame(() => window.glassleafSeek(\(progress)));
         })();
@@ -647,7 +640,6 @@ private enum ChapterTransitionMotion {
 @MainActor
 private func makePublicationConfiguration(for navigator: PublicationNavigator) -> WKWebViewConfiguration {
     let configuration = WKWebViewConfiguration()
-    configuration.userContentController.add(navigator, name: "glassleafTap")
     configuration.userContentController.add(navigator, name: "glassleafPage")
     configuration.userContentController.add(navigator, name: "glassleafProgress")
     configuration.userContentController.add(navigator, name: "glassleafSelection")
@@ -670,14 +662,16 @@ private struct PublicationWebView: NSViewRepresentable {
     }
 }
 
-private final class PublicationWebHostView: NSView, PublicationWebHosting {
+private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGestureRecognizerDelegate {
     private(set) var activeWebView: WKWebView
     private let primaryWebView: WKWebView
     private let secondaryWebView: WKWebView
+    private weak var navigator: PublicationNavigator?
     private weak var loadingWebView: WKWebView?
     private weak var preloadingWebView: WKWebView?
     private var preloadedResource: URL?
     private var isPreloadedChapterReady = false
+    private let pageClickGesture = NSClickGestureRecognizer()
 
     init(navigator: PublicationNavigator) {
         let primary = Self.makeWebView(navigator: navigator)
@@ -685,8 +679,10 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting {
         primaryWebView = primary
         activeWebView = primary
         secondaryWebView = secondary
+        self.navigator = navigator
         super.init(frame: .zero)
         addSubview(primary)
+        configureReadingClick()
     }
 
     @available(*, unavailable)
@@ -696,6 +692,26 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting {
         super.layout()
         activeWebView.frame = bounds
         secondaryWebView.frame = bounds
+    }
+
+    private func configureReadingClick() {
+        pageClickGesture.target = self
+        pageClickGesture.action = #selector(handlePageClick)
+        pageClickGesture.numberOfClicksRequired = 1
+        pageClickGesture.buttonMask = 0x1
+        pageClickGesture.delegate = self
+        addGestureRecognizer(pageClickGesture)
+    }
+
+    @objc private func handlePageClick() {
+        navigator?.onTap?()
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: NSGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: NSGestureRecognizer
+    ) -> Bool {
+        gestureRecognizer === pageClickGesture || otherGestureRecognizer === pageClickGesture
     }
 
     func loadChapter(_ resource: URL, allowingReadAccessTo publicationRoot: URL, retainingCurrentContent: Bool) -> WKWebView? {
