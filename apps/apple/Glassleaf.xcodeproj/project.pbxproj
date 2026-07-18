@@ -377,6 +377,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
 				PRODUCT_BUNDLE_IDENTIFIER = app.glassleaf.reader;
 				PRODUCT_NAME = Glassleaf;
 				SDKROOT = auto;
@@ -405,6 +406,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
 				PRODUCT_BUNDLE_IDENTIFIER = app.glassleaf.reader;
 				PRODUCT_NAME = Glassleaf;
 				SDKROOT = auto;

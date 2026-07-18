@@ -115,7 +115,7 @@ final class LibraryStore {
         guard !isPreview else { return }
 
         do {
-            books = try await repository.load()
+            books = try await repository.load().books
         } catch {
             importAlert = ImportAlert(
                 title: "Library Couldn’t Be Loaded",
@@ -186,7 +186,7 @@ final class LibraryStore {
         guard !isPreview else { return }
         let snapshot = books
         Task {
-            try? await repository.save(snapshot)
+            try? await repository.save(LibrarySnapshot(books: snapshot))
         }
     }
 }
