@@ -70,8 +70,8 @@ struct AppRootView: View {
                 switch store.selection {
                 case .home:
                     HomeView(store: store)
-                case .library(let filter):
-                    LibraryView(store: store, filter: filter)
+                default:
+                    LibraryView(store: store, destination: store.selection)
                 }
             }
         }

@@ -5,7 +5,7 @@ struct HomeView: View {
     @Bindable var store: LibraryStore
 
     private var currentlyReading: [Book] {
-        Array(store.books(matching: .reading).prefix(4))
+        Array(store.books(matching: .library(.reading)).prefix(4))
     }
 
     private var recentlyAdded: [Book] {
