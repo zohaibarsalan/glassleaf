@@ -1,5 +1,6 @@
 import GlassleafDomain
 import Observation
+import QuartzCore
 import SwiftUI
 import WebKit
 #if os(macOS)
@@ -597,7 +598,7 @@ private protocol PublicationWebHosting: AnyObject {
 }
 
 private enum ChapterTransitionMotion {
-    static let crossfadeDuration: TimeInterval = 0.18
+    static let crossfadeDuration: TimeInterval = 0.24
 }
 
 @MainActor
@@ -721,24 +722,26 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting {
         guard webView !== activeWebView else { return }
 
         let outgoing = activeWebView
+        let reducesMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if !reducesMotion { webView.alphaValue = 0 }
         activeWebView = webView
         addSubview(webView, positioned: .above, relativeTo: outgoing)
 
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+        guard !reducesMotion else {
             outgoing.removeFromSuperview()
             return
         }
 
-        webView.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { context in
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = ChapterTransitionMotion.crossfadeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            outgoing.animator().alphaValue = 0
             webView.animator().alphaValue = 1
-        }
-        Task { @MainActor [weak self, weak outgoing] in
-            try? await Task.sleep(for: .seconds(ChapterTransitionMotion.crossfadeDuration))
+        }, completionHandler: { [weak self, weak outgoing] in
             guard let self, let outgoing, outgoing !== self.activeWebView else { return }
+            outgoing.alphaValue = 1
             outgoing.removeFromSuperview()
-        }
+        })
     }
 
     private var inactiveWebView: WKWebView {
@@ -950,25 +953,28 @@ private final class PublicationWebHostView: UIView, PublicationWebHosting {
         guard webView !== activeWebView else { return }
 
         let outgoing = activeWebView
+        let reducesMotion = UIAccessibility.isReduceMotionEnabled
+        if !reducesMotion { webView.alpha = 0 }
         activeWebView = webView
         webView.isUserInteractionEnabled = true
         bringSubviewToFront(webView)
 
-        guard !UIAccessibility.isReduceMotionEnabled else {
+        guard !reducesMotion else {
             outgoing.removeFromSuperview()
             return
         }
 
-        webView.alpha = 0
         UIView.animate(
             withDuration: ChapterTransitionMotion.crossfadeDuration,
             delay: 0,
             options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut],
             animations: {
+                outgoing.alpha = 0
                 webView.alpha = 1
             },
             completion: { _ in
                 guard outgoing !== self.activeWebView else { return }
+                outgoing.alpha = 1
                 outgoing.removeFromSuperview()
             }
         )
