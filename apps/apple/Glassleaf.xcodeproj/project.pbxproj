@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0A2820723DC8B5742462D9A8 /* PublicationSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E0572DB334A4316351219C /* PublicationSearchService.swift */; };
 		16EC150A297EEDA3D3AF7E46 /* BookMetadataEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D6F4C17159F612F6D59CF9 /* BookMetadataEditor.swift */; };
+		2E318871EB2FBD27F151E157 /* PortableLibraryDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A793CB4C6B40772782DBCFB /* PortableLibraryDocument.swift */; };
 		398D2A09D3126CAFFCFE0B00 /* LocalLibraryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA499FF391D3BD366C109967 /* LocalLibraryRepository.swift */; };
 		417DEAA268458A6541BD7C10 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD8BFE6D73C6A27679CEE88 /* BookDetailView.swift */; };
 		431BF93F57537BECB54738DA /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94357B64186DB854B040E9E6 /* HomeView.swift */; };
@@ -41,6 +42,7 @@
 		49ED142E8F28846D47550C4C /* BookComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookComponents.swift; sourceTree = "<group>"; };
 		72621FB648D03F473EE63DD5 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		7314B72715874FE3CF052FDB /* domain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = domain; path = ../../packages/domain; sourceTree = SOURCE_ROOT; };
+		7A793CB4C6B40772782DBCFB /* PortableLibraryDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableLibraryDocument.swift; sourceTree = "<group>"; };
 		7B07DCBFBCC7989158C5539B /* EPUBReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderView.swift; sourceTree = "<group>"; };
 		94357B64186DB854B040E9E6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		ABD8BFE6D73C6A27679CEE88 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
@@ -84,6 +86,7 @@
 				C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */,
 				CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */,
 				FA499FF391D3BD366C109967 /* LocalLibraryRepository.swift */,
+				7A793CB4C6B40772782DBCFB /* PortableLibraryDocument.swift */,
 				C9E0572DB334A4316351219C /* PublicationSearchService.swift */,
 				D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */,
 			);
@@ -251,6 +254,7 @@
 				F5434F5552F620E975D552E1 /* LibraryView.swift in Sources */,
 				A8EB88BE901D6EAD1D09E5B0 /* LocalBookImporter.swift in Sources */,
 				398D2A09D3126CAFFCFE0B00 /* LocalLibraryRepository.swift in Sources */,
+				2E318871EB2FBD27F151E157 /* PortableLibraryDocument.swift in Sources */,
 				F7357CD22B5F58D51741031D /* PreviewLibrary.swift in Sources */,
 				0A2820723DC8B5742462D9A8 /* PublicationSearchService.swift in Sources */,
 				E1956715325F3D9C4B23E35D /* ReaderContentsView.swift in Sources */,

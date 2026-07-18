@@ -52,11 +52,15 @@ final class LibraryStore {
     var showsImporter = false
     var isImporting = false
     var importAlert: ImportAlert?
+    var exportDocument: PortableLibraryDocument?
+    var showsExporter = false
+    var isExporting = false
     private(set) var isSearching = false
 
     private let isPreview: Bool
     private let repository: LocalLibraryRepository
     private let importer: LocalBookImporter
+    private let exporter = LibraryExportService()
     private var searchResultIDs: [UUID]?
     private var searchTask: Task<Void, Never>?
 
@@ -181,6 +185,18 @@ final class LibraryStore {
 
     func requestImport() {
         showsImporter = true
+    }
+
+    func prepareExport() async {
+        guard !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            exportDocument = try await exporter.makeDocument(snapshot: snapshot())
+            showsExporter = true
+        } catch {
+            importAlert = ImportAlert(title: "Export Failed", message: error.localizedDescription)
+        }
     }
 
     func importBooks(from urls: [URL]) async {
@@ -337,9 +353,20 @@ final class LibraryStore {
     }
 
     func emptyTrash() {
-        books.removeAll { $0.deletedAt != nil }
-        selectedBookIDs.removeAll()
-        Task { await persistSnapshot() }
+        let discarded = books.filter { $0.deletedAt != nil }
+        guard !discarded.isEmpty else { return }
+        Task {
+            do {
+                try await importer.removeAssets(for: discarded)
+                books.removeAll { $0.deletedAt != nil }
+                bookmarks.removeAll { bookmark in discarded.contains { $0.id == bookmark.bookID } }
+                annotations.removeAll { annotation in discarded.contains { $0.id == annotation.bookID } }
+                selectedBookIDs.removeAll()
+                await persistSnapshot()
+            } catch {
+                importAlert = ImportAlert(title: "Trash Couldn’t Be Emptied", message: error.localizedDescription)
+            }
+        }
     }
 
     func toggleSelection(_ id: UUID) {

@@ -114,6 +114,20 @@ actor LocalBookImporter {
         )
     }
 
+    func removeAssets(for books: [Book]) throws {
+        let root = try libraryRoot().standardizedFileURL
+        for book in books {
+            guard let relativePath = book.asset?.localRelativePath else { continue }
+            let components = relativePath.split(separator: "/")
+            guard components.count >= 3, components[0] == "Books", String(components[1]) == book.id.uuidString else { continue }
+            let directory = root.appending(path: "Books/\(book.id.uuidString)", directoryHint: .isDirectory).standardizedFileURL
+            guard directory.path.hasPrefix(root.appending(path: "Books").path + "/") else { continue }
+            if fileManager.fileExists(atPath: directory.path) {
+                try fileManager.removeItem(at: directory)
+            }
+        }
+    }
+
     private func hashFile(at url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }

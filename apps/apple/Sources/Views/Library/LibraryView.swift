@@ -48,7 +48,7 @@ struct LibraryView: View {
             Button("Cancel", role: .cancel) {}
             Button("Delete Permanently", role: .destructive) { store.emptyTrash() }
         } message: {
-            Text("This permanently removes every book in Trash from the catalog. Original files will be removed in a later cleanup pass.")
+            Text("This permanently removes every book in Trash, including its local EPUB, cover, bookmarks, and notes. This can’t be undone.")
         }
     }
 
@@ -132,6 +132,10 @@ struct LibraryView: View {
                 }
             }
             layoutPicker
+            Button("Export Library", systemImage: "square.and.arrow.up") {
+                Task { await store.prepareExport() }
+            }
+            .help("Export original EPUBs, metadata, and reading data")
             Button("Import", systemImage: "plus") { store.requestImport() }
                 .help("Import an EPUB")
         }

@@ -38,6 +38,17 @@ struct AppRootView: View {
                 )
             }
         }
+        .fileExporter(
+            isPresented: $store.showsExporter,
+            document: store.exportDocument,
+            contentType: .glassleafLibrary,
+            defaultFilename: "Glassleaf Library"
+        ) { result in
+            if case .failure(let error) = result {
+                store.importAlert = .init(title: "Export Failed", message: error.localizedDescription)
+            }
+            store.exportDocument = nil
+        }
         .alert(item: $store.importAlert) { issue in
             Alert(
                 title: Text(issue.title),
@@ -46,8 +57,8 @@ struct AppRootView: View {
             )
         }
         .overlay(alignment: .bottom) {
-            if store.isImporting {
-                ProgressView("Importing…")
+            if store.isImporting || store.isExporting {
+                ProgressView(store.isImporting ? "Importing…" : "Preparing Export…")
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .glassEffect(.regular, in: .capsule)
