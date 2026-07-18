@@ -7,7 +7,7 @@ struct SidebarView: View {
     @State private var draftName = ""
     @State private var renameTarget: RenameTarget?
     @State private var pendingDeletion: DeletionTarget?
-    @State private var showsSmartCollectionEditor = false
+    @State private var organizerSheet: OrganizerSheet?
 
     var body: some View {
         List(selection: selectionBinding) {
@@ -56,8 +56,13 @@ struct SidebarView: View {
         } message: {
             Text("Books will stay in your library. This can’t be undone.")
         }
-        .sheet(isPresented: $showsSmartCollectionEditor) {
-            SmartCollectionEditor(store: store)
+        .sheet(item: $organizerSheet) { sheet in
+            switch sheet {
+            case .smartCollection(let collection):
+                SmartCollectionEditor(store: store, collection: collection)
+            case .series(let item):
+                SeriesManagerView(store: store, series: item)
+            }
         }
     }
 
@@ -90,6 +95,10 @@ struct SidebarView: View {
                 .foregroundStyle(.secondary)
             ForEach(store.collections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 row(.collection(collection.id), icon: "rectangle.stack", count: store.count(for: .collection(collection.id)))
+                    .dropDestination(for: String.self) { values, _ in
+                        store.assignCollection(collection.id, to: Set(values.compactMap(UUID.init(uuidString:))))
+                        return !values.isEmpty
+                    }
                     .contextMenu {
                         Button("Rename", systemImage: "pencil") { beginRename(.collection(collection)) }
                         Button("Delete Collection", systemImage: "trash", role: .destructive) { pendingDeletion = .collection(collection.id) }
@@ -99,17 +108,31 @@ struct SidebarView: View {
             Label("Tags", systemImage: "tag")
                 .foregroundStyle(.secondary)
             ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
-                row(.tag(tag.name), icon: "tag", count: store.count(for: .tag(tag.name)))
+                row(.tag(tag.id), icon: "tag", count: store.count(for: .tag(tag.id)))
+                    .dropDestination(for: String.self) { values, _ in
+                        store.assignTag(tag.id, to: Set(values.compactMap(UUID.init(uuidString:))))
+                        return !values.isEmpty
+                    }
                     .contextMenu {
-                        Button("Rename", systemImage: "pencil") { beginRename(.tag(tag.name)) }
-                        Button("Delete Tag", systemImage: "trash", role: .destructive) { pendingDeletion = .tag(tag.name) }
+                        Button("Rename", systemImage: "pencil") { beginRename(.tag(tag)) }
+                        Button("Delete Tag", systemImage: "trash", role: .destructive) { pendingDeletion = .tag(tag.id) }
                     }
             }
 
             Label("Series", systemImage: "square.stack.3d.up")
                 .foregroundStyle(.secondary)
-            ForEach(seriesNames, id: \.self) { name in
-                row(.series(name), icon: "square.stack.3d.up", count: store.count(for: .series(name)))
+            ForEach(store.series.sorted(by: { $0.sortOrder < $1.sortOrder })) { item in
+                row(.series(item.id), icon: "square.stack.3d.up", count: store.count(for: .series(item.id)))
+                    .dropDestination(for: String.self) { values, _ in
+                        store.assignSeries(item.id, to: Set(values.compactMap(UUID.init(uuidString:))))
+                        return !values.isEmpty
+                    }
+                    .contextMenu {
+                        Button("Manage Series…", systemImage: "slider.horizontal.3") { organizerSheet = .series(item) }
+                        Button("Rename", systemImage: "pencil") { beginRename(.series(item)) }
+                        Divider()
+                        Button("Delete Series", systemImage: "trash", role: .destructive) { pendingDeletion = .series(item.id) }
+                    }
             }
 
             if !store.smartCollections.isEmpty {
@@ -119,7 +142,7 @@ struct SidebarView: View {
             ForEach(store.smartCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 row(.smartCollection(collection.id), icon: "gearshape.2", count: store.count(for: .smartCollection(collection.id)))
                     .contextMenu {
-                        Button("Rename", systemImage: "pencil") { beginRename(.smartCollection(collection)) }
+                        Button("Edit Rules…", systemImage: "slider.horizontal.3") { organizerSheet = .smartCollection(collection) }
                         Button("Delete Smart Collection", systemImage: "trash", role: .destructive) { pendingDeletion = .smartCollection(collection.id) }
                     }
             }
@@ -129,7 +152,8 @@ struct SidebarView: View {
                     Button("Folder", systemImage: "folder.badge.plus") { beginCreation(.folder) }
                     Button("Collection", systemImage: "rectangle.stack.badge.plus") { beginCreation(.collection) }
                     Button("Tag", systemImage: "tag") { beginCreation(.tag) }
-                    Button("Smart Collection…", systemImage: "gearshape.2") { showsSmartCollectionEditor = true }
+                    Button("Series", systemImage: "square.stack.3d.up") { beginCreation(.series) }
+                    Button("Smart Collection…", systemImage: "gearshape.2") { organizerSheet = .smartCollection(nil) }
                 }
             } label: {
                 Label("New Organizer…", systemImage: "plus")
@@ -177,10 +201,6 @@ struct SidebarView: View {
         .padding(.vertical, 10)
     }
 #endif
-
-    private var seriesNames: [String] {
-        Array(Set(store.books.compactMap(\.series))).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-    }
 
     private func folderDepth(_ folder: Folder) -> Int {
         var depth = 0
@@ -238,6 +258,7 @@ struct SidebarView: View {
         case .subfolder(let parentID): store.createFolder(name: draftName, parentID: parentID)
         case .tag: store.createTag(name: draftName)
         case .collection: store.createCollection(name: draftName)
+        case .series: store.createSeries(name: draftName)
         case nil: break
         }
         resetEditor()
@@ -246,9 +267,9 @@ struct SidebarView: View {
     private func commitRename() {
         switch renameTarget {
         case .folder(let folder): store.renameFolder(id: folder.id, name: draftName)
-        case .tag(let name): store.renameTag(name, to: draftName)
+        case .tag(let tag): store.renameTag(id: tag.id, to: draftName)
         case .collection(let collection): store.renameCollection(id: collection.id, name: draftName)
-        case .smartCollection(let collection): store.renameSmartCollection(id: collection.id, name: draftName)
+        case .series(let item): store.renameSeries(id: item.id, name: draftName)
         case nil: break
         }
         resetEditor()
@@ -257,8 +278,9 @@ struct SidebarView: View {
     private func commitDeletion() {
         switch pendingDeletion {
         case .folder(let id): store.deleteFolder(id: id)
-        case .tag(let name): store.deleteTag(name)
+        case .tag(let id): store.deleteTag(id: id)
         case .collection(let id): store.deleteCollection(id: id)
+        case .series(let id): store.deleteSeries(id: id)
         case .smartCollection(let id): store.deleteSmartCollection(id: id)
         case nil: break
         }
@@ -272,11 +294,126 @@ struct SidebarView: View {
     }
 }
 
+private struct SeriesManagerView: View {
+    @Bindable var store: LibraryStore
+    let series: Series
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var coverBookID: UUID?
+    @State private var orderedBookIDs: [UUID]
+
+    init(store: LibraryStore, series: Series) {
+        self.store = store
+        self.series = series
+        _name = State(initialValue: series.name)
+        _coverBookID = State(initialValue: series.coverBookID)
+        _orderedBookIDs = State(initialValue: store.books
+            .filter { $0.seriesID == series.id }
+            .sorted { ($0.seriesIndex ?? 0) < ($1.seriesIndex ?? 0) }
+            .map(\.id))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Series") {
+                    TextField("Name", text: $name)
+                    Picker("Cover", selection: $coverBookID) {
+                        Text("Automatic").tag(UUID?.none)
+                        ForEach(memberBooks) { book in
+                            Text(book.title).tag(Optional(book.id))
+                        }
+                    }
+                }
+
+                Section("Reading Order") {
+                    if memberBooks.isEmpty {
+                        ContentUnavailableView(
+                            "No Books in Series",
+                            systemImage: "square.stack.3d.up",
+                            description: Text("Add books below, then drag them into reading order.")
+                        )
+                    } else {
+                        ForEach(memberBooks) { book in
+                            HStack(spacing: 12) {
+                                BookCoverView(book: book, size: .row)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(book.title)
+                                    Text(book.author).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button("Remove", systemImage: "minus.circle", role: .destructive) {
+                                    orderedBookIDs.removeAll { $0 == book.id }
+                                    if coverBookID == book.id { coverBookID = nil }
+                                }
+                                .labelStyle(.iconOnly)
+                                .accessibilityLabel("Remove \(book.title) from series")
+                            }
+                        }
+                        .onMove(perform: moveBooks)
+                    }
+                }
+
+                if !availableBooks.isEmpty {
+                    Section("Add Books") {
+                        ForEach(availableBooks) { book in
+                            Button {
+                                orderedBookIDs.append(book.id)
+                            } label: {
+                                Label(book.title, systemImage: "plus.circle")
+                            }
+                        }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle("Manage Series")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .frame(minWidth: 440, idealWidth: 560, minHeight: 560, idealHeight: 720)
+    }
+
+    private var memberBooks: [Book] {
+        let rank = Dictionary(uniqueKeysWithValues: orderedBookIDs.enumerated().map { ($0.element, $0.offset) })
+        return store.books
+            .filter { rank[$0.id] != nil }
+            .sorted { rank[$0.id, default: .max] < rank[$1.id, default: .max] }
+    }
+
+    private var availableBooks: [Book] {
+        let memberIDs = Set(orderedBookIDs)
+        return store.books
+            .filter { $0.deletedAt == nil && !memberIDs.contains($0.id) && ($0.seriesID == nil || $0.seriesID == series.id) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    private func moveBooks(from source: IndexSet, to destination: Int) {
+        orderedBookIDs.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func save() {
+        store.updateSeries(
+            id: series.id,
+            name: name,
+            coverBookID: coverBookID,
+            orderedBookIDs: orderedBookIDs
+        )
+        dismiss()
+    }
+}
+
 private enum CreationKind {
     case folder
     case subfolder(UUID)
     case tag
     case collection
+    case series
 
     var title: String {
         switch self {
@@ -284,6 +421,7 @@ private enum CreationKind {
         case .subfolder: "New Subfolder"
         case .tag: "New Tag"
         case .collection: "New Collection"
+        case .series: "New Series"
         }
     }
 
@@ -294,23 +432,36 @@ private enum CreationKind {
 
 private enum RenameTarget {
     case folder(Folder)
-    case tag(String)
+    case tag(Tag)
     case collection(BookCollection)
-    case smartCollection(SmartCollection)
+    case series(Series)
 
     var name: String {
         switch self {
         case .folder(let folder): folder.name
-        case .tag(let name): name
+        case .tag(let tag): tag.name
         case .collection(let collection): collection.name
-        case .smartCollection(let collection): collection.name
+        case .series(let item): item.name
         }
     }
 }
 
 private enum DeletionTarget {
     case folder(UUID)
-    case tag(String)
+    case tag(UUID)
     case collection(UUID)
+    case series(UUID)
     case smartCollection(UUID)
+}
+
+private enum OrganizerSheet: Identifiable {
+    case smartCollection(SmartCollection?)
+    case series(Series)
+
+    var id: String {
+        switch self {
+        case .smartCollection(let collection): "smart-\(collection?.id.uuidString ?? "new")"
+        case .series(let item): "series-\(item.id.uuidString)"
+        }
+    }
 }

@@ -11,11 +11,12 @@ struct BookMetadataEditor: View {
     @State private var author: String
     @State private var summary: String
     @State private var language: String
-    @State private var series: String
+    @State private var seriesID: UUID?
+    @State private var newSeries = ""
     @State private var seriesIndex: String
     @State private var folderID: UUID?
     @State private var collectionIDs: Set<UUID>
-    @State private var tagNames: Set<String>
+    @State private var tagIDs: Set<UUID>
     @State private var newTag = ""
     @State private var coverStyle: CoverStyle
     @State private var showsCoverImporter = false
@@ -28,11 +29,11 @@ struct BookMetadataEditor: View {
         _author = State(initialValue: book.author)
         _summary = State(initialValue: book.summary)
         _language = State(initialValue: book.language ?? "")
-        _series = State(initialValue: book.series ?? "")
+        _seriesID = State(initialValue: book.seriesID)
         _seriesIndex = State(initialValue: book.seriesIndex.map(String.init(describing:)) ?? "")
         _folderID = State(initialValue: book.folderID)
         _collectionIDs = State(initialValue: book.collectionIDs)
-        _tagNames = State(initialValue: book.tags)
+        _tagIDs = State(initialValue: book.tagIDs)
         _coverStyle = State(initialValue: book.coverStyle)
     }
 
@@ -60,8 +61,8 @@ struct BookMetadataEditor: View {
                 Section("Location") {
                     Picker("Folder", selection: $folderID) {
                         Text("No Folder").tag(UUID?.none)
-                        ForEach(store.folders.sorted(by: { $0.name < $1.name })) { folder in
-                            Text(folder.name).tag(Optional(folder.id))
+                        ForEach(store.foldersByPath) { folder in
+                            Text(store.folderPath(for: folder.id)).tag(Optional(folder.id))
                         }
                     }
                     if store.collections.isEmpty {
@@ -75,13 +76,27 @@ struct BookMetadataEditor: View {
                 }
 
                 Section("Series") {
-                    TextField("Series", text: $series)
+                    Picker("Series", selection: $seriesID) {
+                        Text("No Series").tag(UUID?.none)
+                        ForEach(store.series) { item in
+                            Text(item.name).tag(Optional(item.id))
+                        }
+                    }
+                    HStack {
+                        TextField("New series", text: $newSeries)
+                            .onSubmit(addSeries)
+                        Button("Add", systemImage: "plus", action: addSeries)
+                            .labelStyle(.iconOnly)
+                            .accessibilityLabel("Add series")
+                            .disabled(newSeries.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                     TextField("Position", text: $seriesIndex, prompt: Text("For example, 1.5"))
+                        .disabled(seriesID == nil)
                 }
 
                 Section("Tags") {
-                    ForEach(allTagNames, id: \.self) { tag in
-                        Toggle(tag, isOn: tagBinding(tag))
+                    ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
+                        Toggle(tag.name, isOn: membershipBinding(tag.id, in: $tagIDs))
                     }
                     HStack {
                         TextField("New tag", text: $newTag)
@@ -115,10 +130,6 @@ struct BookMetadataEditor: View {
         }
     }
 
-    private var allTagNames: [String] {
-        Array(Set(store.tags.map(\.name)).union(tagNames)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-    }
-
     private func membershipBinding(_ id: UUID, in selection: Binding<Set<UUID>>) -> Binding<Bool> {
         Binding(
             get: { selection.wrappedValue.contains(id) },
@@ -128,34 +139,31 @@ struct BookMetadataEditor: View {
         )
     }
 
-    private func tagBinding(_ name: String) -> Binding<Bool> {
-        Binding(
-            get: { tagNames.contains(name) },
-            set: { enabled in
-                if enabled { tagNames.insert(name) } else { tagNames.remove(name) }
-            }
-        )
-    }
-
     private func addTag() {
         let value = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
-        tagNames.insert(value)
+        if let id = store.createTag(name: value) { tagIDs.insert(id) }
         newTag = ""
     }
 
+    private func addSeries() {
+        let value = newSeries.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        seriesID = store.createSeries(name: value)
+        newSeries = ""
+    }
+
     private func save() {
-        for tag in tagNames { store.createTag(name: tag) }
         store.updateBook(id: book.id) { value in
             value.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
             value.author = author.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "Unknown Author"
             value.summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
             value.language = language.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            value.series = series.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            value.seriesID = seriesID
             value.seriesIndex = Decimal(string: seriesIndex.trimmingCharacters(in: .whitespacesAndNewlines))
             value.folderID = folderID
             value.collectionIDs = collectionIDs
-            value.tags = tagNames
+            value.tagIDs = tagIDs
             value.coverStyle = coverStyle
         }
         if let replacementCover {

@@ -38,7 +38,7 @@ actor LocalLibraryRepository {
     func load() throws -> LibrarySnapshot {
         try withDatabase { database in
             try migrateLegacyCatalogIfNeeded(database)
-            return LibrarySnapshot(
+            let stored = LibrarySnapshot(
                 books: try decodeRows(Book.self, table: "books", database: database),
                 folders: try decodeRows(Folder.self, table: "folders", database: database),
                 tags: try decodeRows(Tag.self, table: "tags", database: database),
@@ -48,6 +48,17 @@ actor LocalLibraryRepository {
                 bookmarks: try decodeRows(Bookmark.self, table: "bookmarks", database: database),
                 annotations: try decodeRows(Annotation.self, table: "annotations", database: database)
             )
+            let migrated = stored.migratingOrganizationIdentity()
+            if migrated != stored {
+                try transaction(database) {
+                    try replace(migrated.books, table: "books", database: database)
+                    try replace(migrated.tags, table: "tags", database: database)
+                    try replace(migrated.series, table: "series", database: database)
+                    try replace(migrated.smartCollections, table: "smart_collections", database: database)
+                    try rebuildSearchIndex(snapshot: migrated, database: database)
+                }
+            }
+            return migrated
         }
     }
 
@@ -132,6 +143,8 @@ actor LocalLibraryRepository {
     }
 
     struct SearchContext: Sendable {
+        var seriesName: String = ""
+        var tagNames: String = ""
         var folderName: String = ""
         var collectionNames: String = ""
     }
@@ -209,8 +222,12 @@ actor LocalLibraryRepository {
         try execute(database, sql: "DELETE FROM book_search")
         let folders = Dictionary(uniqueKeysWithValues: snapshot.folders.map { ($0.id, $0.name) })
         let collections = Dictionary(uniqueKeysWithValues: snapshot.collections.map { ($0.id, $0.name) })
+        let tags = Dictionary(uniqueKeysWithValues: snapshot.tags.map { ($0.id, $0.name) })
+        let series = Dictionary(uniqueKeysWithValues: snapshot.series.map { ($0.id, $0.name) })
         for book in snapshot.books where book.deletedAt == nil {
             let context = SearchContext(
+                seriesName: book.seriesID.flatMap { series[$0] } ?? "",
+                tagNames: book.tagIDs.compactMap { tags[$0] }.joined(separator: " "),
                 folderName: book.folderID.flatMap { folders[$0] } ?? "",
                 collectionNames: book.collectionIDs.compactMap { collections[$0] }.joined(separator: " ")
             )
@@ -223,8 +240,8 @@ actor LocalLibraryRepository {
             database,
             sql: "INSERT INTO book_search(book_id, title, author, series, tags, folder, collections) VALUES (?, ?, ?, ?, ?, ?, ?)",
             values: [
-                .text(book.id.uuidString), .text(book.title), .text(book.author), .text(book.series ?? ""),
-                .text(book.tags.sorted().joined(separator: " ")), .text(context.folderName), .text(context.collectionNames),
+                .text(book.id.uuidString), .text(book.title), .text(book.author), .text(context.seriesName),
+                .text(context.tagNames), .text(context.folderName), .text(context.collectionNames),
             ]
         )
     }

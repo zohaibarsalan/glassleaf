@@ -24,8 +24,8 @@ struct BookDetailView: View {
                         Text(currentBook.author)
                             .font(.title3)
                             .foregroundStyle(.secondary)
-                        if let series = currentBook.series {
-                            Text(series)
+                        if let seriesName = store.seriesName(for: currentBook) {
+                            Text(seriesName)
                                 .font(.subheadline)
                                 .foregroundStyle(.tertiary)
                         }
@@ -69,7 +69,7 @@ struct BookDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    if !currentBook.tags.isEmpty {
+                    if !store.tagNames(for: currentBook).isEmpty {
                         ViewThatFits {
                             HStack {
                                 tagViews
@@ -103,7 +103,7 @@ struct BookDetailView: View {
 
     @ViewBuilder
     private var tagViews: some View {
-        ForEach(currentBook.tags.sorted(), id: \.self) { tag in
+        ForEach(store.tagNames(for: currentBook), id: \.self) { tag in
             Text(tag)
                 .font(.caption.weight(.medium))
                 .padding(.horizontal, 10)

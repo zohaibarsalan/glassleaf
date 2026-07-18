@@ -7,9 +7,9 @@ enum SidebarDestination: Hashable, Sendable {
     case library(LibraryFilter)
     case inbox
     case folder(UUID)
-    case tag(String)
+    case tag(UUID)
     case collection(UUID)
-    case series(String)
+    case series(UUID)
     case smartCollection(UUID)
     case trash
 }
@@ -78,14 +78,24 @@ final class LibraryStore {
         repository: LocalLibraryRepository = LocalLibraryRepository(),
         importer: LocalBookImporter = LocalBookImporter()
     ) {
-        self.books = books
-        self.folders = folders
-        self.tags = tags
-        self.collections = collections
-        self.series = series
-        self.smartCollections = smartCollections
-        self.bookmarks = bookmarks
-        self.annotations = annotations
+        let migrated = LibrarySnapshot(
+            books: books,
+            folders: folders,
+            tags: tags,
+            collections: collections,
+            series: series,
+            smartCollections: smartCollections,
+            bookmarks: bookmarks,
+            annotations: annotations
+        ).migratingOrganizationIdentity()
+        self.books = migrated.books
+        self.folders = migrated.folders
+        self.tags = migrated.tags
+        self.collections = migrated.collections
+        self.series = migrated.series
+        self.smartCollections = migrated.smartCollections
+        self.bookmarks = migrated.bookmarks
+        self.annotations = migrated.annotations
         self.readerPreferences = readerPreferences
         self.isPreview = isPreview
         self.repository = repository
@@ -108,11 +118,50 @@ final class LibraryStore {
                 return []
             }
         }
+        if sort == .series {
+            return candidates.sorted { lhs, rhs in
+                let left = seriesName(for: lhs) ?? ""
+                let right = seriesName(for: rhs) ?? ""
+                if left.localizedStandardCompare(right) == .orderedSame {
+                    return (lhs.seriesIndex ?? 0) < (rhs.seriesIndex ?? 0)
+                }
+                return left.localizedStandardCompare(right) == .orderedAscending
+            }
+        }
         return candidates.sorted(by: sort.areInIncreasingOrder)
     }
 
     func count(for destination: SidebarDestination) -> Int {
         books.lazy.filter { destination.includes($0, store: self) }.count
+    }
+
+    func tagName(for id: UUID) -> String? {
+        tags.first(where: { $0.id == id })?.name
+    }
+
+    func tagNames(for book: Book) -> [String] {
+        book.tagIDs.compactMap(tagName(for:)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    func seriesName(for book: Book) -> String? {
+        book.seriesID.flatMap { id in series.first(where: { $0.id == id })?.name }
+    }
+
+    func folderPath(for id: UUID) -> String {
+        var components: [String] = []
+        var currentID: UUID? = id
+        var visited: Set<UUID> = []
+        while let value = currentID,
+              visited.insert(value).inserted,
+              let folder = folders.first(where: { $0.id == value }) {
+            components.append(folder.name)
+            currentID = folder.parentID
+        }
+        return components.reversed().joined(separator: " / ")
+    }
+
+    var foldersByPath: [Folder] {
+        folders.sorted { folderPath(for: $0.id).localizedStandardCompare(folderPath(for: $1.id)) == .orderedAscending }
     }
 
     func toggleFavorite(for id: Book.ID) {
@@ -212,11 +261,16 @@ final class LibraryStore {
         var failures: [String] = []
         for url in urls {
             do {
-                let book = try await importer.importBook(
+                var book = try await importer.importBook(
                     from: url,
                     existingHashes: existingHashes,
                     existingIdentifiers: existingIdentifiers
                 )
+                let migrated = LibrarySnapshot(books: [book], tags: tags, series: series)
+                    .migratingOrganizationIdentity()
+                book = migrated.books[0]
+                tags = migrated.tags
+                series = migrated.series
                 books.insert(book, at: 0)
                 if let hash = book.asset?.contentHash { existingHashes.insert(hash) }
                 existingIdentifiers.formUnion(book.identifiers.map {
@@ -262,26 +316,28 @@ final class LibraryStore {
         selectedBookIDs.removeAll()
     }
 
-    func assignTag(_ name: String, to ids: Set<UUID>) {
+    func assignTag(named name: String, to ids: Set<UUID>) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty else { return }
-        if !tags.contains(where: { $0.normalizedName == Tag(name: cleanName).normalizedName }) {
-            tags.append(Tag(name: cleanName))
-            persistOrganization()
-        }
-        for id in ids { updateBook(id: id) { $0.tags.insert(cleanName) } }
+        guard let tagID = createTag(name: cleanName) else { return }
+        assignTag(tagID, to: ids)
     }
 
-    func removeTag(_ name: String, from ids: Set<UUID>) {
-        for id in ids {
-            updateBook(id: id) { book in
-                book.tags = Set(book.tags.filter { $0.localizedCaseInsensitiveCompare(name) != .orderedSame })
-            }
-        }
+    func assignTag(_ tagID: UUID, to ids: Set<UUID>) {
+        guard tags.contains(where: { $0.id == tagID }) else { return }
+        for id in ids { updateBook(id: id) { $0.tagIDs.insert(tagID) } }
+    }
+
+    func removeTag(_ tagID: UUID, from ids: Set<UUID>) {
+        for id in ids { updateBook(id: id) { $0.tagIDs.remove(tagID) } }
     }
 
     func assignCollection(_ collectionID: UUID, to ids: Set<UUID>) {
         for id in ids { updateBook(id: id) { $0.collectionIDs.insert(collectionID) } }
+    }
+
+    func removeCollection(_ collectionID: UUID, from ids: Set<UUID>) {
+        for id in ids { updateBook(id: id) { $0.collectionIDs.remove(collectionID) } }
     }
 
     func createFolder(name: String, parentID: UUID? = nil) {
@@ -290,11 +346,15 @@ final class LibraryStore {
         persistOrganization()
     }
 
-    func createTag(name: String) {
-        guard let cleanName = validatedName(name) else { return }
-        guard !tags.contains(where: { $0.normalizedName == Tag(name: cleanName).normalizedName }) else { return }
+    @discardableResult
+    func createTag(name: String) -> UUID? {
+        guard let cleanName = validatedName(name) else { return nil }
+        if let existing = tags.first(where: { $0.normalizedName == Tag(name: cleanName).normalizedName }) {
+            return existing.id
+        }
         tags.append(Tag(name: cleanName, sortOrder: tags.count))
         persistOrganization()
+        return tags.last?.id
     }
 
     func createCollection(name: String) {
@@ -306,6 +366,14 @@ final class LibraryStore {
     func createSmartCollection(name: String, rule: SmartCollectionRule) {
         guard let cleanName = validatedName(name) else { return }
         smartCollections.append(SmartCollection(name: cleanName, rule: rule, sortOrder: smartCollections.count))
+        persistOrganization()
+    }
+
+    func updateSmartCollection(id: UUID, name: String, rule: SmartCollectionRule) {
+        guard let cleanName = validatedName(name),
+              let index = smartCollections.firstIndex(where: { $0.id == id }) else { return }
+        smartCollections[index].name = cleanName
+        smartCollections[index].rule = rule
         persistOrganization()
     }
 
@@ -321,14 +389,66 @@ final class LibraryStore {
         persistOrganization()
     }
 
-    func assignSeries(_ name: String?, to ids: Set<UUID>) {
-        let cleanName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+    @discardableResult
+    func createSeries(name: String) -> UUID? {
+        guard let cleanName = validatedName(name) else { return nil }
+        let normalized = Series(name: cleanName).normalizedName
+        if let existing = series.first(where: { $0.normalizedName == normalized }) { return existing.id }
+        series.append(Series(name: cleanName, sortOrder: series.count))
+        persistOrganization()
+        return series.last?.id
+    }
+
+    func assignSeries(_ seriesID: UUID?, to ids: Set<UUID>) {
         for id in ids {
             updateBook(id: id) { book in
-                book.series = cleanName?.isEmpty == false ? cleanName : nil
-                if book.series == nil { book.seriesIndex = nil }
+                book.seriesID = seriesID
+                if seriesID == nil { book.seriesIndex = nil }
             }
         }
+    }
+
+    func renameSeries(id: UUID, name: String) {
+        guard let cleanName = validatedName(name),
+              let index = series.firstIndex(where: { $0.id == id }) else { return }
+        let normalized = Series(name: cleanName).normalizedName
+        guard !series.contains(where: { $0.id != id && $0.normalizedName == normalized }) else { return }
+        series[index].name = cleanName
+        series[index].updatedAt = .now
+        persistOrganization()
+    }
+
+    func updateSeries(id: UUID, name: String, coverBookID: UUID?, orderedBookIDs: [UUID]) {
+        guard let cleanName = validatedName(name),
+              let index = series.firstIndex(where: { $0.id == id }) else { return }
+        series[index].name = cleanName
+        series[index].coverBookID = coverBookID
+        series[index].updatedAt = .now
+        let memberIDs = Set(orderedBookIDs)
+        for book in books where book.seriesID == id && !memberIDs.contains(book.id) {
+            updateBook(id: book.id) { value in
+                value.seriesID = nil
+                value.seriesIndex = nil
+            }
+        }
+        for (offset, bookID) in orderedBookIDs.enumerated() {
+            updateBook(id: bookID) { book in
+                book.seriesID = id
+                book.seriesIndex = Decimal(offset + 1)
+            }
+        }
+        persistOrganization()
+    }
+
+    func deleteSeries(id: UUID) {
+        series.removeAll { $0.id == id }
+        for index in books.indices where books[index].seriesID == id {
+            books[index].seriesID = nil
+            books[index].seriesIndex = nil
+            books[index].updatedAt = .now
+        }
+        if selection == .series(id) { selection = .inbox }
+        Task { await persistSnapshot() }
     }
 
     func renameFolder(id: UUID, name: String) {
@@ -348,25 +468,19 @@ final class LibraryStore {
         Task { await persistSnapshot() }
     }
 
-    func renameTag(_ oldName: String, to newName: String) {
+    func renameTag(id: UUID, to newName: String) {
         guard let cleanName = validatedName(newName) else { return }
-        if let index = tags.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(oldName) == .orderedSame }) {
-            tags[index].name = cleanName
-        }
-        for index in books.indices where books[index].tags.contains(where: { $0.localizedCaseInsensitiveCompare(oldName) == .orderedSame }) {
-            books[index].tags = Set(books[index].tags.filter { $0.localizedCaseInsensitiveCompare(oldName) != .orderedSame })
-            books[index].tags.insert(cleanName)
-        }
-        if selection == .tag(oldName) { selection = .tag(cleanName) }
-        Task { await persistSnapshot() }
+        guard let index = tags.firstIndex(where: { $0.id == id }) else { return }
+        let normalized = Tag(name: cleanName).normalizedName
+        guard !tags.contains(where: { $0.id != id && $0.normalizedName == normalized }) else { return }
+        tags[index].name = cleanName
+        persistOrganization()
     }
 
-    func deleteTag(_ name: String) {
-        tags.removeAll { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
-        for index in books.indices {
-            books[index].tags = Set(books[index].tags.filter { $0.localizedCaseInsensitiveCompare(name) != .orderedSame })
-        }
-        if selection == .tag(name) { selection = .inbox }
+    func deleteTag(id: UUID) {
+        tags.removeAll { $0.id == id }
+        for index in books.indices { books[index].tagIDs.remove(id) }
+        if selection == .tag(id) { selection = .inbox }
         Task { await persistSnapshot() }
     }
 
@@ -433,14 +547,15 @@ final class LibraryStore {
     }
 
     private func apply(_ snapshot: LibrarySnapshot) {
-        books = snapshot.books
-        folders = snapshot.folders
-        tags = snapshot.tags
-        collections = snapshot.collections
-        series = snapshot.series
-        smartCollections = snapshot.smartCollections
-        bookmarks = snapshot.bookmarks
-        annotations = snapshot.annotations
+        let migrated = snapshot.migratingOrganizationIdentity()
+        books = migrated.books
+        folders = migrated.folders
+        tags = migrated.tags
+        collections = migrated.collections
+        series = migrated.series
+        smartCollections = migrated.smartCollections
+        bookmarks = migrated.bookmarks
+        annotations = migrated.annotations
         scheduleSearch()
     }
 
@@ -467,14 +582,16 @@ final class LibraryStore {
     private static func matchesSearch(_ book: Book, query: String, store: LibraryStore) -> Bool {
         book.title.localizedStandardContains(query)
             || book.author.localizedStandardContains(query)
-            || book.series?.localizedStandardContains(query) == true
-            || book.tags.contains(where: { $0.localizedStandardContains(query) })
+            || store.seriesName(for: book)?.localizedStandardContains(query) == true
+            || store.tagNames(for: book).contains(where: { $0.localizedStandardContains(query) })
             || book.folderID.flatMap { id in store.folders.first(where: { $0.id == id })?.name.localizedStandardContains(query) } == true
             || book.collectionIDs.contains { id in store.collections.first(where: { $0.id == id })?.name.localizedStandardContains(query) == true }
     }
 
     private func searchContext(for book: Book) -> LocalLibraryRepository.SearchContext {
         .init(
+            seriesName: seriesName(for: book) ?? "",
+            tagNames: tagNames(for: book).joined(separator: " "),
             folderName: book.folderID.flatMap { id in folders.first(where: { $0.id == id })?.name } ?? "",
             collectionNames: book.collectionIDs.compactMap { id in collections.first(where: { $0.id == id })?.name }.joined(separator: " ")
         )
@@ -597,11 +714,15 @@ extension SidebarDestination {
         case .library(let filter): book.deletedAt == nil && filter.includes(book)
         case .inbox: book.deletedAt == nil && book.isInInbox
         case .folder(let id): book.deletedAt == nil && book.folderID == id
-        case .tag(let name): book.deletedAt == nil && book.tags.contains { $0.localizedCaseInsensitiveCompare(name) == .orderedSame }
+        case .tag(let id): book.deletedAt == nil && book.tagIDs.contains(id)
         case .collection(let id): book.deletedAt == nil && book.collectionIDs.contains(id)
-        case .series(let name): book.deletedAt == nil && book.series?.localizedCaseInsensitiveCompare(name) == .orderedSame
+        case .series(let id): book.deletedAt == nil && book.seriesID == id
         case .smartCollection(let id):
-            book.deletedAt == nil && store.smartCollections.first(where: { $0.id == id })?.rule.includes(book) == true
+            book.deletedAt == nil && store.smartCollections.first(where: { $0.id == id })?.rule.includes(
+                book,
+                tags: store.tags,
+                series: store.series
+            ) == true
         case .trash: book.deletedAt != nil
         }
     }
@@ -613,9 +734,9 @@ extension SidebarDestination {
         case .library(let filter): filter.title
         case .inbox: "Inbox"
         case .folder(let id): store.folders.first(where: { $0.id == id })?.name ?? "Folder"
-        case .tag(let name): name
+        case .tag(let id): store.tags.first(where: { $0.id == id })?.name ?? "Tag"
         case .collection(let id): store.collections.first(where: { $0.id == id })?.name ?? "Collection"
-        case .series(let name): name
+        case .series(let id): store.series.first(where: { $0.id == id })?.name ?? "Series"
         case .smartCollection(let id): store.smartCollections.first(where: { $0.id == id })?.name ?? "Smart Collection"
         case .trash: "Trash"
         }

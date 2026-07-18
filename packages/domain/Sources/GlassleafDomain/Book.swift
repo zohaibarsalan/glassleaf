@@ -5,13 +5,15 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
     public var title: String
     public var author: String
     public var summary: String
-    public var series: String?
+    public var seriesID: UUID?
+    public var legacySeriesName: String?
     public var seriesIndex: Decimal?
     public var dateAdded: Date
     public var lastOpened: Date?
     public var isFavorite: Bool
     public var progress: ReadingProgress
-    public var tags: Set<String>
+    public var tagIDs: Set<UUID>
+    public var legacyTagNames: Set<String>
     public var folderID: UUID?
     public var collectionIDs: Set<UUID>
     public var language: String?
@@ -27,12 +29,14 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
         title: String,
         author: String,
         summary: String = "",
+        seriesID: UUID? = nil,
         series: String? = nil,
         seriesIndex: Decimal? = nil,
         dateAdded: Date = .now,
         lastOpened: Date? = nil,
         isFavorite: Bool = false,
         progress: ReadingProgress = .notStarted,
+        tagIDs: Set<UUID> = [],
         tags: Set<String> = [],
         folderID: UUID? = nil,
         collectionIDs: Set<UUID> = [],
@@ -48,13 +52,15 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
         self.title = title
         self.author = author
         self.summary = summary
-        self.series = series
+        self.seriesID = seriesID
+        legacySeriesName = series
         self.seriesIndex = seriesIndex
         self.dateAdded = dateAdded
         self.lastOpened = lastOpened
         self.isFavorite = isFavorite
         self.progress = progress
-        self.tags = tags
+        self.tagIDs = tagIDs
+        legacyTagNames = tags
         self.folderID = folderID
         self.collectionIDs = collectionIDs
         self.language = language
@@ -73,12 +79,16 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
     }
 
     public var isInInbox: Bool {
-        folderID == nil && collectionIDs.isEmpty && tags.isEmpty
+        folderID == nil && collectionIDs.isEmpty && tagIDs.isEmpty && legacyTagNames.isEmpty
+    }
+
+    public var hasLegacyOrganizationIdentity: Bool {
+        legacySeriesName != nil || !legacyTagNames.isEmpty
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, author, summary, series, seriesIndex, dateAdded, lastOpened
-        case isFavorite, progress, tags, folderID, collectionIDs, language, identifiers
+        case id, title, author, summary, seriesID, series, seriesIndex, dateAdded, lastOpened
+        case isFavorite, progress, tagIDs, tags, folderID, collectionIDs, language, identifiers
         case updatedAt, deletedAt, coverStyle, cover, asset
     }
 
@@ -88,13 +98,15 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
         title = try values.decode(String.self, forKey: .title)
         author = try values.decode(String.self, forKey: .author)
         summary = try values.decodeIfPresent(String.self, forKey: .summary) ?? ""
-        series = try values.decodeIfPresent(String.self, forKey: .series)
+        seriesID = try values.decodeIfPresent(UUID.self, forKey: .seriesID)
+        legacySeriesName = try values.decodeIfPresent(String.self, forKey: .series)
         seriesIndex = try values.decodeIfPresent(Decimal.self, forKey: .seriesIndex)
         dateAdded = try values.decodeIfPresent(Date.self, forKey: .dateAdded) ?? .now
         lastOpened = try values.decodeIfPresent(Date.self, forKey: .lastOpened)
         isFavorite = try values.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
         progress = try values.decodeIfPresent(ReadingProgress.self, forKey: .progress) ?? .notStarted
-        tags = try values.decodeIfPresent(Set<String>.self, forKey: .tags) ?? []
+        tagIDs = try values.decodeIfPresent(Set<UUID>.self, forKey: .tagIDs) ?? []
+        legacyTagNames = try values.decodeIfPresent(Set<String>.self, forKey: .tags) ?? []
         folderID = try values.decodeIfPresent(UUID.self, forKey: .folderID)
         collectionIDs = try values.decodeIfPresent(Set<UUID>.self, forKey: .collectionIDs) ?? []
         language = try values.decodeIfPresent(String.self, forKey: .language)
@@ -112,13 +124,15 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
         try values.encode(title, forKey: .title)
         try values.encode(author, forKey: .author)
         try values.encode(summary, forKey: .summary)
-        try values.encodeIfPresent(series, forKey: .series)
+        try values.encodeIfPresent(seriesID, forKey: .seriesID)
+        if seriesID == nil { try values.encodeIfPresent(legacySeriesName, forKey: .series) }
         try values.encodeIfPresent(seriesIndex, forKey: .seriesIndex)
         try values.encode(dateAdded, forKey: .dateAdded)
         try values.encodeIfPresent(lastOpened, forKey: .lastOpened)
         try values.encode(isFavorite, forKey: .isFavorite)
         try values.encode(progress, forKey: .progress)
-        try values.encode(tags, forKey: .tags)
+        try values.encode(tagIDs, forKey: .tagIDs)
+        if tagIDs.isEmpty, !legacyTagNames.isEmpty { try values.encode(legacyTagNames, forKey: .tags) }
         try values.encodeIfPresent(folderID, forKey: .folderID)
         try values.encode(collectionIDs, forKey: .collectionIDs)
         try values.encodeIfPresent(language, forKey: .language)

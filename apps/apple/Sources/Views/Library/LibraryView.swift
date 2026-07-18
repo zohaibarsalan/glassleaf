@@ -40,7 +40,7 @@ struct LibraryView: View {
             TextField("Tag name", text: $batchTagName)
             Button("Cancel", role: .cancel) { batchTagName = "" }
             Button("Add") {
-                store.assignTag(batchTagName, to: store.selectedBookIDs)
+                store.assignTag(named: batchTagName, to: store.selectedBookIDs)
                 batchTagName = ""
             }
         }
@@ -92,7 +92,7 @@ struct LibraryView: View {
 
     private var list: some View {
         List(visibleBooks) { book in
-            BookRow(book: book) { activate(book) }
+            BookRow(book: book, seriesName: store.seriesName(for: book)) { activate(book) }
                 .overlay(alignment: .trailing) {
                     if store.isSelecting {
                         Image(systemName: store.selectedBookIDs.contains(book.id) ? "checkmark.circle.fill" : "circle")
@@ -175,25 +175,41 @@ struct LibraryView: View {
                 .accessibilityLabel("\(store.selectedBookIDs.count) books selected")
             Menu("Move", systemImage: "folder") {
                 Button("No Folder") { store.moveBooks(store.selectedBookIDs, to: nil) }
-                ForEach(store.folders) { folder in
-                    Button(folder.name) { store.moveBooks(store.selectedBookIDs, to: folder.id) }
+                ForEach(store.foldersByPath) { folder in
+                    Button(store.folderPath(for: folder.id)) { store.moveBooks(store.selectedBookIDs, to: folder.id) }
                 }
             }
             Menu("Collect", systemImage: "rectangle.stack") {
                 ForEach(store.collections) { collection in
-                    Button(collection.name) { store.assignCollection(collection.id, to: store.selectedBookIDs) }
+                    Button {
+                        if selectedBooksAllContain(collectionID: collection.id) {
+                            store.removeCollection(collection.id, from: store.selectedBookIDs)
+                        } else {
+                            store.assignCollection(collection.id, to: store.selectedBookIDs)
+                        }
+                    } label: {
+                        Label(collection.name, systemImage: selectedBooksAllContain(collectionID: collection.id) ? "checkmark" : "plus")
+                    }
                 }
             }
             Menu("Tag", systemImage: "tag") {
                 Button("New Tag…", systemImage: "plus") { showsBatchTagEditor = true }
                 ForEach(store.tags) { tag in
-                    Button(tag.name) { store.assignTag(tag.name, to: store.selectedBookIDs) }
+                    Button {
+                        if selectedBooksAllContain(tagID: tag.id) {
+                            store.removeTag(tag.id, from: store.selectedBookIDs)
+                        } else {
+                            store.assignTag(tag.id, to: store.selectedBookIDs)
+                        }
+                    } label: {
+                        Label(tag.name, systemImage: selectedBooksAllContain(tagID: tag.id) ? "checkmark" : "plus")
+                    }
                 }
             }
             Menu("Series", systemImage: "square.stack.3d.up") {
                 Button("No Series") { store.assignSeries(nil, to: store.selectedBookIDs) }
-                ForEach(Array(Set(store.books.compactMap(\.series))).sorted(), id: \.self) { name in
-                    Button(name) { store.assignSeries(name, to: store.selectedBookIDs) }
+                ForEach(store.series) { item in
+                    Button(item.name) { store.assignSeries(item.id, to: store.selectedBookIDs) }
                 }
             }
             Spacer()
@@ -218,13 +234,21 @@ struct LibraryView: View {
         }
         Menu("Move to Folder", systemImage: "folder") {
             Button("No Folder") { store.moveBooks([book.id], to: nil) }
-            ForEach(store.folders) { folder in
-                Button(folder.name) { store.moveBooks([book.id], to: folder.id) }
+            ForEach(store.foldersByPath) { folder in
+                Button(store.folderPath(for: folder.id)) { store.moveBooks([book.id], to: folder.id) }
             }
         }
         Menu("Add Tag", systemImage: "tag") {
             ForEach(store.tags) { tag in
-                Button(tag.name) { store.assignTag(tag.name, to: [book.id]) }
+                Button {
+                    if book.tagIDs.contains(tag.id) {
+                        store.removeTag(tag.id, from: [book.id])
+                    } else {
+                        store.assignTag(tag.id, to: [book.id])
+                    }
+                } label: {
+                    Label(tag.name, systemImage: book.tagIDs.contains(tag.id) ? "checkmark" : "plus")
+                }
             }
         }
         Divider()
@@ -237,6 +261,18 @@ struct LibraryView: View {
 
     private func activate(_ book: Book) {
         if store.isSelecting { store.toggleSelection(book.id) } else { store.showDetails(for: book) }
+    }
+
+    private func selectedBooksAllContain(tagID: UUID) -> Bool {
+        !store.selectedBookIDs.isEmpty && store.selectedBookIDs.allSatisfy { id in
+            store.books.first(where: { $0.id == id })?.tagIDs.contains(tagID) == true
+        }
+    }
+
+    private func selectedBooksAllContain(collectionID: UUID) -> Bool {
+        !store.selectedBookIDs.isEmpty && store.selectedBookIDs.allSatisfy { id in
+            store.books.first(where: { $0.id == id })?.collectionIDs.contains(collectionID) == true
+        }
     }
 
     private var emptyTitle: String {

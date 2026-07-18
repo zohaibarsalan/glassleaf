@@ -138,6 +138,7 @@ struct BookCard: View {
 
 struct BookRow: View {
     let book: Book
+    var seriesName: String?
     let action: () -> Void
 
     var body: some View {
@@ -149,8 +150,8 @@ struct BookRow: View {
                         .font(.headline)
                     Text(book.author)
                         .foregroundStyle(.secondary)
-                    if let series = book.series {
-                        Text(series)
+                    if let seriesName {
+                        Text(seriesName)
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
