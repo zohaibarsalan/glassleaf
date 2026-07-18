@@ -305,6 +305,8 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
             switch message.body as? String {
             case "next": next()
             case "previous": previous()
+            case "nextChapter": goToChapter(chapterIndex + 1)
+            case "previousChapter": goToChapter(chapterIndex - 1, progress: 1)
             default: break
             }
         case "glassleafProgress":
@@ -426,20 +428,47 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
           const position = () => horizontal() ? scrollX : scrollY;
           const report = () => webkit.messageHandlers.glassleafProgress.postMessage(Math.min(Math.max(position() / maxScroll(), 0), 1));
           window.glassleafSeek = value => { scrollTo(horizontal() ? value * maxScroll() : 0, horizontal() ? 0 : value * maxScroll()); setTimeout(report, 40); };
-          window.glassleafNext = () => { if (position() >= maxScroll() - 4) return false; scrollBy({left: horizontal() ? innerWidth : 0, top: horizontal() ? 0 : innerHeight * .86, behavior: 'smooth'}); return true; };
-          window.glassleafPrevious = () => { if (position() <= 4) return false; scrollBy({left: horizontal() ? -innerWidth : 0, top: horizontal() ? 0 : -innerHeight * .86, behavior: 'smooth'}); return true; };
+          const paginatedTarget = direction => {
+            const page = Math.round(scrollX / innerWidth);
+            const lastPage = Math.max(Math.ceil(root.scrollWidth / innerWidth) - 1, 0);
+            const targetPage = Math.min(Math.max(page + direction, 0), lastPage);
+            if (targetPage === page) return false;
+            scrollTo({left: targetPage * innerWidth, top: 0, behavior: 'smooth'});
+            return true;
+          };
+          window.glassleafNext = () => {
+            if (horizontal()) return paginatedTarget(1);
+            if (position() >= maxScroll() - 4) return false;
+            scrollBy({top: innerHeight * .86, behavior: 'smooth'});
+            return true;
+          };
+          window.glassleafPrevious = () => {
+            if (horizontal()) return paginatedTarget(-1);
+            if (position() <= 4) return false;
+            scrollBy({top: -innerHeight * .86, behavior: 'smooth'});
+            return true;
+          };
           let wheelDistance = 0;
-          let wheelLocked = false;
+          let wheelCommitted = false;
+          let wheelEndTimer = 0;
           addEventListener('wheel', event => {
-            if (!horizontal() || Math.abs(event.deltaX) <= Math.abs(event.deltaY) || Math.abs(event.deltaX) < 1) return;
+            if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) || Math.abs(event.deltaX) < 1) return;
             event.preventDefault();
-            if (wheelLocked) return;
+            clearTimeout(wheelEndTimer);
+            wheelEndTimer = setTimeout(() => {
+              wheelDistance = 0;
+              wheelCommitted = false;
+            }, 180);
+            if (wheelCommitted) return;
+            if (wheelDistance !== 0 && Math.sign(wheelDistance) !== Math.sign(event.deltaX)) wheelDistance = 0;
             wheelDistance += event.deltaX;
-            if (Math.abs(wheelDistance) < 54) return;
-            wheelLocked = true;
-            webkit.messageHandlers.glassleafPage.postMessage(wheelDistance > 0 ? 'next' : 'previous');
-            wheelDistance = 0;
-            setTimeout(() => { wheelLocked = false; }, 320);
+            if (Math.abs(wheelDistance) < 72) return;
+            wheelCommitted = true;
+            const forward = wheelDistance > 0;
+            const action = horizontal()
+              ? (forward ? 'next' : 'previous')
+              : (forward ? 'nextChapter' : 'previousChapter');
+            webkit.messageHandlers.glassleafPage.postMessage(action);
           }, {passive: false});
           addEventListener('keydown', event => {
             if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
