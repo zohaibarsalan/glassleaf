@@ -48,5 +48,27 @@
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Glassleaf Library</string>
+			<key>UTTypeIdentifier</key>
+			<string>app.glassleaf.library</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>glassleaflibrary</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.glassleaf.library</string>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

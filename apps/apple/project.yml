@@ -39,6 +39,15 @@ targets:
           UIApplicationSupportsMultipleScenes: true
           UISceneConfigurations: {}
         UILaunchScreen: {}
+        UTExportedTypeDeclarations:
+          - UTTypeConformsTo:
+              - com.apple.package
+            UTTypeDescription: Glassleaf Library
+            UTTypeIdentifier: app.glassleaf.library
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - glassleaflibrary
+              public.mime-type: application/vnd.glassleaf.library
     dependencies:
       - package: GlassleafDomain
     settings:
