@@ -361,6 +361,7 @@ struct ReaderSystemChromeModifier: ViewModifier {
             .persistentSystemOverlays(controlsVisible ? .automatic : .hidden)
 #else
         content
+            .toolbarVisibility(.hidden, for: .windowToolbar)
 #endif
     }
 }
