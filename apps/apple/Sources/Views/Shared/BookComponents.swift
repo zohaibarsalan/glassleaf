@@ -1,5 +1,10 @@
 import GlassleafDomain
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 enum BookCoverSize {
     case card
@@ -21,29 +26,37 @@ struct BookCoverView: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(book.coverStyle.palette.background)
+            if let image = LocalCoverLoader.image(for: book.cover) {
+                image
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size.dimensions.width, height: size.dimensions.height)
+                    .clipped()
+            } else {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(book.coverStyle.palette.background)
 
-            Image(systemName: "leaf.fill")
-                .font(.system(size: size == .row ? 24 : 58, weight: .ultraLight))
-                .foregroundStyle(book.coverStyle.palette.ink.opacity(0.14))
-                .rotationEffect(.degrees(-18))
-                .offset(x: size == .row ? 20 : 76, y: size == .row ? -26 : -106)
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: size == .row ? 24 : 58, weight: .ultraLight))
+                    .foregroundStyle(book.coverStyle.palette.ink.opacity(0.14))
+                    .rotationEffect(.degrees(-18))
+                    .offset(x: size == .row ? 20 : 76, y: size == .row ? -26 : -106)
 
-            if size != .row {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(book.title)
-                        .font(size == .hero ? .headline : .subheadline)
-                        .fontWeight(.semibold)
-                        .lineLimit(3)
-                    Text(book.author.uppercased())
-                        .font(.system(size: 8, weight: .semibold))
-                        .tracking(0.7)
-                        .lineLimit(1)
-                        .opacity(0.78)
+                if size != .row {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(book.title)
+                            .font(size == .hero ? .headline : .subheadline)
+                            .fontWeight(.semibold)
+                            .lineLimit(3)
+                        Text(book.author.uppercased())
+                            .font(.system(size: 8, weight: .semibold))
+                            .tracking(0.7)
+                            .lineLimit(1)
+                            .opacity(0.78)
+                    }
+                    .foregroundStyle(book.coverStyle.palette.ink)
+                    .padding(size == .hero ? 16 : 13)
                 }
-                .foregroundStyle(book.coverStyle.palette.ink)
-                .padding(size == .hero ? 16 : 13)
             }
         }
         .frame(width: size.dimensions.width, height: size.dimensions.height)
@@ -60,6 +73,25 @@ struct BookCoverView: View {
 
     private var cornerRadius: CGFloat {
         size == .row ? 6 : 10
+    }
+}
+
+private enum LocalCoverLoader {
+    static func image(for cover: CoverAsset?) -> Image? {
+        guard let cover, let root = try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        ) else { return nil }
+        let url = root.appending(path: "Glassleaf").appending(path: cover.localRelativePath)
+#if os(macOS)
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        return Image(nsImage: image)
+#else
+        guard let image = UIImage(contentsOfFile: url.path) else { return nil }
+        return Image(uiImage: image)
+#endif
     }
 }
 

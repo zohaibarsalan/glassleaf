@@ -17,6 +17,8 @@
 		54AAC2A7140429F4D3EB2F5D /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320945BB73FF5890E9635ACD /* LibraryStore.swift */; };
 		6A0B08C7B299373421EA1762 /* GlassleafDomain in Frameworks */ = {isa = PBXBuildFile; productRef = F710918C6DDF27ABBC6ECC8E /* GlassleafDomain */; };
 		7B90F52883B174C6E46116C2 /* ReaderSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEEF7115371C191B9B4C635 /* ReaderSample.swift */; };
+		8A7F33C9ED6236CF8E662D1C /* ZIPArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */; };
+		9F61AEBD09E4190657FFA2CE /* EPUBParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */; };
 		A8EB88BE901D6EAD1D09E5B0 /* LocalBookImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */; };
 		B399D23A4B2D15C8043BAAE7 /* ReaderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2841971642089A4E9142BBE0 /* ReaderSettingsView.swift */; };
 		E1956715325F3D9C4B23E35D /* ReaderContentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0352684D1F52DF780A508F92 /* ReaderContentsView.swift */; };
@@ -40,7 +42,9 @@
 		ABD8BFE6D73C6A27679CEE88 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
 		C058C58364BF8B28BA69C9A3 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		C2D6F4C17159F612F6D59CF9 /* BookMetadataEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookMetadataEditor.swift; sourceTree = "<group>"; };
+		C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBParser.swift; sourceTree = "<group>"; };
 		CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalBookImporter.swift; sourceTree = "<group>"; };
+		D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchive.swift; sourceTree = "<group>"; };
 		D4353F25B9511ACB2A6A8144 /* Glassleaf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glassleaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLibrary.swift; sourceTree = "<group>"; };
 		FA499FF391D3BD366C109967 /* LocalLibraryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryRepository.swift; sourceTree = "<group>"; };
@@ -71,8 +75,10 @@
 		0C8D236472A7F2B692E50174 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */,
 				CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */,
 				FA499FF391D3BD366C109967 /* LocalLibraryRepository.swift */,
+				D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -227,6 +233,7 @@
 				EAF56C921619354548BC035E /* BookComponents.swift in Sources */,
 				417DEAA268458A6541BD7C10 /* BookDetailView.swift in Sources */,
 				16EC150A297EEDA3D3AF7E46 /* BookMetadataEditor.swift in Sources */,
+				9F61AEBD09E4190657FFA2CE /* EPUBParser.swift in Sources */,
 				53D20A975A53ECD2001C0490 /* GlassleafApp.swift in Sources */,
 				431BF93F57537BECB54738DA /* HomeView.swift in Sources */,
 				54AAC2A7140429F4D3EB2F5D /* LibraryStore.swift in Sources */,
@@ -239,6 +246,7 @@
 				B399D23A4B2D15C8043BAAE7 /* ReaderSettingsView.swift in Sources */,
 				48386931E0AB1D0D96F463F5 /* ReaderView.swift in Sources */,
 				51D335C1211D89ADEB278F05 /* SidebarView.swift in Sources */,
+				8A7F33C9ED6236CF8E662D1C /* ZIPArchive.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -381,7 +389,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
+				OTHER_LDFLAGS = "$(inherited) -lsqlite3 -lz";
 				PRODUCT_BUNDLE_IDENTIFIER = app.glassleaf.reader;
 				PRODUCT_NAME = Glassleaf;
 				SDKROOT = auto;
@@ -410,7 +418,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
+				OTHER_LDFLAGS = "$(inherited) -lsqlite3 -lz";
 				PRODUCT_BUNDLE_IDENTIFIER = app.glassleaf.reader;
 				PRODUCT_NAME = Glassleaf;
 				SDKROOT = auto;

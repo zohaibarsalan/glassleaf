@@ -36,7 +36,7 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.books
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         TARGETED_DEVICE_FAMILY: "1,2"
-        OTHER_LDFLAGS: "$(inherited) -lsqlite3"
+        OTHER_LDFLAGS: "$(inherited) -lsqlite3 -lz"
     scheme:
       gatherCoverageData: true
 

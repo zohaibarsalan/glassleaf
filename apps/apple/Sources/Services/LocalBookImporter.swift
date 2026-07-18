@@ -48,7 +48,14 @@ actor LocalBookImporter {
         guard resourceValues.isRegularFile == true, byteCount > 0 else {
             throw ImportError.emptyFile
         }
-        try validateEPUB(at: sourceURL)
+        let archive: ZIPArchive
+        let package: EPUBPackage
+        do {
+            archive = try ZIPArchive(url: sourceURL)
+            package = try EPUBParser().parse(archive)
+        } catch {
+            throw ImportError.invalidEPUB
+        }
 
         let contentHash = try hashFile(at: sourceURL)
         guard !existingHashes.contains(contentHash) else {
@@ -60,33 +67,49 @@ actor LocalBookImporter {
         let destinationURL = try libraryRoot()
             .appending(path: relativePath, directoryHint: .notDirectory)
         let bookDirectory = destinationURL.deletingLastPathComponent()
+        let publicationRelativePath = "Books/\(id.uuidString)/Publication"
+        let publicationURL = try libraryRoot().appending(path: publicationRelativePath, directoryHint: .isDirectory)
 
         try fileManager.createDirectory(at: bookDirectory, withIntermediateDirectories: true)
         do {
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            try archive.extract(to: publicationURL, fileManager: fileManager)
         } catch {
             try? fileManager.removeItem(at: bookDirectory)
             throw error
         }
 
-        let rawTitle = sourceURL.deletingPathExtension().lastPathComponent
-        let title = rawTitle.replacingOccurrences(of: "_", with: " ")
+        let rawTitle = sourceURL.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "_", with: " ")
+        let title = package.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cover = package.coverPath.map {
+            CoverAsset(
+                localRelativePath: "\(publicationRelativePath)/\($0)",
+                mediaType: package.coverMediaType ?? "application/octet-stream"
+            )
+        }
         let coverIndex = id.uuidString.utf8.reduce(0) {
             ($0 + Int($1)) % CoverStyle.allCases.count
         }
 
         return Book(
             id: id,
-            title: title.isEmpty ? "Untitled" : title,
-            author: "Unknown Author",
-            summary: "Metadata will be extracted when EPUB rendering is integrated.",
-            tags: ["Inbox"],
+            title: title?.isEmpty == false ? title! : (rawTitle.isEmpty ? "Untitled" : rawTitle),
+            author: package.authors.isEmpty ? "Unknown Author" : package.authors.joined(separator: ", "),
+            summary: package.summary ?? "",
+            series: package.series,
+            seriesIndex: package.seriesIndex,
+            language: package.language,
+            identifiers: package.identifiers,
             coverStyle: CoverStyle.allCases[coverIndex],
+            cover: cover,
             asset: BookAsset(
                 contentHash: contentHash,
                 byteCount: byteCount,
                 originalFilename: sourceURL.lastPathComponent,
-                localRelativePath: relativePath
+                localRelativePath: relativePath,
+                extractedRelativePath: publicationRelativePath,
+                readingOrder: package.readingOrder,
+                tableOfContents: package.tableOfContents
             )
         )
     }
@@ -101,19 +124,6 @@ actor LocalBookImporter {
         }
 
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
-    }
-
-    private func validateEPUB(at url: URL) throws {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-
-        let prefix = try handle.read(upToCount: 4_096) ?? Data()
-        let zipSignature = Data([0x50, 0x4B, 0x03, 0x04])
-        let epubMediaType = Data("application/epub+zip".utf8)
-
-        guard prefix.starts(with: zipSignature), prefix.range(of: epubMediaType) != nil else {
-            throw ImportError.invalidEPUB
-        }
     }
 
     private func libraryRoot() throws -> URL {

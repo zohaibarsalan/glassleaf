@@ -67,6 +67,18 @@ let encodedBook = try JSONEncoder().encode(assetBook)
 let decodedBook = try JSONDecoder().decode(Book.self, from: encodedBook)
 check(decodedBook.asset == asset, "book assets survive portable encoding")
 
+let publicationAsset = BookAsset(
+    contentHash: String(repeating: "b", count: 64),
+    byteCount: 2_048,
+    originalFilename: "Publication.epub",
+    localRelativePath: "Books/publication/Publication.epub",
+    extractedRelativePath: "Books/publication/Publication",
+    readingOrder: [PublicationLink(href: "chapter-1.xhtml", title: "Chapter One")]
+)
+let publicationData = try JSONEncoder().encode(publicationAsset)
+let decodedPublicationAsset = try JSONDecoder().decode(BookAsset.self, from: publicationData)
+check(decodedPublicationAsset == publicationAsset, "publication navigation survives portable encoding")
+
 let folder = Folder(name: "Research")
 let collection = BookCollection(name: "Summer")
 let organized = Book(
