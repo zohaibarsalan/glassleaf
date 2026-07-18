@@ -7,6 +7,7 @@ struct SidebarView: View {
     @State private var draftName = ""
     @State private var renameTarget: RenameTarget?
     @State private var pendingDeletion: DeletionTarget?
+    @State private var showsSmartCollectionEditor = false
 
     var body: some View {
         List(selection: $store.selection) {
@@ -49,6 +50,9 @@ struct SidebarView: View {
         } message: {
             Text("Books will stay in your library. This can’t be undone.")
         }
+        .sheet(isPresented: $showsSmartCollectionEditor) {
+            SmartCollectionEditor(store: store)
+        }
     }
 
     private var organizationSection: some View {
@@ -89,6 +93,10 @@ struct SidebarView: View {
 
             ForEach(store.smartCollections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
                 row(.smartCollection(collection.id), icon: "gearshape.2", count: store.count(for: .smartCollection(collection.id)))
+                    .contextMenu {
+                        Button("Rename", systemImage: "pencil") { beginRename(.smartCollection(collection)) }
+                        Button("Delete Smart Collection", systemImage: "trash", role: .destructive) { pendingDeletion = .smartCollection(collection.id) }
+                    }
             }
         } header: {
             HStack {
@@ -98,7 +106,7 @@ struct SidebarView: View {
                     Button("Folder", systemImage: "folder.badge.plus") { beginCreation(.folder) }
                     Button("Collection", systemImage: "rectangle.stack.badge.plus") { beginCreation(.collection) }
                     Button("Tag", systemImage: "tag") { beginCreation(.tag) }
-                    Button("Smart Favorites", systemImage: "gearshape.2") { beginCreation(.smartFavorites) }
+                    Button("Smart Collection…", systemImage: "gearshape.2") { showsSmartCollectionEditor = true }
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
@@ -196,7 +204,6 @@ struct SidebarView: View {
         case .subfolder(let parentID): store.createFolder(name: draftName, parentID: parentID)
         case .tag: store.createTag(name: draftName)
         case .collection: store.createCollection(name: draftName)
-        case .smartFavorites: store.createSmartCollection(name: draftName, rule: .favorite(true))
         case nil: break
         }
         resetEditor()
@@ -207,6 +214,7 @@ struct SidebarView: View {
         case .folder(let folder): store.renameFolder(id: folder.id, name: draftName)
         case .tag(let name): store.renameTag(name, to: draftName)
         case .collection(let collection): store.renameCollection(id: collection.id, name: draftName)
+        case .smartCollection(let collection): store.renameSmartCollection(id: collection.id, name: draftName)
         case nil: break
         }
         resetEditor()
@@ -217,6 +225,7 @@ struct SidebarView: View {
         case .folder(let id): store.deleteFolder(id: id)
         case .tag(let name): store.deleteTag(name)
         case .collection(let id): store.deleteCollection(id: id)
+        case .smartCollection(let id): store.deleteSmartCollection(id: id)
         case nil: break
         }
         pendingDeletion = nil
@@ -234,7 +243,6 @@ private enum CreationKind {
     case subfolder(UUID)
     case tag
     case collection
-    case smartFavorites
 
     var title: String {
         switch self {
@@ -242,12 +250,10 @@ private enum CreationKind {
         case .subfolder: "New Subfolder"
         case .tag: "New Tag"
         case .collection: "New Collection"
-        case .smartFavorites: "New Smart Collection"
         }
     }
 
     var suggestedName: String {
-        if case .smartFavorites = self { return "Favorite Books" }
         return ""
     }
 }
@@ -256,12 +262,14 @@ private enum RenameTarget {
     case folder(Folder)
     case tag(String)
     case collection(BookCollection)
+    case smartCollection(SmartCollection)
 
     var name: String {
         switch self {
         case .folder(let folder): folder.name
         case .tag(let name): name
         case .collection(let collection): collection.name
+        case .smartCollection(let collection): collection.name
         }
     }
 }
@@ -270,4 +278,5 @@ private enum DeletionTarget {
     case folder(UUID)
     case tag(String)
     case collection(UUID)
+    case smartCollection(UUID)
 }

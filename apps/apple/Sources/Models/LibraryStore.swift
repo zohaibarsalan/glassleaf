@@ -290,6 +290,28 @@ final class LibraryStore {
         persistOrganization()
     }
 
+    func renameSmartCollection(id: UUID, name: String) {
+        guard let cleanName = validatedName(name), let index = smartCollections.firstIndex(where: { $0.id == id }) else { return }
+        smartCollections[index].name = cleanName
+        persistOrganization()
+    }
+
+    func deleteSmartCollection(id: UUID) {
+        smartCollections.removeAll { $0.id == id }
+        if selection == .smartCollection(id) { selection = .inbox }
+        persistOrganization()
+    }
+
+    func assignSeries(_ name: String?, to ids: Set<UUID>) {
+        let cleanName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        for id in ids {
+            updateBook(id: id) { book in
+                book.series = cleanName?.isEmpty == false ? cleanName : nil
+                if book.series == nil { book.seriesIndex = nil }
+            }
+        }
+    }
+
     func renameFolder(id: UUID, name: String) {
         guard let cleanName = validatedName(name), let index = folders.firstIndex(where: { $0.id == id }) else { return }
         folders[index].name = cleanName

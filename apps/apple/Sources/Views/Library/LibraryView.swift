@@ -173,6 +173,12 @@ struct LibraryView: View {
                     Button(tag.name) { store.assignTag(tag.name, to: store.selectedBookIDs) }
                 }
             }
+            Menu("Series", systemImage: "square.stack.3d.up") {
+                Button("No Series") { store.assignSeries(nil, to: store.selectedBookIDs) }
+                ForEach(Array(Set(store.books.compactMap(\.series))).sorted(), id: \.self) { name in
+                    Button(name) { store.assignSeries(name, to: store.selectedBookIDs) }
+                }
+            }
             Spacer()
             if destination == .trash {
                 Button("Restore", systemImage: "arrow.uturn.backward") { store.restoreBooks(store.selectedBookIDs) }
