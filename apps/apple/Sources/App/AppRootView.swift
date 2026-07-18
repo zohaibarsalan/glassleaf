@@ -14,6 +14,15 @@ struct AppRootView: View {
         @Bindable var store = store
 
         ZStack {
+#if os(macOS)
+            if let readerBook = store.readerBook {
+                ReaderView(book: readerBook, store: store)
+                    .transition(.opacity)
+            } else {
+                libraryRoot
+                    .transition(.opacity)
+            }
+#else
             libraryRoot
                 .allowsHitTesting(store.readerBook == nil)
                 .accessibilityHidden(store.readerBook != nil)
@@ -23,6 +32,7 @@ struct AppRootView: View {
                     .transition(.opacity)
                     .zIndex(1)
             }
+#endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onPreferenceChange(ReaderChromeVisibilityPreferenceKey.self) { value in
