@@ -16,7 +16,7 @@ struct EPUBContentsView: View {
     @Bindable var store: LibraryStore
     let selectedChapter: Int
     let onSelect: (ReaderDestination) -> Void
-    @Environment(\.dismiss) private var dismiss
+    let onClose: () -> Void
     @State private var section = ReaderSection.contents
     @State private var searchText = ""
     @State private var searchResults: [PublicationSearchResult] = []
@@ -25,6 +25,18 @@ struct EPUBContentsView: View {
 
     private var links: [PublicationLink] { book.asset?.tableOfContents.isEmpty == false ? book.asset!.tableOfContents : book.asset?.readingOrder ?? [] }
     private var readingOrder: [PublicationLink] { book.asset?.readingOrder ?? [] }
+    private var contentEntries: [ReaderContentEntry] {
+        let tableEntries = links.compactMap { link -> ReaderContentEntry? in
+            guard let chapterIndex = indexForReadingOrder(link) else { return nil }
+            return ReaderContentEntry(link: link, chapterIndex: chapterIndex)
+        }
+        guard !tableEntries.isEmpty else {
+            return readingOrder.enumerated().map { index, link in
+                ReaderContentEntry(link: link, chapterIndex: index)
+            }
+        }
+        return tableEntries
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,7 +66,8 @@ struct EPUBContentsView: View {
             case .notes: notesList
             }
         }
-        .frame(minWidth: 320, idealWidth: 360, minHeight: 420, idealHeight: 620)
+        .frame(minWidth: 320, idealWidth: 360, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onExitCommand(perform: onClose)
         .task(id: searchText) { await performSearch() }
     }
 
@@ -69,7 +82,7 @@ struct EPUBContentsView: View {
                     .lineLimit(1)
             }
             Spacer()
-            Button("Close", systemImage: "xmark") { dismiss() }
+            Button("Close", systemImage: "xmark", action: onClose)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .font(.body.weight(.semibold))
@@ -117,13 +130,13 @@ struct EPUBContentsView: View {
                     }
                 }
             } else {
-                List(Array(links.enumerated()), id: \.offset) { index, link in
-                    Button { onSelect(ReaderDestination(chapterIndex: indexForReadingOrder(link) ?? index)) } label: {
+                List(contentEntries) { entry in
+                    Button { onSelect(ReaderDestination(chapterIndex: entry.chapterIndex)) } label: {
                         HStack(spacing: 14) {
-                            Text(index + 1, format: .number).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28)
-                            Text(link.title ?? "Chapter \(index + 1)")
+                            Text(entry.chapterIndex + 1, format: .number).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28)
+                            Text(entry.link.title ?? "Chapter \(entry.chapterIndex + 1)")
                             Spacer()
-                            if indexForReadingOrder(link) == selectedChapter {
+                            if entry.chapterIndex == selectedChapter {
                                 Image(systemName: "location.fill").foregroundStyle(.secondary).accessibilityLabel("Current chapter")
                             }
                         }
@@ -223,7 +236,13 @@ struct EPUBContentsView: View {
     }
 
     private func indexForReadingOrder(_ link: PublicationLink) -> Int? {
-        readingOrder.firstIndex { $0.href == link.href }
+        let resource = normalizedResourcePath(link.href)
+        return readingOrder.firstIndex { normalizedResourcePath($0.href) == resource }
+    }
+
+    private func normalizedResourcePath(_ href: String) -> String {
+        let resource = href.split(separator: "#", maxSplits: 1).first.map(String.init) ?? href
+        return ((resource.removingPercentEncoding ?? resource) as NSString).standardizingPath
     }
 
     private func chapterIndex(locator: String) -> Int? {
@@ -245,6 +264,12 @@ struct EPUBContentsView: View {
 
 private enum ReaderSection: Hashable {
     case contents, bookmarks, notes
+}
+
+private struct ReaderContentEntry: Identifiable {
+    let link: PublicationLink
+    let chapterIndex: Int
+    var id: String { "\(chapterIndex):\(link.href)" }
 }
 
 struct ReaderNoteEditor: View {

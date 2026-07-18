@@ -86,11 +86,20 @@ struct EPUBReaderView: View {
             navigator.apply(preferences: resolvedPreferences)
         }
         .inspector(isPresented: $showsContents) {
-            EPUBContentsView(book: book, store: store, selectedChapter: navigator.chapterIndex) { destination in
-                navigator.goToChapter(destination.chapterIndex, progress: destination.progress)
-                showsContents = false
-                revealControls()
-            }
+            EPUBContentsView(
+                book: book,
+                store: store,
+                selectedChapter: navigator.chapterIndex,
+                onSelect: { destination in
+                    navigator.goToChapter(destination.chapterIndex, progress: destination.progress)
+                    showsContents = false
+                    revealControls()
+                },
+                onClose: {
+                    showsContents = false
+                    revealControls()
+                }
+            )
             .inspectorColumnWidth(min: 320, ideal: 360, max: 440)
         }
         .sheet(isPresented: $showsSettings) {
