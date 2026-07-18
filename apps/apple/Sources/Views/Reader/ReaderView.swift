@@ -138,12 +138,21 @@ struct ReaderView: View {
     private var readerChrome: some View {
         VStack {
             topControls
+                .padding(.horizontal, macOSTitleBarControlClearance)
             Spacer()
             bottomControls
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
         .foregroundStyle(.primary)
+    }
+
+    private var macOSTitleBarControlClearance: CGFloat {
+#if os(macOS)
+        74
+#else
+        0
+#endif
     }
 
     private var topControls: some View {
