@@ -164,13 +164,35 @@ public indirect enum SmartCollectionRule: Codable, Hashable, Sendable {
         }
     }
 
-    fileprivate func migratingLegacyTags(_ tagIDsByName: [String: UUID]) -> SmartCollectionRule {
+    fileprivate func migratingOrganizationIdentity(
+        tagIDsByName: [String: UUID],
+        tagAliases: [UUID: UUID],
+        seriesAliases: [UUID: UUID]
+    ) -> SmartCollectionRule {
         switch self {
-        case .all(let rules): .all(rules.map { $0.migratingLegacyTags(tagIDsByName) })
-        case .any(let rules): .any(rules.map { $0.migratingLegacyTags(tagIDsByName) })
-        case .not(let rule): .not(rule.migratingLegacyTags(tagIDsByName))
+        case .all(let rules): .all(rules.map {
+            $0.migratingOrganizationIdentity(
+                tagIDsByName: tagIDsByName,
+                tagAliases: tagAliases,
+                seriesAliases: seriesAliases
+            )
+        })
+        case .any(let rules): .any(rules.map {
+            $0.migratingOrganizationIdentity(
+                tagIDsByName: tagIDsByName,
+                tagAliases: tagAliases,
+                seriesAliases: seriesAliases
+            )
+        })
+        case .not(let rule): .not(rule.migratingOrganizationIdentity(
+            tagIDsByName: tagIDsByName,
+            tagAliases: tagAliases,
+            seriesAliases: seriesAliases
+        ))
         case .tag(let name):
             tagIDsByName[Tag(name: name).normalizedName].map(SmartCollectionRule.tagID) ?? self
+        case .tagID(let id): .tagID(tagAliases[id] ?? id)
+        case .series(let id): .series(seriesAliases[id] ?? id)
         default: self
         }
     }
@@ -309,7 +331,11 @@ public struct LibrarySnapshot: Codable, Hashable, Sendable {
         migrated.series = canonicalSeries
         migrated.smartCollections = migrated.smartCollections.map { item in
             var value = item
-            value.rule = value.rule.migratingLegacyTags(tagIDsByName)
+            value.rule = value.rule.migratingOrganizationIdentity(
+                tagIDsByName: tagIDsByName,
+                tagAliases: tagAliases,
+                seriesAliases: seriesAliases
+            )
             return value
         }
         migrated.schemaVersion = max(schemaVersion, 3)

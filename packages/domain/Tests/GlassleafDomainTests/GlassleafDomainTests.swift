@@ -70,6 +70,7 @@ func portableSnapshotRoundTrip() throws {
 @Test("Legacy names migrate to canonical tag and series IDs")
 func legacyOrganizationIdentityMigration() {
     let existingTag = Tag(name: "Research")
+    let duplicateTag = Tag(name: "RESEARCH")
     let legacyBook = Book(
         title: "Legacy",
         author: "Ada",
@@ -79,8 +80,11 @@ func legacyOrganizationIdentityMigration() {
     let snapshot = LibrarySnapshot(
         schemaVersion: 2,
         books: [legacyBook],
-        tags: [existingTag, Tag(name: "RESEARCH")],
-        smartCollections: [SmartCollection(name: "Research", rule: .tag("research"))]
+        tags: [existingTag, duplicateTag],
+        smartCollections: [SmartCollection(
+            name: "Research",
+            rule: .all([.tag("research"), .tagID(duplicateTag.id)])
+        )]
     )
 
     let migrated = snapshot.migratingOrganizationIdentity()
