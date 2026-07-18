@@ -7,15 +7,29 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		417DEAA268458A6541BD7C10 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD8BFE6D73C6A27679CEE88 /* BookDetailView.swift */; };
+		431BF93F57537BECB54738DA /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94357B64186DB854B040E9E6 /* HomeView.swift */; };
+		51D335C1211D89ADEB278F05 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C058C58364BF8B28BA69C9A3 /* SidebarView.swift */; };
 		53D20A975A53ECD2001C0490 /* GlassleafApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE862DF707A036A3A423F20C /* GlassleafApp.swift */; };
+		54AAC2A7140429F4D3EB2F5D /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320945BB73FF5890E9635ACD /* LibraryStore.swift */; };
 		6A0B08C7B299373421EA1762 /* GlassleafDomain in Frameworks */ = {isa = PBXBuildFile; productRef = F710918C6DDF27ABBC6ECC8E /* GlassleafDomain */; };
+		EAF56C921619354548BC035E /* BookComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49ED142E8F28846D47550C4C /* BookComponents.swift */; };
+		F5434F5552F620E975D552E1 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39227AA8AC817E87BBFDC357 /* LibraryView.swift */; };
+		F7357CD22B5F58D51741031D /* PreviewLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */; };
 		F7B887ED000A8066D110FFA9 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72621FB648D03F473EE63DD5 /* AppRootView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		320945BB73FF5890E9635ACD /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
+		39227AA8AC817E87BBFDC357 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		49ED142E8F28846D47550C4C /* BookComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookComponents.swift; sourceTree = "<group>"; };
 		72621FB648D03F473EE63DD5 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		7314B72715874FE3CF052FDB /* domain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = domain; path = ../../packages/domain; sourceTree = SOURCE_ROOT; };
+		94357B64186DB854B040E9E6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		ABD8BFE6D73C6A27679CEE88 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
+		C058C58364BF8B28BA69C9A3 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		D4353F25B9511ACB2A6A8144 /* Glassleaf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glassleaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLibrary.swift; sourceTree = "<group>"; };
 		FE862DF707A036A3A423F20C /* GlassleafApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassleafApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -31,6 +45,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		02C205B7A74A86659A42B740 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				320945BB73FF5890E9635ACD /* LibraryStore.swift */,
+				DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		54951888CE3558C11C62880E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				9BC1053C83B9E783A4C790EB /* Library */,
+				DCE183D49B774F2DA215E2E4 /* Shared */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		593E4C3A8E7E0ED08476CBE8 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -56,12 +88,33 @@
 			);
 			sourceTree = "<group>";
 		};
+		9BC1053C83B9E783A4C790EB /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				ABD8BFE6D73C6A27679CEE88 /* BookDetailView.swift */,
+				94357B64186DB854B040E9E6 /* HomeView.swift */,
+				39227AA8AC817E87BBFDC357 /* LibraryView.swift */,
+				C058C58364BF8B28BA69C9A3 /* SidebarView.swift */,
+			);
+			path = Library;
+			sourceTree = "<group>";
+		};
 		A9CCAE4BEEBDADB3468D84EE /* Sources */ = {
 			isa = PBXGroup;
 			children = (
 				FAFC75CD275BD8B01B4281DC /* App */,
+				02C205B7A74A86659A42B740 /* Models */,
+				54951888CE3558C11C62880E /* Views */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		DCE183D49B774F2DA215E2E4 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				49ED142E8F28846D47550C4C /* BookComponents.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 		FAFC75CD275BD8B01B4281DC /* App */ = {
@@ -134,7 +187,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				F7B887ED000A8066D110FFA9 /* AppRootView.swift in Sources */,
+				EAF56C921619354548BC035E /* BookComponents.swift in Sources */,
+				417DEAA268458A6541BD7C10 /* BookDetailView.swift in Sources */,
 				53D20A975A53ECD2001C0490 /* GlassleafApp.swift in Sources */,
+				431BF93F57537BECB54738DA /* HomeView.swift in Sources */,
+				54AAC2A7140429F4D3EB2F5D /* LibraryStore.swift in Sources */,
+				F5434F5552F620E975D552E1 /* LibraryView.swift in Sources */,
+				F7357CD22B5F58D51741031D /* PreviewLibrary.swift in Sources */,
+				51D335C1211D89ADEB278F05 /* SidebarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
