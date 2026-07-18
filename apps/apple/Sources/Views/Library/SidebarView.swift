@@ -33,6 +33,7 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .contentMargins(.top, 8, for: .scrollContent)
         .navigationTitle("Glassleaf")
         .safeAreaInset(edge: .bottom) { storageStatus }
         .alert(creationKind?.title ?? "New Item", isPresented: creationBinding) {

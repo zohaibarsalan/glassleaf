@@ -10,8 +10,6 @@ struct GlassleafApp: App {
         }
         .defaultSize(width: 1180, height: 820)
         .windowResizability(.contentMinSize)
-        .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
 #else
         WindowGroup {
             AppRootView()

@@ -122,10 +122,7 @@ struct LibraryView: View {
                 store.isSelecting ? store.endSelecting() : (store.isSelecting = true)
             }
             .labelStyle(.iconOnly)
-            .font(.body.weight(.semibold))
-            .frame(width: 32, height: 32)
-            .contentShape(.circle)
-            .focusEffectDisabled()
+            .controlSize(.large)
 
             Menu("View Options", systemImage: "slider.horizontal.3") {
                 Section("Sort By") {
@@ -144,7 +141,7 @@ struct LibraryView: View {
                 }
             }
             .labelStyle(.iconOnly)
-            .focusEffectDisabled()
+            .controlSize(.large)
 
             Menu("More", systemImage: "ellipsis.circle") {
                 Button("Export Library", systemImage: "square.and.arrow.up") {
@@ -160,15 +157,11 @@ struct LibraryView: View {
                 }
             }
             .labelStyle(.iconOnly)
-            .focusEffectDisabled()
+            .controlSize(.large)
             .help("Export original EPUBs, metadata, and reading data")
 
             Button("Import", systemImage: "plus") { store.requestImport() }
-                .labelStyle(.iconOnly)
-                .font(.body.weight(.semibold))
-                .frame(width: 32, height: 32)
-                .contentShape(.circle)
-                .focusEffectDisabled()
+                .controlSize(.large)
                 .keyboardShortcut("o", modifiers: .command)
                 .help("Import an EPUB")
         }
