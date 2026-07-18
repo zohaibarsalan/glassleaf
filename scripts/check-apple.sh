@@ -13,6 +13,9 @@ echo "Checking provider-neutral domain…"
 swift test --package-path packages/domain
 swift run --package-path packages/domain GlassleafDomainChecks
 
+echo "Checking EPUB import and local storage…"
+./scripts/check-local-library.sh
+
 echo "Regenerating the Apple project…"
 xcodegen generate --spec apps/apple/project.yml --project apps/apple
 
