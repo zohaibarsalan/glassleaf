@@ -639,19 +639,17 @@ private final class TrackpadAwareWebView: WKWebView, ChapterTransitioningWebView
     }
 
     private var commitDistance: CGFloat {
-        min(max(bounds.width * 0.12, 120), 180)
+        min(max(bounds.width * 0.075, 82), 120)
     }
 
     private func resolveGestureAxisIfNeeded() {
         guard gestureAxis == .undecided else { return }
         let horizontal = abs(horizontalDistance)
         let vertical = abs(verticalDistance)
-        guard max(horizontal, vertical) >= 8 else { return }
+        guard horizontal >= 8 else { return }
 
-        if horizontal > vertical * 1.15 {
+        if horizontal > vertical * 1.1 {
             gestureAxis = .horizontal
-        } else if vertical > horizontal * 1.15 {
-            gestureAxis = .vertical
         }
     }
 
@@ -664,7 +662,6 @@ private final class TrackpadAwareWebView: WKWebView, ChapterTransitioningWebView
     private enum GestureAxis {
         case undecided
         case horizontal
-        case vertical
     }
 }
 
