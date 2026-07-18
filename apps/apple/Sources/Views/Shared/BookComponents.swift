@@ -1,4 +1,5 @@
 import GlassleafDomain
+import ImageIO
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -23,11 +24,12 @@ enum BookCoverSize {
 struct BookCoverView: View {
     let book: Book
     var size: BookCoverSize = .card
+    @State private var loadedCover: LoadedCoverImage?
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            if let image = LocalCoverLoader.image(for: book.cover) {
-                image
+            if let loadedCover {
+                loadedCover.image
                     .resizable()
                     .scaledToFill()
                     .frame(width: size.dimensions.width, height: size.dimensions.height)
@@ -68,7 +70,22 @@ struct BookCoverView: View {
                 .frame(width: 1)
                 .padding(.vertical, 4)
         }
+        .task(id: coverRequest) {
+            guard let coverRequest else {
+                loadedCover = nil
+                return
+            }
+            loadedCover = await LocalCoverLoader.shared.image(for: coverRequest)
+        }
         .accessibilityHidden(true)
+    }
+
+    private var coverRequest: CoverImageRequest? {
+        guard let cover = book.cover else { return nil }
+        return CoverImageRequest(
+            relativePath: cover.localRelativePath,
+            targetSize: size.dimensions
+        )
     }
 
     private var cornerRadius: CGFloat {
@@ -76,22 +93,105 @@ struct BookCoverView: View {
     }
 }
 
-private enum LocalCoverLoader {
-    static func image(for cover: CoverAsset?) -> Image? {
-        guard let cover, let root = try? FileManager.default.url(
+private struct CoverImageRequest: Hashable, Sendable {
+    let relativePath: String
+    let targetSize: CGSize
+
+    var cacheKey: String {
+        "\(relativePath)#\(Int(targetSize.width))x\(Int(targetSize.height))"
+    }
+}
+
+private struct LoadedCoverImage: @unchecked Sendable {
+#if os(macOS)
+    let platformImage: NSImage
+    var image: Image { Image(nsImage: platformImage) }
+#else
+    let platformImage: UIImage
+    var image: Image { Image(uiImage: platformImage) }
+#endif
+}
+
+private actor LocalCoverLoader {
+    static let shared = LocalCoverLoader()
+
+    private let cache: NSCache<NSString, CoverImageBox>
+    private var pending: [String: Task<LoadedCoverImage?, Never>] = [:]
+
+    init() {
+        cache = NSCache()
+        cache.countLimit = 96
+        cache.totalCostLimit = 48 * 1_024 * 1_024
+    }
+
+    func image(for request: CoverImageRequest) async -> LoadedCoverImage? {
+        let key = request.cacheKey
+        if let cached = cache.object(forKey: key as NSString) {
+            return cached.value
+        }
+        if let task = pending[key] {
+            return await task.value
+        }
+
+        let task = Task.detached(priority: .userInitiated) {
+            Self.load(request)
+        }
+        pending[key] = task
+        let value = await task.value
+        pending[key] = nil
+        if let value {
+            let pixelWidth = max(Int(request.targetSize.width * 2), 1)
+            let pixelHeight = max(Int(request.targetSize.height * 2), 1)
+            cache.setObject(
+                CoverImageBox(value),
+                forKey: key as NSString,
+                cost: pixelWidth * pixelHeight * 4
+            )
+        }
+        return value
+    }
+
+    nonisolated private static func load(_ request: CoverImageRequest) -> LoadedCoverImage? {
+        guard let root = try? FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
             appropriateFor: nil,
             create: false
         ) else { return nil }
-        let url = root.appending(path: "Glassleaf").appending(path: cover.localRelativePath)
+        let url = root.appending(path: "Glassleaf").appending(path: request.relativePath)
+        let maxPixelSize = max(request.targetSize.width, request.targetSize.height) * 2
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        if let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) {
+            let thumbnailOptions: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceShouldCacheImmediately: true,
+            ]
+            if let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) {
 #if os(macOS)
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        return Image(nsImage: image)
+                return LoadedCoverImage(platformImage: NSImage(cgImage: image, size: .zero))
 #else
-        guard let image = UIImage(contentsOfFile: url.path) else { return nil }
-        return Image(uiImage: image)
+                return LoadedCoverImage(platformImage: UIImage(cgImage: image))
 #endif
+            }
+        }
+
+        // SVG covers are uncommon but valid EPUB artwork. Keep that fallback
+        // off the main thread even when ImageIO cannot create a thumbnail.
+#if os(macOS)
+        return NSImage(contentsOf: url).map(LoadedCoverImage.init(platformImage:))
+#else
+        return UIImage(contentsOfFile: url.path).map(LoadedCoverImage.init(platformImage:))
+#endif
+    }
+}
+
+private final class CoverImageBox: NSObject {
+    let value: LoadedCoverImage
+
+    init(_ value: LoadedCoverImage) {
+        self.value = value
     }
 }
 
