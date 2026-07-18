@@ -235,26 +235,27 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     var hasLoadedContent = false
     var selectedText = ""
     var onTap: (() -> Void)?
-    @ObservationIgnored private weak var webView: WKWebView?
+    @ObservationIgnored private weak var webHost: (any PublicationWebHosting)?
     @ObservationIgnored private var book: Book?
     @ObservationIgnored private var preferences = ReaderPreferences()
     @ObservationIgnored private var annotations: [Annotation] = []
     @ObservationIgnored private var pendingProgress = 0.0
     @ObservationIgnored private var isWaitingForWebView = false
+    @ObservationIgnored private var isTransitioning = false
+    @ObservationIgnored private var preloadTask: Task<Void, Never>?
 
-    func attach(_ webView: WKWebView, book: Book, preferences: ReaderPreferences, annotations: [Annotation]) {
-        guard self.webView !== webView else {
+    fileprivate func attach(_ webHost: any PublicationWebHosting, book: Book, preferences: ReaderPreferences, annotations: [Annotation]) {
+        guard self.webHost !== webHost else {
             let annotationsChanged = self.annotations != annotations
             self.annotations = annotations
             apply(preferences: preferences)
             if annotationsChanged { renderAnnotations() }
             return
         }
-        self.webView = webView
+        self.webHost = webHost
         self.book = book
         self.preferences = preferences
         self.annotations = annotations
-        webView.navigationDelegate = self
         if isWaitingForWebView {
             isWaitingForWebView = false
             loadChapter(chapterIndex)
@@ -267,7 +268,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
         let scaled = min(max(initialProgress, 0), 1) * Double(count)
         chapterIndex = min(Int(scaled), count - 1)
         pendingProgress = scaled - Double(chapterIndex)
-        guard webView != nil else {
+        guard webHost != nil else {
             isWaitingForWebView = true
             return
         }
@@ -282,6 +283,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     func next() {
+        guard !isTransitioning else { return }
         evaluate("window.glassleafNext && window.glassleafNext()") { [weak self] value in
             guard let self, value as? Bool != true else { return }
             self.goToChapter(self.chapterIndex + 1)
@@ -289,6 +291,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     func previous() {
+        guard !isTransitioning else { return }
         evaluate("window.glassleafPrevious && window.glassleafPrevious()") { [weak self] value in
             guard let self, value as? Bool != true else { return }
             self.goToChapter(self.chapterIndex - 1, progress: 1)
@@ -296,6 +299,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     func navigateWithTrackpad(forward: Bool) {
+        guard !isTransitioning else { return }
         switch preferences.mode {
         case .paginated:
             forward ? next() : previous()
@@ -338,16 +342,21 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        evaluate(Self.bootstrapScript(preferences: preferences, progress: pendingProgress)) { [weak self, weak webView] _ in
-            guard let self else { return }
-            self.isReady = true
-            self.hasLoadedContent = true
-            self.renderAnnotations()
-            (webView as? ChapterTransitioningWebView)?.revealLoadedChapter()
+        guard let webHost else { return }
+        if webHost.isPreloadNavigation(webView) {
+            evaluate(Self.bootstrapScript(preferences: preferences, progress: 0), in: webView) { [weak webView, weak webHost] _ in
+                guard let webView, let webHost, webHost.isPreloadNavigation(webView) else { return }
+                webHost.markPreloadedChapter(webView)
+            }
+            return
         }
+
+        guard webHost.isCurrentNavigation(webView) else { return }
+        finishLoadingChapter(in: webView)
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.webView === webHost?.activeWebView else { return }
         switch message.name {
         case "glassleafTap": onTap?()
         case "glassleafPage":
@@ -366,27 +375,53 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     private func loadChapter(_ index: Int) {
-        guard let webView, let book, let asset = book.asset, let rootPath = asset.extractedRelativePath,
+        guard let webHost, let book, let asset = book.asset, let rootPath = asset.extractedRelativePath,
               asset.readingOrder.indices.contains(index), let root = PublicationLocation.rootURL() else { return }
+        preloadTask?.cancel()
         isReady = false
+        isTransitioning = hasLoadedContent
         chapterProgress = pendingProgress
         let publicationRoot = root.appending(path: rootPath, directoryHint: .isDirectory)
         let resource = publicationRoot.appending(path: asset.readingOrder[index].href)
-        let beginLoad = {
-            _ = webView.loadFileURL(resource, allowingReadAccessTo: publicationRoot)
-        }
-        if hasLoadedContent, let transitioningWebView = webView as? ChapterTransitioningWebView {
-            transitioningWebView.prepareForChapterNavigation(beginLoad)
-        } else {
-            beginLoad()
+        if let preloadedWebView = webHost.loadChapter(resource, allowingReadAccessTo: publicationRoot, retainingCurrentContent: hasLoadedContent) {
+            finishLoadingChapter(in: preloadedWebView)
         }
     }
 
-    private func evaluate(_ script: String, completion: ((Any?) -> Void)? = nil) {
-        webView?.evaluateJavaScript(script) { value, _ in completion?(value) }
+    private func finishLoadingChapter(in webView: WKWebView) {
+        guard let webHost, webHost.isCurrentNavigation(webView) else { return }
+        let progress = pendingProgress
+        evaluate(Self.bootstrapScript(preferences: preferences, progress: progress), in: webView) { [weak self, weak webView, weak webHost] _ in
+            guard let self, let webView, let webHost, webHost.isCurrentNavigation(webView) else { return }
+            self.isReady = true
+            self.hasLoadedContent = true
+            self.isTransitioning = false
+            self.renderAnnotations(in: webView)
+            webHost.revealLoadedChapter(webView)
+            self.scheduleFollowingChapterPreload()
+        }
     }
 
-    private func renderAnnotations() {
+    private func scheduleFollowingChapterPreload() {
+        preloadTask?.cancel()
+        let expectedChapter = chapterIndex
+        preloadTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(220))
+            guard !Task.isCancelled, let self, self.chapterIndex == expectedChapter, !self.isTransitioning,
+                  let webHost = self.webHost, let asset = self.book?.asset,
+                  let rootPath = asset.extractedRelativePath, let root = PublicationLocation.rootURL(),
+                  asset.readingOrder.indices.contains(expectedChapter + 1) else { return }
+            let publicationRoot = root.appending(path: rootPath, directoryHint: .isDirectory)
+            let resource = publicationRoot.appending(path: asset.readingOrder[expectedChapter + 1].href)
+            webHost.preloadChapter(resource, allowingReadAccessTo: publicationRoot)
+        }
+    }
+
+    private func evaluate(_ script: String, in webView: WKWebView? = nil, completion: ((Any?) -> Void)? = nil) {
+        (webView ?? webHost?.activeWebView)?.evaluateJavaScript(script) { value, _ in completion?(value) }
+    }
+
+    private func renderAnnotations(in webView: WKWebView? = nil) {
         guard isReady, let href = book?.asset?.readingOrder[safe: chapterIndex]?.href else { return }
         let values: [[String: Any]] = annotations.compactMap { annotation in
             guard annotation.locator.split(separator: "#", maxSplits: 1).first.map(String.init) == href,
@@ -400,7 +435,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
             ]
         }
         guard let data = try? JSONSerialization.data(withJSONObject: values), let json = String(data: data, encoding: .utf8) else { return }
-        evaluate(Self.highlightScript(json: json))
+        evaluate(Self.highlightScript(json: json), in: webView)
     }
 
     private static func highlightScript(json: String) -> String {
@@ -551,13 +586,28 @@ private enum PublicationLocation {
 }
 
 @MainActor
-private protocol ChapterTransitioningWebView: AnyObject {
-    func prepareForChapterNavigation(_ completion: @escaping () -> Void)
-    func revealLoadedChapter()
+private protocol PublicationWebHosting: AnyObject {
+    var activeWebView: WKWebView { get }
+    func loadChapter(_ resource: URL, allowingReadAccessTo publicationRoot: URL, retainingCurrentContent: Bool) -> WKWebView?
+    func preloadChapter(_ resource: URL, allowingReadAccessTo publicationRoot: URL)
+    func isCurrentNavigation(_ webView: WKWebView) -> Bool
+    func isPreloadNavigation(_ webView: WKWebView) -> Bool
+    func markPreloadedChapter(_ webView: WKWebView)
+    func revealLoadedChapter(_ webView: WKWebView)
 }
 
 private enum ChapterTransitionMotion {
-    static let crossfadeDuration: TimeInterval = 0.28
+    static let crossfadeDuration: TimeInterval = 0.18
+}
+
+@MainActor
+private func makePublicationConfiguration(for navigator: PublicationNavigator) -> WKWebViewConfiguration {
+    let configuration = WKWebViewConfiguration()
+    configuration.userContentController.add(navigator, name: "glassleafTap")
+    configuration.userContentController.add(navigator, name: "glassleafPage")
+    configuration.userContentController.add(navigator, name: "glassleafProgress")
+    configuration.userContentController.add(navigator, name: "glassleafSelection")
+    return configuration
 }
 
 #if os(macOS)
@@ -567,62 +617,150 @@ private struct PublicationWebView: NSViewRepresentable {
     let annotations: [Annotation]
     let navigator: PublicationNavigator
 
-    func makeNSView(context: Context) -> WKWebView { makeWebView() }
-    func updateNSView(_ webView: WKWebView, context: Context) { navigator.attach(webView, book: book, preferences: preferences, annotations: annotations) }
+    func makeNSView(context: Context) -> PublicationWebHostView {
+        PublicationWebHostView(navigator: navigator)
+    }
 
-    private func makeWebView() -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.userContentController.add(navigator, name: "glassleafTap")
-        configuration.userContentController.add(navigator, name: "glassleafPage")
-        configuration.userContentController.add(navigator, name: "glassleafProgress")
-        configuration.userContentController.add(navigator, name: "glassleafSelection")
-        let webView = TrackpadAwareWebView(frame: .zero, configuration: configuration)
-        webView.onHorizontalSwipe = { [weak navigator] forward in
-            navigator?.navigateWithTrackpad(forward: forward)
+    func updateNSView(_ webHost: PublicationWebHostView, context: Context) {
+        navigator.attach(webHost, book: book, preferences: preferences, annotations: annotations)
+    }
+}
+
+private final class PublicationWebHostView: NSView, PublicationWebHosting {
+    private(set) var activeWebView: WKWebView
+    private let primaryWebView: WKWebView
+    private let secondaryWebView: WKWebView
+    private weak var loadingWebView: WKWebView?
+    private weak var preloadingWebView: WKWebView?
+    private var preloadedResource: URL?
+    private var isPreloadedChapterReady = false
+
+    init(navigator: PublicationNavigator) {
+        let primary = Self.makeWebView(navigator: navigator)
+        let secondary = Self.makeWebView(navigator: navigator)
+        primaryWebView = primary
+        activeWebView = primary
+        secondaryWebView = secondary
+        super.init(frame: .zero)
+        addSubview(primary)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layout() {
+        super.layout()
+        activeWebView.frame = bounds
+        secondaryWebView.frame = bounds
+    }
+
+    func loadChapter(_ resource: URL, allowingReadAccessTo publicationRoot: URL, retainingCurrentContent: Bool) -> WKWebView? {
+        let destination = retainingCurrentContent ? inactiveWebView : activeWebView
+        let reusesPreload = retainingCurrentContent
+            && preloadingWebView === destination
+            && preloadedResource == resource
+        let usesPreloadedChapter = reusesPreload && isPreloadedChapterReady
+        if !reusesPreload { destination.stopLoading() }
+        destination.layer?.removeAllAnimations()
+        destination.alphaValue = 1
+        destination.isHidden = false
+        destination.frame = bounds
+
+        if retainingCurrentContent {
+            activeWebView.layer?.removeAllAnimations()
+            activeWebView.alphaValue = 1
+            addSubview(destination, positioned: .below, relativeTo: activeWebView)
+        } else if destination.superview !== self {
+            addSubview(destination)
         }
+
+        loadingWebView = destination
+        preloadingWebView = nil
+        preloadedResource = nil
+        isPreloadedChapterReady = false
+        guard !usesPreloadedChapter else { return destination }
+        guard !reusesPreload else { return nil }
+        _ = destination.loadFileURL(resource, allowingReadAccessTo: publicationRoot)
+        return nil
+    }
+
+    func preloadChapter(_ resource: URL, allowingReadAccessTo publicationRoot: URL) {
+        guard loadingWebView == nil else { return }
+        if preloadedResource == resource, isPreloadedChapterReady { return }
+
+        let destination = inactiveWebView
+        destination.stopLoading()
+        destination.layer?.removeAllAnimations()
+        destination.alphaValue = 1
+        destination.isHidden = true
+        destination.frame = bounds
+        addSubview(destination, positioned: .below, relativeTo: activeWebView)
+
+        preloadingWebView = destination
+        preloadedResource = resource
+        isPreloadedChapterReady = false
+        _ = destination.loadFileURL(resource, allowingReadAccessTo: publicationRoot)
+    }
+
+    func isCurrentNavigation(_ webView: WKWebView) -> Bool {
+        loadingWebView === webView
+    }
+
+    func isPreloadNavigation(_ webView: WKWebView) -> Bool {
+        preloadingWebView === webView
+    }
+
+    func markPreloadedChapter(_ webView: WKWebView) {
+        guard preloadingWebView === webView else { return }
+        isPreloadedChapterReady = true
+    }
+
+    func revealLoadedChapter(_ webView: WKWebView) {
+        guard loadingWebView === webView else { return }
+        loadingWebView = nil
+        guard webView !== activeWebView else { return }
+
+        let outgoing = activeWebView
+        activeWebView = webView
+        addSubview(webView, positioned: .above, relativeTo: outgoing)
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            outgoing.removeFromSuperview()
+            return
+        }
+
+        webView.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = ChapterTransitionMotion.crossfadeDuration
+            webView.animator().alphaValue = 1
+        }
+        Task { @MainActor [weak self, weak outgoing] in
+            try? await Task.sleep(for: .seconds(ChapterTransitionMotion.crossfadeDuration))
+            guard let self, let outgoing, outgoing !== self.activeWebView else { return }
+            outgoing.removeFromSuperview()
+        }
+    }
+
+    private var inactiveWebView: WKWebView {
+        activeWebView === primaryWebView ? secondaryWebView : primaryWebView
+    }
+
+    private static func makeWebView(navigator: PublicationNavigator) -> TrackpadAwareWebView {
+        let webView = TrackpadAwareWebView(frame: .zero, configuration: makePublicationConfiguration(for: navigator))
+        webView.navigationDelegate = navigator
+        webView.onHorizontalSwipe = { [weak navigator] forward in navigator?.navigateWithTrackpad(forward: forward) }
         webView.setValue(false, forKey: "drawsBackground")
         return webView
     }
 }
 
-private final class TrackpadAwareWebView: WKWebView, ChapterTransitioningWebView {
+private final class TrackpadAwareWebView: WKWebView {
     var onHorizontalSwipe: ((Bool) -> Void)?
 
-    private var transitionSnapshot: NSImageView?
     private var horizontalDistance: CGFloat = 0
     private var verticalDistance: CGFloat = 0
     private var gestureAxis: GestureAxis = .undecided
     private var suppressesMomentum = false
-
-    func prepareForChapterNavigation(_ completion: @escaping () -> Void) {
-        transitionSnapshot?.removeFromSuperview()
-        takeSnapshot(with: nil) { [weak self] image, _ in
-            guard let self, let image else {
-                completion()
-                return
-            }
-            let snapshot = PassthroughImageView(frame: self.bounds)
-            snapshot.image = image
-            snapshot.imageScaling = .scaleAxesIndependently
-            snapshot.autoresizingMask = [.width, .height]
-            self.addSubview(snapshot)
-            self.transitionSnapshot = snapshot
-            completion()
-        }
-    }
-
-    func revealLoadedChapter() {
-        guard let transitionSnapshot else { return }
-        self.transitionSnapshot = nil
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            transitionSnapshot.removeFromSuperview()
-            return
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = ChapterTransitionMotion.crossfadeDuration
-            transitionSnapshot.animator().alphaValue = 0
-        }
-    }
 
     override func scrollWheel(with event: NSEvent) {
         if !event.momentumPhase.isEmpty {
@@ -697,10 +835,6 @@ private final class TrackpadAwareWebView: WKWebView, ChapterTransitioningWebView
         case horizontal
     }
 }
-
-private final class PassthroughImageView: NSImageView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-}
 #else
 private struct PublicationWebView: UIViewRepresentable {
     let book: Book
@@ -708,61 +842,149 @@ private struct PublicationWebView: UIViewRepresentable {
     let annotations: [Annotation]
     let navigator: PublicationNavigator
 
-    func makeUIView(context: Context) -> WKWebView { makeWebView() }
-    func updateUIView(_ webView: WKWebView, context: Context) { navigator.attach(webView, book: book, preferences: preferences, annotations: annotations) }
+    func makeUIView(context: Context) -> PublicationWebHostView {
+        PublicationWebHostView(navigator: navigator)
+    }
 
-    private func makeWebView() -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.userContentController.add(navigator, name: "glassleafTap")
-        configuration.userContentController.add(navigator, name: "glassleafPage")
-        configuration.userContentController.add(navigator, name: "glassleafProgress")
-        configuration.userContentController.add(navigator, name: "glassleafSelection")
-        let webView = TransitioningWebView(frame: .zero, configuration: configuration)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
-        return webView
+    func updateUIView(_ webHost: PublicationWebHostView, context: Context) {
+        navigator.attach(webHost, book: book, preferences: preferences, annotations: annotations)
     }
 }
 
-private final class TransitioningWebView: WKWebView, ChapterTransitioningWebView {
-    private var transitionSnapshot: UIImageView?
+private final class PublicationWebHostView: UIView, PublicationWebHosting {
+    private(set) var activeWebView: WKWebView
+    private let primaryWebView: WKWebView
+    private let secondaryWebView: WKWebView
+    private weak var loadingWebView: WKWebView?
+    private weak var preloadingWebView: WKWebView?
+    private var preloadedResource: URL?
+    private var isPreloadedChapterReady = false
 
-    func prepareForChapterNavigation(_ completion: @escaping () -> Void) {
-        transitionSnapshot?.removeFromSuperview()
-        takeSnapshot(with: nil) { [weak self] image, _ in
-            guard let self, let image else {
-                completion()
-                return
-            }
-            let snapshot = UIImageView(image: image)
-            snapshot.frame = self.bounds
-            snapshot.contentMode = .scaleToFill
-            snapshot.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            self.addSubview(snapshot)
-            self.transitionSnapshot = snapshot
-            completion()
-        }
+    init(navigator: PublicationNavigator) {
+        let primary = Self.makeWebView(navigator: navigator)
+        let secondary = Self.makeWebView(navigator: navigator)
+        primaryWebView = primary
+        secondaryWebView = secondary
+        activeWebView = primary
+        super.init(frame: .zero)
+        addSubview(primary)
     }
 
-    func revealLoadedChapter() {
-        guard let transitionSnapshot else { return }
-        self.transitionSnapshot = nil
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        primaryWebView.frame = bounds
+        secondaryWebView.frame = bounds
+    }
+
+    func loadChapter(_ resource: URL, allowingReadAccessTo publicationRoot: URL, retainingCurrentContent: Bool) -> WKWebView? {
+        let destination = retainingCurrentContent ? inactiveWebView : activeWebView
+        let reusesPreload = retainingCurrentContent
+            && preloadingWebView === destination
+            && preloadedResource == resource
+        let usesPreloadedChapter = reusesPreload && isPreloadedChapterReady
+        if !reusesPreload { destination.stopLoading() }
+        destination.layer.removeAllAnimations()
+        destination.alpha = 1
+        destination.isHidden = false
+        destination.accessibilityElementsHidden = false
+        destination.isUserInteractionEnabled = !retainingCurrentContent
+        destination.frame = bounds
+
+        if retainingCurrentContent {
+            activeWebView.layer.removeAllAnimations()
+            activeWebView.alpha = 1
+            insertSubview(destination, belowSubview: activeWebView)
+        } else if destination.superview !== self {
+            addSubview(destination)
+        }
+
+        loadingWebView = destination
+        preloadingWebView = nil
+        preloadedResource = nil
+        isPreloadedChapterReady = false
+        guard !usesPreloadedChapter else { return destination }
+        guard !reusesPreload else { return nil }
+        _ = destination.loadFileURL(resource, allowingReadAccessTo: publicationRoot)
+        return nil
+    }
+
+    func preloadChapter(_ resource: URL, allowingReadAccessTo publicationRoot: URL) {
+        guard loadingWebView == nil else { return }
+        if preloadedResource == resource, isPreloadedChapterReady { return }
+
+        let destination = inactiveWebView
+        destination.stopLoading()
+        destination.layer.removeAllAnimations()
+        destination.alpha = 1
+        destination.isHidden = false
+        destination.accessibilityElementsHidden = true
+        destination.isUserInteractionEnabled = false
+        destination.frame = bounds
+        insertSubview(destination, belowSubview: activeWebView)
+
+        preloadingWebView = destination
+        preloadedResource = resource
+        isPreloadedChapterReady = false
+        _ = destination.loadFileURL(resource, allowingReadAccessTo: publicationRoot)
+    }
+
+    func isCurrentNavigation(_ webView: WKWebView) -> Bool {
+        loadingWebView === webView
+    }
+
+    func isPreloadNavigation(_ webView: WKWebView) -> Bool {
+        preloadingWebView === webView
+    }
+
+    func markPreloadedChapter(_ webView: WKWebView) {
+        guard preloadingWebView === webView else { return }
+        isPreloadedChapterReady = true
+    }
+
+    func revealLoadedChapter(_ webView: WKWebView) {
+        guard loadingWebView === webView else { return }
+        loadingWebView = nil
+        guard webView !== activeWebView else { return }
+
+        let outgoing = activeWebView
+        activeWebView = webView
+        webView.isUserInteractionEnabled = true
+        bringSubviewToFront(webView)
+
         guard !UIAccessibility.isReduceMotionEnabled else {
-            transitionSnapshot.removeFromSuperview()
+            outgoing.removeFromSuperview()
             return
         }
+
+        webView.alpha = 0
         UIView.animate(
             withDuration: ChapterTransitionMotion.crossfadeDuration,
             delay: 0,
             options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut],
             animations: {
-                transitionSnapshot.alpha = 0
+                webView.alpha = 1
             },
             completion: { _ in
-                transitionSnapshot.removeFromSuperview()
+                guard outgoing !== self.activeWebView else { return }
+                outgoing.removeFromSuperview()
             }
         )
+    }
+
+    private var inactiveWebView: WKWebView {
+        activeWebView === primaryWebView ? secondaryWebView : primaryWebView
+    }
+
+    private static func makeWebView(navigator: PublicationNavigator) -> WKWebView {
+        let webView = WKWebView(frame: .zero, configuration: makePublicationConfiguration(for: navigator))
+        webView.navigationDelegate = navigator
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        return webView
     }
 }
 #endif
