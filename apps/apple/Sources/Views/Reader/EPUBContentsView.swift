@@ -1,11 +1,21 @@
 import GlassleafDomain
 import SwiftUI
 
+struct ReaderDestination: Hashable, Sendable {
+    let chapterIndex: Int
+    let progress: Double
+
+    init(chapterIndex: Int, progress: Double = 0) {
+        self.chapterIndex = chapterIndex
+        self.progress = min(max(progress, 0), 1)
+    }
+}
+
 struct EPUBContentsView: View {
     let book: Book
     @Bindable var store: LibraryStore
     let selectedChapter: Int
-    let onSelect: (Int) -> Void
+    let onSelect: (ReaderDestination) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var section = ReaderSection.contents
     @State private var searchText = ""
@@ -17,31 +27,74 @@ struct EPUBContentsView: View {
     private var readingOrder: [PublicationLink] { book.asset?.readingOrder ?? [] }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Picker("Reader section", selection: $section) {
-                    Text("Contents").tag(ReaderSection.contents)
-                    Text("Bookmarks").tag(ReaderSection.bookmarks)
-                    Text("Notes").tag(ReaderSection.notes)
-                }
-                .pickerStyle(.segmented)
-                .padding()
+        VStack(spacing: 0) {
+            header
 
-                switch section {
-                case .contents: contentsList
-                case .bookmarks: bookmarksList
-                case .notes: notesList
-                }
+            Picker("Reader section", selection: $section) {
+                Text("Contents").tag(ReaderSection.contents)
+                Text("Bookmarks").tag(ReaderSection.bookmarks)
+                Text("Notes").tag(ReaderSection.notes)
             }
-            .navigationTitle("\(book.title)")
-            .searchable(text: $searchText, prompt: "Search this book")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+
+            if section == .contents {
+                searchField
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 10)
+            }
+
+            Divider()
+
+            switch section {
+            case .contents: contentsList
+            case .bookmarks: bookmarksList
+            case .notes: notesList
             }
         }
-        .frame(minWidth: 380, idealWidth: 520, minHeight: 460, idealHeight: 680)
-        .presentationDetents([.medium, .large])
+        .frame(minWidth: 320, idealWidth: 360, minHeight: 420, idealHeight: 620)
         .task(id: searchText) { await performSearch() }
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Book Navigation")
+                    .font(.headline)
+                Text(book.title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button("Close", systemImage: "xmark") { dismiss() }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .font(.body.weight(.semibold))
+                .frame(width: 32, height: 32)
+                .contentShape(.circle)
+        }
+        .padding(16)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search this book", text: $searchText)
+                .textFieldStyle(.plain)
+            if !searchText.isEmpty {
+                Button("Clear Search", systemImage: "xmark.circle.fill") { searchText = "" }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 34)
+        .background(.quaternary.opacity(0.65), in: .rect(cornerRadius: 9))
     }
 
     private var contentsList: some View {
@@ -53,7 +106,7 @@ struct EPUBContentsView: View {
                     ContentUnavailableView.search(text: searchText)
                 } else {
                     List(searchResults) { result in
-                        Button { onSelect(result.chapterIndex) } label: {
+                        Button { onSelect(ReaderDestination(chapterIndex: result.chapterIndex)) } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(result.title).font(.headline)
                                 Text(result.snippet).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
@@ -65,7 +118,7 @@ struct EPUBContentsView: View {
                 }
             } else {
                 List(Array(links.enumerated()), id: \.offset) { index, link in
-                    Button { onSelect(indexForReadingOrder(link) ?? index) } label: {
+                    Button { onSelect(ReaderDestination(chapterIndex: indexForReadingOrder(link) ?? index)) } label: {
                         HStack(spacing: 14) {
                             Text(index + 1, format: .number).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28)
                             Text(link.title ?? "Chapter \(index + 1)")
@@ -89,11 +142,20 @@ struct EPUBContentsView: View {
                 ContentUnavailableView("No Bookmarks", systemImage: "bookmark", description: Text("Bookmark a page from the reader to find it here."))
             } else {
                 List(values) { bookmark in
-                    Button { if let index = chapterIndex(locator: bookmark.locator) { onSelect(index) } } label: {
-                        VStack(alignment: .leading, spacing: 3) {
+                    Button { if let destination = destination(locator: bookmark.locator) { onSelect(destination) } } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "bookmark.fill")
+                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 3) {
                             Text(bookmark.label ?? chapterTitle(locator: bookmark.locator))
                             Text(bookmark.createdAt, style: .date).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
                         }
+                        .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                 }
@@ -108,14 +170,36 @@ struct EPUBContentsView: View {
                 ContentUnavailableView("No Notes", systemImage: "highlighter", description: Text("Select text or add a note from the reader."))
             } else {
                 List(values) { annotation in
-                    VStack(alignment: .leading, spacing: 5) {
-                        if let selected = annotation.selectedText, !selected.isEmpty {
-                            Text(selected).font(.subheadline).lineLimit(3)
+                    Button {
+                        if let destination = destination(locator: annotation.locator) { onSelect(destination) }
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "highlighter")
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 2)
+                            VStack(alignment: .leading, spacing: 5) {
+                                if let selected = annotation.selectedText, !selected.isEmpty {
+                                    Text(selected).font(.subheadline).lineLimit(3)
+                                }
+                                if !annotation.note.isEmpty { Text(annotation.note).foregroundStyle(.secondary).lineLimit(3) }
+                                Text(chapterTitle(locator: annotation.locator))
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 3)
                         }
-                        if !annotation.note.isEmpty { Text(annotation.note).foregroundStyle(.secondary) }
+                        .contentShape(.rect)
                     }
+                    .buttonStyle(.plain)
                     .swipeActions {
                         Button("Delete", systemImage: "trash", role: .destructive) { store.deleteAnnotation(annotation.id) }
+                    }
+                    .contextMenu {
+                        Button("Delete Note", systemImage: "trash", role: .destructive) { store.deleteAnnotation(annotation.id) }
                     }
                 }
             }
@@ -145,6 +229,12 @@ struct EPUBContentsView: View {
     private func chapterIndex(locator: String) -> Int? {
         let href = locator.split(separator: "#", maxSplits: 1).first.map(String.init) ?? locator
         return readingOrder.firstIndex { $0.href == href }
+    }
+
+    private func destination(locator: String) -> ReaderDestination? {
+        guard let chapterIndex = chapterIndex(locator: locator) else { return nil }
+        let progress = locator.components(separatedBy: "#progress=").last.flatMap(Double.init) ?? 0
+        return ReaderDestination(chapterIndex: chapterIndex, progress: progress)
     }
 
     private func chapterTitle(locator: String) -> String {

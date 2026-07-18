@@ -74,12 +74,13 @@ struct EPUBReaderView: View {
         .onChange(of: colorScheme) { _, _ in
             navigator.apply(preferences: resolvedPreferences)
         }
-        .sheet(isPresented: $showsContents) {
-            EPUBContentsView(book: book, store: store, selectedChapter: navigator.chapterIndex) { index in
-                navigator.goToChapter(index)
+        .inspector(isPresented: $showsContents) {
+            EPUBContentsView(book: book, store: store, selectedChapter: navigator.chapterIndex) { destination in
+                navigator.goToChapter(destination.chapterIndex, progress: destination.progress)
                 showsContents = false
                 revealControls()
             }
+            .inspectorColumnWidth(min: 320, ideal: 360, max: 440)
         }
         .sheet(isPresented: $showsSettings) {
             ReaderSettingsView(preferences: $preferences)
