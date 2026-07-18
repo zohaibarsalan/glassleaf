@@ -18,5 +18,9 @@ let package = Package(
             name: "GlassleafDomainChecks",
             dependencies: ["GlassleafDomain"]
         ),
+        .testTarget(
+            name: "GlassleafDomainTests",
+            dependencies: ["GlassleafDomain"]
+        ),
     ]
 )
