@@ -28,7 +28,7 @@ struct BookDetailView: View {
 
                     HStack(spacing: 10) {
                         Button {
-                            // Reader presentation is added in the next vertical slice.
+                            store.startReading(book)
                         } label: {
                             Label(book.progress.fraction > 0 ? "Continue" : "Read", systemImage: "book.pages")
                                 .frame(maxWidth: .infinity)

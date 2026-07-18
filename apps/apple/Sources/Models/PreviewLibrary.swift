@@ -3,7 +3,16 @@ import GlassleafDomain
 
 extension LibraryStore {
     static var preview: LibraryStore {
-        LibraryStore(books: PreviewLibrary.books)
+        let store = LibraryStore(books: PreviewLibrary.books)
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--reader-preview") {
+            if var previewBook = store.books.first {
+                previewBook.progress = .notStarted
+                store.readerBook = previewBook
+            }
+        }
+#endif
+        return store
     }
 }
 

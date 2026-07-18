@@ -46,6 +46,7 @@ final class LibraryStore {
     var books: [Book]
     var selection: SidebarDestination = .home
     var presentedBook: Book?
+    var readerBook: Book?
     var searchText = ""
     var layout: LibraryLayout = .grid
 
@@ -70,6 +71,28 @@ final class LibraryStore {
 
     func showDetails(for book: Book) {
         presentedBook = book
+    }
+
+    func startReading(_ book: Book) {
+        presentedBook = nil
+        readerBook = book
+    }
+
+    func closeReader(at fraction: Double) {
+        guard let id = readerBook?.id,
+              let index = books.firstIndex(where: { $0.id == id }) else {
+            readerBook = nil
+            return
+        }
+
+        books[index].progress = ReadingProgress(
+            locator: "prototype:\(fraction)",
+            fraction: fraction,
+            deviceID: "local-preview",
+            isCompleted: fraction >= 0.995
+        )
+        books[index].lastOpened = .now
+        readerBook = nil
     }
 
     private func matchesSearch(_ book: Book) -> Bool {
