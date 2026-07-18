@@ -483,13 +483,25 @@ final class LibraryStore {
     private func persistBook(_ book: Book) {
         guard !isPreview else { return }
         let context = searchContext(for: book)
-        Task { try? await repository.upsert(book, context: context) }
+        Task {
+            do {
+                try await repository.upsert(book, context: context)
+            } catch {
+                reportPersistenceFailure(error)
+            }
+        }
     }
 
     private func persistOrganization() {
         guard !isPreview else { return }
         let value = snapshot()
-        Task { try? await repository.saveOrganization(value) }
+        Task {
+            do {
+                try await repository.saveOrganization(value)
+            } catch {
+                reportPersistenceFailure(error)
+            }
+        }
     }
 
     private func persistReading(bookID: UUID) {
@@ -497,12 +509,34 @@ final class LibraryStore {
         let bookBookmarks = bookmarks.filter { $0.bookID == bookID }
         let bookAnnotations = annotations.filter { $0.bookID == bookID }
         let context = searchContext(for: book)
-        Task { try? await repository.saveReading(book: book, bookmarks: bookBookmarks, annotations: bookAnnotations, context: context) }
+        Task {
+            do {
+                try await repository.saveReading(
+                    book: book,
+                    bookmarks: bookBookmarks,
+                    annotations: bookAnnotations,
+                    context: context
+                )
+            } catch {
+                reportPersistenceFailure(error)
+            }
+        }
     }
 
     private func persistSnapshot() async {
         guard !isPreview else { return }
-        try? await repository.save(snapshot())
+        do {
+            try await repository.save(snapshot())
+        } catch {
+            reportPersistenceFailure(error)
+        }
+    }
+
+    private func reportPersistenceFailure(_ error: Error) {
+        importAlert = ImportAlert(
+            title: "Library Changes Couldn’t Be Saved",
+            message: "Your changes are still visible in this session, but they may not survive reopening Glassleaf. \(error.localizedDescription)"
+        )
     }
 
     private func refreshPresentedBook(id: UUID) {

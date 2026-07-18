@@ -4,17 +4,21 @@ import SwiftUI
 struct HomeView: View {
     @Bindable var store: LibraryStore
 
+    private var activeBooks: [Book] {
+        store.books.filter { $0.deletedAt == nil }
+    }
+
     private var currentlyReading: [Book] {
         Array(store.books(matching: .library(.reading)).prefix(4))
     }
 
     private var recentlyAdded: [Book] {
-        Array(store.books.sorted { $0.dateAdded > $1.dateAdded }.prefix(6))
+        Array(activeBooks.sorted { $0.dateAdded > $1.dateAdded }.prefix(6))
     }
 
     var body: some View {
         Group {
-            if store.books.isEmpty {
+            if activeBooks.isEmpty {
                 emptyLibrary
             } else {
                 populatedHome
@@ -53,7 +57,7 @@ struct HomeView: View {
                 BookShelf(
                     title: "Favorites",
                     subtitle: "The books you want close by",
-                    books: Array(store.books.filter(\.isFavorite).prefix(6)),
+                    books: Array(activeBooks.filter(\.isFavorite).prefix(6)),
                     onSelect: store.showDetails
                 )
             }
