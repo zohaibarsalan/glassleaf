@@ -169,6 +169,7 @@ private struct PrototypeReaderView: View {
         .scrollIndicators(controlsVisible ? .visible : .hidden)
         .contentShape(.rect)
         .onTapGesture { toggleControls() }
+        .simultaneousGesture(pageSwipe)
     }
 
     private var readerChrome: some View {
@@ -287,7 +288,6 @@ private struct PrototypeReaderView: View {
                 } else {
                     previousPage()
                 }
-                revealControls()
             }
     }
 
