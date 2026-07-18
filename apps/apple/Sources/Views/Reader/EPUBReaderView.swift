@@ -714,7 +714,7 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
     private var preloadedResource: URL?
     private var isPreloadedChapterReady = false
     private let pageClickGesture = NSClickGestureRecognizer()
-    private var chapterKeyMonitor: Any?
+    private var readerKeyMonitor: Any?
 
     init(navigator: PublicationNavigator) {
         let primary = Self.makeWebView(navigator: navigator)
@@ -740,9 +740,9 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window == nil {
-            removeChapterKeyMonitor()
+            removeReaderKeyMonitor()
         } else {
-            installChapterKeyMonitorIfNeeded()
+            installReaderKeyMonitorIfNeeded()
         }
     }
 
@@ -759,10 +759,10 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
         navigator?.onTap?()
     }
 
-    private func installChapterKeyMonitorIfNeeded() {
-        guard chapterKeyMonitor == nil else { return }
-        chapterKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.shouldHandleChapterKey(event) else { return event }
+    private func installReaderKeyMonitorIfNeeded() {
+        guard readerKeyMonitor == nil else { return }
+        readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.shouldHandleReaderKey(event) else { return event }
             switch event.specialKey {
             case .rightArrow:
                 self.navigator?.navigateChapter(forward: true)
@@ -770,24 +770,32 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
             case .leftArrow:
                 self.navigator?.navigateChapter(forward: false)
                 return nil
+            case .downArrow:
+                self.navigator?.next()
+                return nil
+            case .upArrow:
+                self.navigator?.previous()
+                return nil
             default:
                 return event
             }
         }
     }
 
-    private func removeChapterKeyMonitor() {
-        guard let chapterKeyMonitor else { return }
-        NSEvent.removeMonitor(chapterKeyMonitor)
-        self.chapterKeyMonitor = nil
+    private func removeReaderKeyMonitor() {
+        guard let readerKeyMonitor else { return }
+        NSEvent.removeMonitor(readerKeyMonitor)
+        self.readerKeyMonitor = nil
     }
 
-    private func shouldHandleChapterKey(_ event: NSEvent) -> Bool {
+    private func shouldHandleReaderKey(_ event: NSEvent) -> Bool {
         let navigationModifiers: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        let readerKeys: Set<NSEvent.SpecialKey> = [.leftArrow, .rightArrow, .upArrow, .downArrow]
         guard event.window === window,
               !event.isARepeat,
               event.modifierFlags.intersection(navigationModifiers).isEmpty,
-              event.specialKey == .leftArrow || event.specialKey == .rightArrow
+              let specialKey = event.specialKey,
+              readerKeys.contains(specialKey)
         else { return false }
 
         guard let responder = window?.firstResponder else { return true }
@@ -920,6 +928,7 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
         webView.navigationDelegate = navigator
         webView.onHorizontalSwipe = { [weak navigator] forward in navigator?.navigateWithTrackpad(forward: forward) }
         webView.onChapterKeyNavigation = { [weak navigator] forward in navigator?.navigateChapter(forward: forward) }
+        webView.onPageKeyNavigation = { [weak navigator] forward in forward ? navigator?.next() : navigator?.previous() }
         webView.setValue(false, forKey: "drawsBackground")
         return webView
     }
@@ -928,6 +937,7 @@ private final class PublicationWebHostView: NSView, PublicationWebHosting, NSGes
 private final class TrackpadAwareWebView: WKWebView {
     var onHorizontalSwipe: ((Bool) -> Void)?
     var onChapterKeyNavigation: ((Bool) -> Void)?
+    var onPageKeyNavigation: ((Bool) -> Void)?
 
     private var horizontalDistance: CGFloat = 0
     private var verticalDistance: CGFloat = 0
@@ -947,6 +957,10 @@ private final class TrackpadAwareWebView: WKWebView {
             onChapterKeyNavigation?(true)
         case .leftArrow:
             onChapterKeyNavigation?(false)
+        case .downArrow:
+            onPageKeyNavigation?(true)
+        case .upArrow:
+            onPageKeyNavigation?(false)
         default:
             super.keyDown(with: event)
         }
