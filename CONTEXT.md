@@ -4,7 +4,7 @@ This file is the canonical starting point for AI agents and contributors working
 
 ## Project status
 
-Glassleaf is in an early local-native prototype stage. Application code exists; no deployment or cloud infrastructure exists.
+Glassleaf has a functional local-native MVP. Application code and repeatable Apple-platform checks exist; no deployment or cloud infrastructure exists.
 
 The working product name is **Glassleaf**. The repository name is `glassleaf`.
 
@@ -12,11 +12,12 @@ The working product name is **Glassleaf**. The repository name is `glassleaf`.
 
 - The universal SwiftUI project is generated from `apps/apple/project.yml` and targets iPhone, iPad, and Mac.
 - `packages/domain` contains the provider-neutral Swift model and executable behavior checks.
-- The application has an adaptive library shell and a visually validated Liquid Glass reader prototype.
-- Local EPUB import preserves original files, streams SHA-256 hashes for duplicate detection, and persists an atomic JSON catalog.
-- Imported EPUB metadata and covers are not extracted yet.
-- Reader content is generated fixture text; Readium rendering has not been integrated or verified.
-- iPhone and iPad builds have not been run because the current development machine does not have a full Xcode installation.
+- The application has an adaptive Home/library shell and a content-first, same-window Liquid Glass reader validated on Mac, iPhone Simulator, and iPad Simulator.
+- The local catalog uses migrated SQLite/WAL storage and an FTS5 index; the prior JSON catalog is imported once and archived.
+- EPUB import safely extracts publication resources, preserves originals, parses metadata/covers/navigation, and detects duplicates by SHA-256 and publication identifier.
+- The local WebKit reader renders imported EPUB XHTML/resources offline with pagination/scrolling, TOC/search, position restore, bookmarks, annotations, and persisted appearance controls.
+- Hierarchical folders, tags, collections, series, smart collections, Inbox, batch organization, recoverable Trash, metadata/custom-cover editing, and portable export are implemented.
+- Formal domain tests, generated-EPUB/SQLite integration checks, macOS and generic iOS Simulator builds, and a 50,000-book indexed-search benchmark pass locally.
 - CloudKit, Google Drive, web, synchronization, migration, and deployment have not started.
 
 ## Product vision
@@ -86,7 +87,7 @@ These are intentionally the first platform releases with Liquid Glass. Glassleaf
 
 - Swift and SwiftUI.
 - SwiftData or an equivalent local persistence layer for the offline catalog and sync state.
-- Readium Swift Toolkit as the initial EPUB rendering engine candidate.
+- A local WebKit publication navigator behind a replaceable reader boundary; revisit a dedicated toolkit only when it provides a verified universal iPhone/iPad/Mac path without weakening portability.
 - System frameworks for file import, drag and drop, share-sheet import, authentication, background tasks, and accessibility.
 - Current Apple SDKs for Liquid Glass, with graceful behavior on older supported OS versions.
 
@@ -381,7 +382,7 @@ The benchmark is **Apple Books, but calmer and substantially better organized**.
 
 ## Decisions still open
 
-- Exact local persistence stack and whether CloudKit integration uses a custom sync layer or framework-assisted persistence.
+- Whether CloudKit integration uses a custom sync layer or framework-assisted persistence. Local persistence is SQLite with WAL and FTS5.
 - Final web EPUB rendering engine.
 - Whether Google Drive content encryption is default, optional, or deferred.
 - Native app distribution strategy: private device install, TestFlight, unlisted App Store, or public App Store.

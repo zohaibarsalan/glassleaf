@@ -4,17 +4,18 @@ Glassleaf is a private, native-feeling EPUB library and reader for iPhone, iPad,
 
 The goal is straightforward: deliver the simplicity and polish of Apple Books with substantially better organization, user-controlled storage, and no lock-in.
 
-> Status: early local-native prototype. The universal SwiftUI project, provider-neutral domain, persistent local catalog, EPUB import path, adaptive library, and reader experience are scaffolded. Real EPUB rendering is not integrated yet.
+> Status: functional local-native MVP. The universal SwiftUI app imports, organizes, searches, reads, annotates, and exports DRM-free EPUB libraries entirely on-device. Cloud providers and the web companion have not started.
 
 ## Current implementation
 
 - One SwiftUI application target for iPhone, iPad, and Mac, beginning at iOS 26, iPadOS 26, and macOS 26.
-- Adaptive home, sidebar, library grid/list, search, reading-state filters, favorites, details, and empty states.
-- A Liquid Glass reader prototype with paginated/scrolling modes, chapter search, progress, bookmarks, themes, and typography controls.
-- Local EPUB selection, format preflight, streamed SHA-256 duplicate detection, original-file preservation, and atomic catalog persistence.
-- A pure Swift domain package with executable behavior checks.
-
-The reader currently uses generated fixture text. Readium integration, EPUB metadata/cover extraction, production pagination, annotations, and cloud providers remain future work.
+- Adaptive Home, hierarchical sidebar, grid/list library, Inbox, Trash, reading states, favorites, detail and metadata editing.
+- Nested folders, tags, collections, ordered series, smart collections, drag-and-drop assignment, and multi-book actions.
+- SQLite/WAL persistence with an FTS5 index over title, author, series, tags, folder, and collections.
+- Safe local EPUB extraction, metadata/cover/TOC parsing, original-file preservation, streamed SHA-256 and identifier duplicate detection, and custom cover replacement.
+- A same-window WebKit EPUB reader with pagination or scrolling, TOC, full-book search, restored position, bookmarks, persistent highlights/notes, themes, typography, margins, spacing, and alignment.
+- Recoverable Trash plus a portable `.glassleaflibrary` package containing original EPUBs, covers, metadata, organization, progress, bookmarks, and notes.
+- Swift Testing coverage, executable domain checks, a generated-EPUB integration check, macOS/iOS Simulator build gates, and a 50,000-book search performance gate.
 
 ## Local development
 
@@ -25,13 +26,21 @@ Generate the Xcode project and run the checks:
 open apps/apple/Glassleaf.xcodeproj
 ```
 
-The check script works with the macOS command-line SDK plus XcodeGen. Building iPhone and iPad destinations, using SwiftUI previews, signing, and simulator testing require a full current Xcode installation.
+The check script runs domain tests, the complete local import/storage regression, Debug and Release source checks, and unsigned macOS/iOS Simulator builds. It requires current Xcode and XcodeGen.
+
+Run the repeatable large-library search benchmark separately:
+
+```sh
+./scripts/benchmark-search.sh
+```
+
+The current 50,000-book gate requires p95 indexed queries below 50 ms; the latest Apple Silicon run measured 3.06 ms p95.
 
 ## Product direction
 
 - Universal SwiftUI application for iPhone, iPad, and macOS.
 - Thoughtful Liquid Glass interface using native system components.
-- Readium-based EPUB reading experience.
+- Local, offline EPUB reading experience with a renderer boundary that can evolve independently of the catalog.
 - Folders, tags, series, smart collections, search, and batch organization.
 - Offline-first library and reading.
 - Local-only, iCloud/CloudKit, or Google Drive storage.
@@ -96,16 +105,13 @@ glassleaf/
 
 The planned web app and portable sync-spec package will be added only when their delivery phases begin. Native and web implementations may use different languages, but they must share a versioned domain and sync specification.
 
-## Planned technical spikes
+## Next delivery phases
 
-1. Open and render EPUBs through Readium Swift Toolkit on all Apple targets.
-2. Store metadata and EPUB assets in a private CloudKit database.
-3. Access that same library through CloudKit JS on the web.
-4. Implement least-privilege Google Drive synchronization using `drive.file`.
-5. Exercise interrupted, duplicate, offline, migration, and conflict scenarios.
-6. Prototype the core Liquid Glass library and reader surfaces.
-
-Spike 6 has a visually checked macOS prototype. The other spikes, production EPUB rendering, and iPhone/iPad runtime validation remain open.
+1. Complete hands-on accessibility, keyboard, malformed-EPUB, and real-library fixture testing on iPhone, iPad, and Mac.
+2. Validate a private CloudKit record/asset spike before adding the iCloud provider.
+3. Define and chaos-test the versioned sync manifest, tombstones, conflicts, and migration protocol.
+4. Add least-privilege Google Drive synchronization using `drive.file` after iCloud behavior is proven.
+5. Build the authenticated web companion only after the native provider contract is stable.
 
 ## Development prerequisites
 
