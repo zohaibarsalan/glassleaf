@@ -56,6 +56,19 @@ check(preferences.fontScale == 2, "font scale has a legible maximum")
 check(preferences.lineSpacing == 2, "line spacing has a legible minimum")
 check(preferences.horizontalMargin == 72, "reader margins have a useful maximum")
 
+let legacyPreferences = try JSONDecoder().decode(
+    ReaderPreferences.self,
+    from: Data(#"{"fontFamily":"serif","fontScale":1,"lineSpacing":8,"horizontalMargin":28,"theme":"paper","mode":"paginated"}"#.utf8)
+)
+check(legacyPreferences.alignment == .leading, "older reader settings gain a safe alignment default")
+
+let justifiedPreferences = ReaderPreferences(alignment: .justified)
+let decodedJustifiedPreferences = try JSONDecoder().decode(
+    ReaderPreferences.self,
+    from: JSONEncoder().encode(justifiedPreferences)
+)
+check(decodedJustifiedPreferences.alignment == .justified, "reader alignment survives persistence")
+
 let asset = BookAsset(
     contentHash: String(repeating: "a", count: 64),
     byteCount: 1_024,

@@ -324,7 +324,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
           if (!style) { style = document.createElement('style'); style.id = 'glassleaf-style'; document.head.appendChild(style); }
           style.textContent = `
             html { background: \(preferences.theme.cssBackground) !important; color: \(preferences.theme.cssForeground) !important; }
-            body { box-sizing: border-box; max-width: none !important; font-family: \(font) !important; font-size: \(19 * preferences.fontScale)px !important; line-height: \(1.35 + preferences.lineSpacing / 20) !important; color: \(preferences.theme.cssForeground) !important; background: transparent !important; }
+            body { box-sizing: border-box; max-width: none !important; font-family: \(font) !important; font-size: \(19 * preferences.fontScale)px !important; line-height: \(1.35 + preferences.lineSpacing / 20) !important; text-align: \(preferences.alignment == .justified ? "justify" : "start") !important; color: \(preferences.theme.cssForeground) !important; background: transparent !important; }
             img, svg, video { max-width: 100% !important; height: auto !important; }
             a { color: inherit !important; }
             ::selection { background: rgba(255, 204, 64, .45); }

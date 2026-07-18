@@ -29,6 +29,7 @@ public struct ReaderPreferences: Codable, Hashable, Sendable {
     public var fontScale: Double
     public var lineSpacing: Double
     public var horizontalMargin: Double
+    public var alignment: ReaderTextAlignment
     public var theme: ReaderTheme
     public var mode: ReadingMode
 
@@ -37,6 +38,7 @@ public struct ReaderPreferences: Codable, Hashable, Sendable {
         fontScale: Double = 1,
         lineSpacing: Double = 8,
         horizontalMargin: Double = 28,
+        alignment: ReaderTextAlignment = .leading,
         theme: ReaderTheme = .paper,
         mode: ReadingMode = .paginated
     ) {
@@ -44,8 +46,37 @@ public struct ReaderPreferences: Codable, Hashable, Sendable {
         self.fontScale = min(max(fontScale, 0.8), 2)
         self.lineSpacing = min(max(lineSpacing, 2), 20)
         self.horizontalMargin = min(max(horizontalMargin, 16), 72)
+        self.alignment = alignment
         self.theme = theme
         self.mode = mode
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case fontFamily, fontScale, lineSpacing, horizontalMargin, alignment, theme, mode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            fontFamily: try values.decodeIfPresent(ReaderFont.self, forKey: .fontFamily) ?? .serif,
+            fontScale: try values.decodeIfPresent(Double.self, forKey: .fontScale) ?? 1,
+            lineSpacing: try values.decodeIfPresent(Double.self, forKey: .lineSpacing) ?? 8,
+            horizontalMargin: try values.decodeIfPresent(Double.self, forKey: .horizontalMargin) ?? 28,
+            alignment: try values.decodeIfPresent(ReaderTextAlignment.self, forKey: .alignment) ?? .leading,
+            theme: try values.decodeIfPresent(ReaderTheme.self, forKey: .theme) ?? .paper,
+            mode: try values.decodeIfPresent(ReadingMode.self, forKey: .mode) ?? .paginated
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(fontFamily, forKey: .fontFamily)
+        try values.encode(fontScale, forKey: .fontScale)
+        try values.encode(lineSpacing, forKey: .lineSpacing)
+        try values.encode(horizontalMargin, forKey: .horizontalMargin)
+        try values.encode(alignment, forKey: .alignment)
+        try values.encode(theme, forKey: .theme)
+        try values.encode(mode, forKey: .mode)
     }
 }
 
@@ -62,6 +93,13 @@ public enum ReaderTheme: String, Codable, CaseIterable, Identifiable, Sendable {
     case sepia
     case night
     case black
+
+    public var id: Self { self }
+}
+
+public enum ReaderTextAlignment: String, Codable, CaseIterable, Identifiable, Sendable {
+    case leading
+    case justified
 
     public var id: Self { self }
 }

@@ -46,6 +46,14 @@ struct ReaderSettingsView: View {
                         Slider(value: $preferences.horizontalMargin, in: 16...72, step: 4)
                             .accessibilityLabel("Page margins")
                     }
+
+                    Picker("Alignment", selection: $preferences.alignment) {
+                        Label("Natural", systemImage: "text.alignleft")
+                            .tag(ReaderTextAlignment.leading)
+                        Label("Justified", systemImage: "text.justify")
+                            .tag(ReaderTextAlignment.justified)
+                    }
+                    .pickerStyle(.segmented)
                 }
 
                 Section("Reading") {
