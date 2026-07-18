@@ -21,6 +21,24 @@ targets:
       - macOS
     sources:
       - Sources
+    info:
+      path: Support/Info.plist
+      properties:
+        CFBundleDisplayName: Glassleaf
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: EPUB Book
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - org.idpf.epub-container
+        LSApplicationCategoryType: public.app-category.books
+        NSHumanReadableCopyright: ""
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations: {}
+        UILaunchScreen: {}
     dependencies:
       - package: GlassleafDomain
     settings:
@@ -31,12 +49,6 @@ targets:
         CURRENT_PROJECT_VERSION: 1
         SWIFT_VERSION: 6.0
         SWIFT_STRICT_CONCURRENCY: complete
-        GENERATE_INFOPLIST_FILE: true
-        INFOPLIST_KEY_CFBundleDisplayName: Glassleaf
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.books
-        INFOPLIST_KEY_NSHumanReadableCopyright: ""
-        INFOPLIST_KEY_UILaunchScreen_Generation: true
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         TARGETED_DEVICE_FAMILY: "1,2"
         OTHER_LDFLAGS: "$(inherited) -lsqlite3 -lz"
     scheme:
