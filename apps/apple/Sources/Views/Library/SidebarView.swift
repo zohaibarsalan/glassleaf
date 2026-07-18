@@ -10,7 +10,7 @@ struct SidebarView: View {
     @State private var showsSmartCollectionEditor = false
 
     var body: some View {
-        List(selection: $store.selection) {
+        List(selection: selectionBinding) {
             Section {
                 row(.home, icon: "house")
                 row(.library(.all), icon: "books.vertical", count: store.count(for: .library(.all)))
@@ -53,6 +53,13 @@ struct SidebarView: View {
         .sheet(isPresented: $showsSmartCollectionEditor) {
             SmartCollectionEditor(store: store)
         }
+    }
+
+    private var selectionBinding: Binding<SidebarDestination?> {
+        Binding(
+            get: { store.selection },
+            set: { if let destination = $0 { store.selection = destination } }
+        )
     }
 
     private var organizationSection: some View {
