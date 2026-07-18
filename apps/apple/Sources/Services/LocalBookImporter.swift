@@ -39,7 +39,11 @@ actor LocalBookImporter {
         self.rootOverride = rootURL
     }
 
-    func importBook(from sourceURL: URL, existingHashes: Set<String>) throws -> Book {
+    func importBook(
+        from sourceURL: URL,
+        existingHashes: Set<String>,
+        existingIdentifiers: Set<String> = []
+    ) throws -> Book {
         guard sourceURL.pathExtension.lowercased() == "epub" else {
             throw ImportError.unsupportedFormat
         }
@@ -67,6 +71,10 @@ actor LocalBookImporter {
 
         let contentHash = try hashFile(at: sourceURL)
         guard !existingHashes.contains(contentHash) else {
+            throw ImportError.duplicate
+        }
+        let importedIdentifiers = Set(package.identifiers.map(Self.normalizedIdentifier))
+        guard importedIdentifiers.isDisjoint(with: existingIdentifiers) else {
             throw ImportError.duplicate
         }
 
@@ -148,16 +156,18 @@ actor LocalBookImporter {
 
         let directory = try libraryRoot().appending(path: "Books/\(bookID.uuidString)", directoryHint: .isDirectory)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        if let oldCover = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-            .first(where: { $0.lastPathComponent.hasPrefix("CustomCover.") }) {
-            try fileManager.removeItem(at: oldCover)
-        }
-
         let fileExtension = type.preferredFilenameExtension ?? suppliedExtension
         let relativePath = "Books/\(bookID.uuidString)/CustomCover.\(fileExtension)"
         let destination = try libraryRoot().appending(path: relativePath)
         try data.write(to: destination, options: [.atomic, .completeFileProtection])
+        let obsoleteCovers = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?
+            .filter { $0.lastPathComponent.hasPrefix("CustomCover.") && $0.standardizedFileURL != destination.standardizedFileURL } ?? []
+        for oldCover in obsoleteCovers { try fileManager.removeItem(at: oldCover) }
         return CoverAsset(localRelativePath: relativePath, mediaType: type.preferredMIMEType ?? "application/octet-stream")
+    }
+
+    private static func normalizedIdentifier(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func hashFile(at url: URL) throws -> String {

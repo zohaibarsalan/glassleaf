@@ -205,13 +205,23 @@ final class LibraryStore {
         defer { isImporting = false }
 
         var existingHashes = Set(books.compactMap(\.asset?.contentHash))
+        var existingIdentifiers = Set(books.flatMap(\.identifiers).map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        })
         var importedCount = 0
         var failures: [String] = []
         for url in urls {
             do {
-                let book = try await importer.importBook(from: url, existingHashes: existingHashes)
+                let book = try await importer.importBook(
+                    from: url,
+                    existingHashes: existingHashes,
+                    existingIdentifiers: existingIdentifiers
+                )
                 books.insert(book, at: 0)
                 if let hash = book.asset?.contentHash { existingHashes.insert(hash) }
+                existingIdentifiers.formUnion(book.identifiers.map {
+                    $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                })
                 importedCount += 1
             } catch {
                 failures.append(error.localizedDescription)

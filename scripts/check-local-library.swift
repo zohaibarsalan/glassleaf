@@ -49,10 +49,23 @@ struct LocalLibraryCheck {
             fatalError("Duplicate EPUB was accepted")
         } catch LocalBookImporter.ImportError.duplicate {}
 
+        var identifierVariant = try Data(contentsOf: source)
+        identifierVariant.append(0)
+        let identifierVariantURL = library.appending(path: "Identifier_Variant.epub")
+        try identifierVariant.write(to: identifierVariantURL)
+        do {
+            _ = try await importer.importBook(
+                from: identifierVariantURL,
+                existingHashes: [asset.contentHash],
+                existingIdentifiers: Set(book.identifiers.map { $0.lowercased() })
+            )
+            fatalError("Matching publication identifier was accepted")
+        } catch LocalBookImporter.ImportError.duplicate {}
+
         let onePixelPNG = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")!
         let cover = try await importer.storeCover(data: onePixelPNG, filename: "cover.png", for: organized.id)
         precondition(FileManager.default.fileExists(atPath: library.appending(path: cover.localRelativePath).path))
 
-        print("PASS: safe EPUB import, metadata, assets, cover replacement, SQLite round-trip, FTS, and deduplication")
+        print("PASS: safe EPUB import, metadata, assets, cover replacement, SQLite round-trip, FTS, and hash/identifier deduplication")
     }
 }
