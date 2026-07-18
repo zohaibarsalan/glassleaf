@@ -76,7 +76,9 @@ struct EPUBContentsView: View {
         }
         .frame(minWidth: 320, idealWidth: 360, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.regularMaterial)
+        #if os(macOS)
         .onExitCommand(perform: onClose)
+        #endif
         .task(id: searchText) { await performSearch() }
     }
 
