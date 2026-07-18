@@ -41,6 +41,8 @@ struct EPUBReaderView: View {
 
             if controlsVisible { readerChrome.transition(.opacity) }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(preferences.theme.background)
         .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: controlsVisible)
         .modifier(ReaderSystemChromeModifier(controlsVisible: controlsVisible))
         .onAppear {
@@ -177,6 +179,7 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     @ObservationIgnored private var book: Book?
     @ObservationIgnored private var preferences = ReaderPreferences()
     @ObservationIgnored private var pendingProgress = 0.0
+    @ObservationIgnored private var isWaitingForWebView = false
 
     func attach(_ webView: WKWebView, book: Book, preferences: ReaderPreferences) {
         guard self.webView !== webView else { apply(preferences: preferences); return }
@@ -184,6 +187,10 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
         self.book = book
         self.preferences = preferences
         webView.navigationDelegate = self
+        if isWaitingForWebView {
+            isWaitingForWebView = false
+            loadChapter(chapterIndex)
+        }
     }
 
     func open(book: Book, initialProgress: Double) {
@@ -192,6 +199,10 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
         let scaled = min(max(initialProgress, 0), 1) * Double(count)
         chapterIndex = min(Int(scaled), count - 1)
         pendingProgress = scaled - Double(chapterIndex)
+        guard webView != nil else {
+            isWaitingForWebView = true
+            return
+        }
         loadChapter(chapterIndex)
     }
 
@@ -239,8 +250,14 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     }
 
     func apply(preferences: ReaderPreferences) {
+        let modeChanged = self.preferences.mode != preferences.mode
         self.preferences = preferences
-        evaluate(Self.appearanceScript(preferences))
+        if modeChanged {
+            pendingProgress = chapterProgress
+            loadChapter(chapterIndex)
+        } else {
+            evaluate(Self.appearanceScript(preferences))
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -275,6 +292,9 @@ final class PublicationNavigator: NSObject, WKNavigationDelegate, WKScriptMessag
     private static func bootstrapScript(preferences: ReaderPreferences, progress: Double) -> String {
         """
         (() => {
+          let viewport = document.querySelector('meta[name="viewport"]');
+          if (!viewport) { viewport = document.createElement('meta'); viewport.name = 'viewport'; document.head.appendChild(viewport); }
+          viewport.content = 'width=device-width, initial-scale=1, maximum-scale=1';
           \(appearanceScript(preferences))
           const root = document.scrollingElement;
           const horizontal = () => \(preferences.mode == .paginated ? "true" : "false");

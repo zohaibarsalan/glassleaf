@@ -19,6 +19,7 @@ struct AppRootView: View {
                     .transition(.opacity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(
             reduceMotion ? nil : .smooth(duration: 0.24),
             value: store.readerBook?.id
@@ -67,6 +68,11 @@ struct AppRootView: View {
         }
         .task {
             await store.loadLibrary()
+#if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--open-first-book"), let book = store.books.first {
+                store.startReading(book)
+            }
+#endif
         }
     }
 

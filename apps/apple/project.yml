@@ -35,6 +35,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Glassleaf
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.books
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         TARGETED_DEVICE_FAMILY: "1,2"
         OTHER_LDFLAGS: "$(inherited) -lsqlite3 -lz"
     scheme:
