@@ -6,6 +6,7 @@ import AppKit
 
 struct AppRootView: View {
     @State private var store = LibraryStore.initial
+    @State private var readerControlsVisible = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @ViewBuilder
@@ -13,16 +14,26 @@ struct AppRootView: View {
         @Bindable var store = store
 
         ZStack {
+            libraryRoot
+                .allowsHitTesting(store.readerBook == nil)
+                .accessibilityHidden(store.readerBook != nil)
+
             if let readerBook = store.readerBook {
                 ReaderView(book: readerBook, store: store)
                     .transition(.opacity)
                     .zIndex(1)
-            } else {
-                libraryRoot
-                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onPreferenceChange(ReaderChromeVisibilityPreferenceKey.self) { value in
+            readerControlsVisible = value
+        }
+        .modifier(
+            AppReaderSystemChromeModifier(
+                readerPresented: store.readerBook != nil,
+                controlsVisible: readerControlsVisible
+            )
+        )
         .animation(
             reduceMotion ? nil : .smooth(duration: 0.24),
             value: store.readerBook?.id

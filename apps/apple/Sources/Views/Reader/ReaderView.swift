@@ -357,11 +357,37 @@ struct ReaderSystemChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
 #if os(iOS)
         content
-            .statusBarHidden(!controlsVisible)
-            .persistentSystemOverlays(controlsVisible ? .automatic : .hidden)
+            .preference(
+                key: ReaderChromeVisibilityPreferenceKey.self,
+                value: controlsVisible
+            )
 #else
         content
             .toolbarVisibility(.hidden, for: .windowToolbar)
+#endif
+    }
+}
+
+struct ReaderChromeVisibilityPreferenceKey: PreferenceKey {
+    static let defaultValue = true
+
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        value = nextValue()
+    }
+}
+
+struct AppReaderSystemChromeModifier: ViewModifier {
+    let readerPresented: Bool
+    let controlsVisible: Bool
+
+    func body(content: Content) -> some View {
+#if os(iOS)
+        let hidesSystemChrome = readerPresented && !controlsVisible
+        content
+            .statusBarHidden(hidesSystemChrome)
+            .persistentSystemOverlays(hidesSystemChrome ? .hidden : .automatic)
+#else
+        content
 #endif
     }
 }
