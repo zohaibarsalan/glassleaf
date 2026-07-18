@@ -7,7 +7,7 @@ cd "$glassleaf_root"
 
 check_root=$(mktemp -d "${TMPDIR:-/tmp}/glassleaf-local-check.XXXXXX")
 trap 'rm -rf "$check_root"' EXIT
-fixture_root="$glassleaf_root/scripts/fixtures/generated.epub"
+fixture_root="$glassleaf_root/scripts/fixtures/generated-epub"
 fixture_epub="$check_root/Generated_Fixture.epub"
 library_root="$check_root/library"
 module_root="$check_root/module"
