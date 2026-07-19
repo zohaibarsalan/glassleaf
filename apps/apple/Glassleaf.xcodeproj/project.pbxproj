@@ -22,12 +22,14 @@
 		7B90F52883B174C6E46116C2 /* ReaderSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEEF7115371C191B9B4C635 /* ReaderSample.swift */; };
 		887F6F594441696C2C1D4CE8 /* EPUBContentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7BBBEF3C1B73F3629AB08A7 /* EPUBContentsView.swift */; };
 		8A7F33C9ED6236CF8E662D1C /* ZIPArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */; };
+		9B6E64DAB60CB497A64CE94A /* CloudKitSyncProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AED176793646EF27FC92C89 /* CloudKitSyncProvider.swift */; };
 		9F61AEBD09E4190657FFA2CE /* EPUBParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */; };
 		A8EB88BE901D6EAD1D09E5B0 /* LocalBookImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */; };
 		AD01B64CE8AC681957CED21A /* EPUBReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B07DCBFBCC7989158C5539B /* EPUBReaderView.swift */; };
 		B399D23A4B2D15C8043BAAE7 /* ReaderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2841971642089A4E9142BBE0 /* ReaderSettingsView.swift */; };
 		B7991BE0C70A555A5FB5584B /* ImportQueueService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9907991E7847158EBC668532 /* ImportQueueService.swift */; };
 		B9525ACB666E0E2E31BE2E70 /* PortableLibraryArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE0131A67C3517FB714D19A /* PortableLibraryArchiveService.swift */; };
+		C7A715000760998E712BA55E /* CloudKitRecordCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D9188B46CE15378CED5250 /* CloudKitRecordCodec.swift */; };
 		E1956715325F3D9C4B23E35D /* ReaderContentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0352684D1F52DF780A508F92 /* ReaderContentsView.swift */; };
 		EAF56C921619354548BC035E /* BookComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49ED142E8F28846D47550C4C /* BookComponents.swift */; };
 		F5434F5552F620E975D552E1 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39227AA8AC817E87BBFDC357 /* LibraryView.swift */; };
@@ -38,6 +40,7 @@
 
 /* Begin PBXFileReference section */
 		0352684D1F52DF780A508F92 /* ReaderContentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderContentsView.swift; sourceTree = "<group>"; };
+		0AED176793646EF27FC92C89 /* CloudKitSyncProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncProvider.swift; sourceTree = "<group>"; };
 		178A8DD9CFEFE3DF506F907D /* SmartCollectionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartCollectionEditor.swift; sourceTree = "<group>"; };
 		2841971642089A4E9142BBE0 /* ReaderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettingsView.swift; sourceTree = "<group>"; };
 		2BEEF7115371C191B9B4C635 /* ReaderSample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSample.swift; sourceTree = "<group>"; };
@@ -63,6 +66,7 @@
 		D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchive.swift; sourceTree = "<group>"; };
 		D4353F25B9511ACB2A6A8144 /* Glassleaf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glassleaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLibrary.swift; sourceTree = "<group>"; };
+		F9D9188B46CE15378CED5250 /* CloudKitRecordCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRecordCodec.swift; sourceTree = "<group>"; };
 		FA499FF391D3BD366C109967 /* LocalLibraryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryRepository.swift; sourceTree = "<group>"; };
 		FE862DF707A036A3A423F20C /* GlassleafApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassleafApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -91,6 +95,8 @@
 		0C8D236472A7F2B692E50174 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				F9D9188B46CE15378CED5250 /* CloudKitRecordCodec.swift */,
+				0AED176793646EF27FC92C89 /* CloudKitSyncProvider.swift */,
 				C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */,
 				9907991E7847158EBC668532 /* ImportQueueService.swift */,
 				CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */,
@@ -277,6 +283,8 @@
 				EAF56C921619354548BC035E /* BookComponents.swift in Sources */,
 				417DEAA268458A6541BD7C10 /* BookDetailView.swift in Sources */,
 				16EC150A297EEDA3D3AF7E46 /* BookMetadataEditor.swift in Sources */,
+				C7A715000760998E712BA55E /* CloudKitRecordCodec.swift in Sources */,
+				9B6E64DAB60CB497A64CE94A /* CloudKitSyncProvider.swift in Sources */,
 				887F6F594441696C2C1D4CE8 /* EPUBContentsView.swift in Sources */,
 				9F61AEBD09E4190657FFA2CE /* EPUBParser.swift in Sources */,
 				AD01B64CE8AC681957CED21A /* EPUBReaderView.swift in Sources */,
