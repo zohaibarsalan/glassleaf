@@ -117,10 +117,12 @@ actor CloudKitSyncProvider: SyncProvider {
         try await prepare()
 
         let recordIDs = mutations.map { codec.recordID(for: $0.record.id) }
-        let fetched = try await database.records(for: recordIDs)
         var existingByID: [CKRecord.ID: CKRecord] = [:]
-        for (recordID, result) in fetched {
-            if case .success(let record) = result { existingByID[recordID] = record }
+        for batch in Self.batches(recordIDs) {
+            let fetched = try await database.records(for: batch)
+            for (recordID, result) in fetched {
+                if case .success(let record) = result { existingByID[recordID] = record }
+            }
         }
 
         var recordsToSave: [CKRecord] = []
@@ -156,14 +158,14 @@ actor CloudKitSyncProvider: SyncProvider {
             mutationByRecordID[recordID] = mutation
         }
 
-        if !recordsToSave.isEmpty {
+        for batch in Self.batches(recordsToSave) {
             let result = try await database.modifyRecords(
-                saving: recordsToSave,
+                saving: batch,
                 deleting: [],
                 savePolicy: .ifServerRecordUnchanged,
                 atomically: false
             )
-            for record in recordsToSave {
+            for record in batch {
                 guard let mutation = mutationByRecordID[record.recordID],
                       let saveResult = result.saveResults[record.recordID] else {
                     throw CloudKitSyncError.missingServerResult(record.recordID.recordName)
@@ -191,5 +193,12 @@ actor CloudKitSyncProvider: SyncProvider {
     private static func serverRecord(from error: Error) -> CKRecord? {
         let value = error as NSError
         return value.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord
+    }
+
+    private static func batches<Value>(_ values: [Value], limit: Int = 200) -> [[Value]] {
+        guard !values.isEmpty else { return [] }
+        return stride(from: 0, to: values.count, by: limit).map { start in
+            Array(values[start..<min(start + limit, values.count)])
+        }
     }
 }
