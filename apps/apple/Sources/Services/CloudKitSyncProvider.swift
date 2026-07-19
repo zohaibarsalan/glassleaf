@@ -134,7 +134,11 @@ actor CloudKitSyncProvider: SyncProvider {
                remote != mutation.record,
                remote.revision != mutation.baseRevision {
                 remoteRecords.append(remote)
-                continue
+                let merged = SyncMergePolicy.merge(local: mutation.record, remote: remote)
+                if merged.record == remote {
+                    acknowledged.insert(mutation.id)
+                    continue
+                }
             }
 
             recordsToSave.append(codec.encode(mutation.record, mutationID: mutation.id, into: existing))
