@@ -40,67 +40,99 @@ struct BookMetadataEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Book") {
+                Section {
+                    coverEditor
+                }
+
+                Section("Book Information") {
                     TextField("Title", text: $title)
                     TextField("Author", text: $author)
                     TextField("Language", text: $language, prompt: Text("Optional language code"))
-                    Picker("Cover style", selection: $coverStyle) {
-                        ForEach(CoverStyle.allCases, id: \.self) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    LabeledContent("Cover image") {
-                        Button(replacementCover?.filename ?? "Choose Image…") {
-                            showsCoverImporter = true
-                        }
-                    }
                     TextField("Description", text: $summary, axis: .vertical)
                         .lineLimit(4...10)
                 }
 
-                Section("Location") {
+                Section("Organization") {
                     Picker("Folder", selection: $folderID) {
                         Text("No Folder").tag(UUID?.none)
                         ForEach(store.foldersByPath) { folder in
                             Text(store.folderPath(for: folder.id)).tag(Optional(folder.id))
                         }
                     }
+
                     if store.collections.isEmpty {
                         Text("Create a collection from the sidebar to add this book to it.")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(store.collections) { collection in
-                            Toggle(collection.name, isOn: membershipBinding(collection.id, in: $collectionIDs))
+                        LabeledContent("Collections") {
+                            Menu {
+                                ForEach(sortedCollections) { collection in
+                                    Button {
+                                        toggle(collection.id, in: &collectionIDs)
+                                    } label: {
+                                        Label(
+                                            collection.name,
+                                            systemImage: collectionIDs.contains(collection.id) ? "checkmark" : "circle"
+                                        )
+                                    }
+                                }
+                            } label: {
+                                Text(collectionSummary)
+                                    .lineLimit(1)
+                            }
                         }
                     }
                 }
 
-                Section("Series") {
+                Section {
                     Picker("Series", selection: $seriesID) {
                         Text("No Series").tag(UUID?.none)
-                        ForEach(store.series) { item in
+                        ForEach(sortedSeries) { item in
                             Text(item.name).tag(Optional(item.id))
                         }
                     }
-                    InlineOrganizerCreator(
-                        label: "New series",
+                    if seriesID != nil {
+                        TextField("Position", text: $seriesIndex, prompt: Text("For example, 1.5"))
+                    }
+                    OrganizerCreationRow(
+                        icon: "square.stack.3d.up",
                         prompt: "Series name",
-                        buttonTitle: "Create Series",
+                        buttonTitle: "Add Series",
                         name: $newSeries,
                         action: addSeries
                     )
-                    TextField("Position", text: $seriesIndex, prompt: Text("For example, 1.5"))
-                        .disabled(seriesID == nil)
+                } header: {
+                    Text("Series")
+                } footer: {
+                    Text("Position controls the reading order and can include decimals, such as 1.5.")
                 }
 
                 Section("Tags") {
-                    ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
-                        Toggle(tag.name, isOn: membershipBinding(tag.id, in: $tagIDs))
+                    if !store.tags.isEmpty {
+                        LabeledContent("Applied tags") {
+                            Menu {
+                                ForEach(sortedTags) { tag in
+                                    Button {
+                                        toggle(tag.id, in: &tagIDs)
+                                    } label: {
+                                        Label(
+                                            tag.name,
+                                            systemImage: tagIDs.contains(tag.id) ? "checkmark" : "circle"
+                                        )
+                                    }
+                                }
+                            } label: {
+                                Text(tagSummary)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
-                    InlineOrganizerCreator(
-                        label: "New tag",
+
+                    OrganizerCreationRow(
+                        icon: "tag",
                         prompt: "Tag name",
-                        buttonTitle: "Create Tag",
+                        buttonTitle: "Add Tag",
                         name: $newTag,
                         action: addTag
                     )
@@ -118,7 +150,9 @@ struct BookMetadataEditor: View {
                 }
             }
         }
-        .frame(minWidth: 420, idealWidth: 520, minHeight: 560, idealHeight: 720)
+#if os(macOS)
+        .frame(minWidth: 440, idealWidth: 560, minHeight: 600, idealHeight: 760)
+#endif
         .fileImporter(isPresented: $showsCoverImporter, allowedContentTypes: [.image]) { result in
             guard case .success(let url) = result else { return }
             let accessed = url.startAccessingSecurityScopedResource()
@@ -128,13 +162,98 @@ struct BookMetadataEditor: View {
         }
     }
 
-    private func membershipBinding(_ id: UUID, in selection: Binding<Set<UUID>>) -> Binding<Bool> {
-        Binding(
-            get: { selection.wrappedValue.contains(id) },
-            set: { enabled in
-                if enabled { selection.wrappedValue.insert(id) } else { selection.wrappedValue.remove(id) }
+    private var coverEditor: some View {
+        HStack(alignment: .center, spacing: 18) {
+            BookCoverView(book: previewBook, size: .row)
+
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "Untitled Book")
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text(author.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "Unknown Author")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Picker("Cover style", selection: $coverStyle) {
+                    ForEach(CoverStyle.allCases, id: \.self) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+
+                Button("Choose Cover Image…", systemImage: "photo") {
+                    showsCoverImporter = true
+                }
+                .buttonStyle(.bordered)
+
+                if let filename = replacementCover?.filename {
+                    Text(filename)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var previewBook: Book {
+        var value = book
+        value.title = title
+        value.author = author
+        value.coverStyle = coverStyle
+        return value
+    }
+
+    private var sortedCollections: [BookCollection] {
+        store.collections.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private var sortedTags: [Tag] {
+        store.tags.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private var sortedSeries: [Series] {
+        store.series.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private var collectionSummary: String {
+        selectionSummary(
+            selectedIDs: collectionIDs,
+            namesByID: Dictionary(uniqueKeysWithValues: store.collections.map { ($0.id, $0.name) }),
+            emptyTitle: "None"
         )
+    }
+
+    private var tagSummary: String {
+        selectionSummary(
+            selectedIDs: tagIDs,
+            namesByID: Dictionary(uniqueKeysWithValues: store.tags.map { ($0.id, $0.name) }),
+            emptyTitle: "None"
+        )
+    }
+
+    private func selectionSummary(
+        selectedIDs: Set<UUID>,
+        namesByID: [UUID: String],
+        emptyTitle: String
+    ) -> String {
+        let names = selectedIDs.compactMap { namesByID[$0] }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        if names.isEmpty { return emptyTitle }
+        if names.count <= 2 { return names.joined(separator: ", ") }
+        return "\(names.count) selected"
+    }
+
+    private func toggle(_ id: UUID, in selection: inout Set<UUID>) {
+        if selection.contains(id) {
+            selection.remove(id)
+        } else {
+            selection.insert(id)
+        }
     }
 
     private func addTag() {
@@ -158,7 +277,9 @@ struct BookMetadataEditor: View {
             value.summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
             value.language = language.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             value.seriesID = seriesID
-            value.seriesIndex = Decimal(string: seriesIndex.trimmingCharacters(in: .whitespacesAndNewlines))
+            value.seriesIndex = seriesID == nil
+                ? nil
+                : Decimal(string: seriesIndex.trimmingCharacters(in: .whitespacesAndNewlines))
             value.folderID = folderID
             value.collectionIDs = collectionIDs
             value.tagIDs = tagIDs
@@ -173,8 +294,8 @@ struct BookMetadataEditor: View {
     }
 }
 
-private struct InlineOrganizerCreator: View {
-    let label: String
+private struct OrganizerCreationRow: View {
+    let icon: String
     let prompt: String
     let buttonTitle: String
     @Binding var name: String
@@ -185,25 +306,24 @@ private struct InlineOrganizerCreator: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.subheadline)
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .frame(width: 18)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
-            HStack(spacing: 10) {
-                TextField(prompt, text: $name)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit {
-                        guard !isEmpty else { return }
-                        action()
-                    }
+            TextField(prompt, text: $name)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    guard !isEmpty else { return }
+                    action()
+                }
 
-                Button(buttonTitle, systemImage: "plus", action: action)
-                    .buttonStyle(.bordered)
-                    .disabled(isEmpty)
-            }
+            Button(buttonTitle, systemImage: "plus", action: action)
+                .buttonStyle(.bordered)
+                .disabled(isEmpty)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }
 
