@@ -2,7 +2,7 @@ import Foundation
 import GlassleafDomain
 import SQLite3
 
-actor LocalLibraryRepository {
+actor LocalLibraryRepository: SyncJournalStore {
     enum RepositoryError: LocalizedError {
         case open(String)
         case sqlite(String)
@@ -151,6 +151,33 @@ actor LocalLibraryRepository {
         }
     }
 
+    func loadSyncJournal() async throws -> SyncJournal {
+        try withDatabase { database in
+            var statement: OpaquePointer?
+            defer { sqlite3_finalize(statement) }
+            try prepare(database, sql: "SELECT data FROM sync_journal WHERE id = 1", statement: &statement)
+            let step = sqlite3_step(statement)
+            if step == SQLITE_DONE { return SyncJournal() }
+            guard step == SQLITE_ROW, let bytes = sqlite3_column_blob(statement, 0) else {
+                try checkStatement(database, statement: statement)
+                return SyncJournal()
+            }
+            let data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 0)))
+            return try decoder.decode(SyncJournal.self, from: data)
+        }
+    }
+
+    func saveSyncJournal(_ journal: SyncJournal) async throws {
+        try withDatabase { database in
+            let data = try encoder.encode(journal)
+            try execute(
+                database,
+                sql: "INSERT OR REPLACE INTO sync_journal(id, data) VALUES (1, ?)",
+                values: [.blob(data)]
+            )
+        }
+    }
+
     func exportSnapshot(to destination: URL) throws {
         let snapshot = try load()
         let data = try encoder.encode(snapshot)
@@ -263,6 +290,10 @@ actor LocalLibraryRepository {
             CREATE INDEX IF NOT EXISTS bookmarks_book_id ON bookmarks(book_id);
             CREATE TABLE IF NOT EXISTS annotations (id TEXT PRIMARY KEY, book_id TEXT NOT NULL, data BLOB NOT NULL);
             CREATE INDEX IF NOT EXISTS annotations_book_id ON annotations(book_id);
+            CREATE TABLE IF NOT EXISTS sync_journal (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                data BLOB NOT NULL
+            );
             CREATE VIRTUAL TABLE IF NOT EXISTS book_search USING fts5(
                 book_id UNINDEXED,
                 title,
@@ -274,7 +305,7 @@ actor LocalLibraryRepository {
                 tokenize = 'unicode61 remove_diacritics 2',
                 prefix = '2 3 4'
             );
-            INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', '2');
+            INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', '3');
             """)
     }
 

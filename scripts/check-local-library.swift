@@ -74,6 +74,20 @@ struct LocalLibraryCheck {
         precondition(folderMatches == [organized.id])
         precondition(collectionMatches == [organized.id])
 
+        let syncRecord = SyncRecord(
+            id: SyncRecordID(kind: .book, entityID: organized.id),
+            revision: SyncRevision(generation: 1, deviceID: "local-check"),
+            payload: Data("book-payload".utf8)
+        )
+        let syncJournal = SyncJournal(
+            records: [syncRecord],
+            outbox: [SyncMutation(record: syncRecord)]
+        )
+        try await repository.saveSyncJournal(syncJournal)
+        let reopenedRepository = LocalLibraryRepository(rootURL: library)
+        let reopenedJournal = try await reopenedRepository.loadSyncJournal()
+        precondition(reopenedJournal == syncJournal)
+
         do {
             _ = try await importer.importBook(from: source, existingHashes: [asset.contentHash])
             fatalError("Duplicate EPUB was accepted")
@@ -134,6 +148,6 @@ struct LocalLibraryCheck {
         precondition(FileManager.default.fileExists(atPath: restoredRoot.appending(path: asset.extractedRelativePath!).appending(path: "OEBPS/chapter.xhtml").path))
         precondition(FileManager.default.fileExists(atPath: restoredRoot.appending(path: cover.localRelativePath).path))
 
-        print("PASS: safe EPUB import, metadata, assets, portable backup/restore, rollback backup, SQLite round-trip, FTS, and deduplication")
+        print("PASS: safe EPUB import, durable queue and sync journal, metadata, assets, portable backup/restore, SQLite round-trip, FTS, and deduplication")
     }
 }
