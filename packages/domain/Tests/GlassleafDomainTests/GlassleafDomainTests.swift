@@ -163,3 +163,100 @@ func readingEventsResolveByTime() {
     #expect(resolved.fraction == 0.3)
     #expect(resolved.deviceID == "mac")
 }
+
+@Test("Direct descendants win and stale tombstones cannot erase newer edits")
+func mergeHonorsAncestryAndTombstones() {
+    let id = SyncRecordID(kind: .book, entityID: UUID())
+    let firstRevision = SyncRevision(generation: 1, updatedAt: Date(timeIntervalSince1970: 1), deviceID: "mac")
+    let secondRevision = SyncRevision(generation: 2, updatedAt: Date(timeIntervalSince1970: 2), deviceID: "iphone")
+    let first = SyncRecord(id: id, revision: firstRevision, payload: Data("first".utf8))
+    let deleted = SyncRecord(
+        id: id,
+        revision: secondRevision,
+        parentRevision: firstRevision,
+        isTombstone: true
+    )
+
+    let deletion = SyncMergePolicy.merge(local: first, remote: deleted)
+    #expect(deletion.record.isTombstone)
+
+    let restoredRevision = SyncRevision(generation: 3, updatedAt: Date(timeIntervalSince1970: 3), deviceID: "mac")
+    let restored = SyncRecord(
+        id: id,
+        revision: restoredRevision,
+        parentRevision: secondRevision,
+        payload: Data("restored".utf8)
+    )
+    let staleDelete = SyncMergePolicy.merge(local: restored, remote: deleted)
+    #expect(!staleDelete.record.isTombstone)
+    if case .keptLocal = staleDelete.result {} else {
+        Issue.record("A stale tombstone should not replace its descendant")
+    }
+}
+
+@Test("Concurrent updates are projected deterministically and retained as conflicts")
+func concurrentUpdatesCreateConflict() {
+    let id = SyncRecordID(kind: .tag, entityID: UUID())
+    let local = SyncRecord(
+        id: id,
+        revision: SyncRevision(generation: 2, updatedAt: Date(timeIntervalSince1970: 2), deviceID: "mac"),
+        payload: Data("Local".utf8)
+    )
+    let remote = SyncRecord(
+        id: id,
+        revision: SyncRevision(generation: 2, updatedAt: Date(timeIntervalSince1970: 2), deviceID: "iphone"),
+        payload: Data("Remote".utf8)
+    )
+    var journal = SyncJournal(records: [local])
+
+    let result = journal.merge(remote)
+    if case .conflict = result {} else {
+        Issue.record("Concurrent edits should create a recoverable conflict")
+    }
+    #expect(journal.conflicts.count == 1)
+    #expect(journal.record(for: id)?.revision == max(local.revision, remote.revision))
+}
+
+@Test("Offline synchronization preserves the durable outbox for retry")
+func offlineOutboxRetries() async throws {
+    let provider = InMemorySyncProvider(isAvailable: false)
+    let store = InMemorySyncJournalStore()
+    let coordinator = SyncCoordinator(provider: provider, store: store)
+    let record = SyncRecord(
+        id: SyncRecordID(kind: .folder, entityID: UUID()),
+        revision: SyncRevision(generation: 1, deviceID: "mac"),
+        payload: Data("Folder".utf8)
+    )
+    let mutation = SyncMutation(record: record)
+    try await coordinator.enqueue(mutation)
+
+    await #expect(throws: InMemorySyncProvider.ProviderError.unavailable) {
+        try await coordinator.synchronize()
+    }
+    var journal = try await store.loadSyncJournal()
+    #expect(journal.outbox.map(\.id) == [mutation.id])
+
+    await provider.setAvailable(true)
+    let summary = try await coordinator.synchronize()
+    journal = try await store.loadSyncJournal()
+    #expect(summary.acknowledgedMutationCount == 1)
+    #expect(journal.outbox.isEmpty)
+    #expect(await provider.record(for: record.id) == record)
+}
+
+@Test("Provider mutation IDs are idempotent across retries")
+func providerRetriesAreIdempotent() async throws {
+    let provider = InMemorySyncProvider()
+    let record = SyncRecord(
+        id: SyncRecordID(kind: .bookmark, entityID: UUID()),
+        revision: SyncRevision(generation: 1, deviceID: "iphone"),
+        payload: Data("Bookmark".utf8)
+    )
+    let mutation = SyncMutation(record: record)
+
+    let first = try await provider.apply([mutation])
+    let second = try await provider.apply([mutation])
+    #expect(first.acknowledgedMutationIDs == [mutation.id])
+    #expect(second.acknowledgedMutationIDs == [mutation.id])
+    #expect(await provider.record(for: record.id) == record)
+}
