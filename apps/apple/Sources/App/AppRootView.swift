@@ -131,6 +131,9 @@ struct AppRootView: View {
         }
         .task {
             await store.loadLibrary()
+            if store.isICloudSyncEnabled {
+                CloudKitNotificationBridge.registerForRemoteNotifications()
+            }
 #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--open-first-book"), let book = store.books.first {
                 store.startReading(book)
@@ -140,6 +143,10 @@ struct AppRootView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, store.isICloudSyncEnabled else { return }
             Task { await store.synchronizeWithICloud(reportFailure: false) }
+        }
+        .onChange(of: store.isICloudSyncEnabled) { _, isEnabled in
+            guard isEnabled else { return }
+            CloudKitNotificationBridge.registerForRemoteNotifications()
         }
         .onReceive(NotificationCenter.default.publisher(for: .glassleafCloudKitDidChange)) { _ in
             guard store.isICloudSyncEnabled else { return }

@@ -9,12 +9,9 @@ extension Notification.Name {
 import UIKit
 
 final class CloudKitNotificationBridge: NSObject, UIApplicationDelegate {
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        application.registerForRemoteNotifications()
-        return true
+    @MainActor
+    static func registerForRemoteNotifications() {
+        UIApplication.shared.registerForRemoteNotifications()
     }
 
     func application(
@@ -35,7 +32,8 @@ final class CloudKitNotificationBridge: NSObject, UIApplicationDelegate {
 import AppKit
 
 final class CloudKitNotificationBridge: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    @MainActor
+    static func registerForRemoteNotifications() {
         NSApplication.shared.registerForRemoteNotifications()
     }
 
