@@ -70,8 +70,24 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
         TARGETED_DEVICE_FAMILY: "1,2"
         OTHER_LDFLAGS: "$(inherited) -lsqlite3 -lz"
-    scheme:
-      gatherCoverageData: true
+  GlassleafTests:
+    type: bundle.unit-test
+    platform: auto
+    supportedDestinations:
+      - iOS
+      - macOS
+    sources:
+      - Tests
+    dependencies:
+      - target: Glassleaf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.glassleaf.reader.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 6.0
+        SWIFT_STRICT_CONCURRENCY: complete
+        "TEST_HOST[sdk=macosx*]": "$(BUILT_PRODUCTS_DIR)/Glassleaf.app/Contents/MacOS/Glassleaf"
+        "BUNDLE_LOADER[sdk=macosx*]": "$(TEST_HOST)"
 
 schemes:
   Glassleaf:
@@ -82,3 +98,6 @@ schemes:
       config: Debug
     test:
       config: Debug
+      gatherCoverageData: true
+      targets:
+        - GlassleafTests

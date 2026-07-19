@@ -18,6 +18,7 @@
 		51D335C1211D89ADEB278F05 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C058C58364BF8B28BA69C9A3 /* SidebarView.swift */; };
 		53D20A975A53ECD2001C0490 /* GlassleafApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE862DF707A036A3A423F20C /* GlassleafApp.swift */; };
 		54AAC2A7140429F4D3EB2F5D /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320945BB73FF5890E9635ACD /* LibraryStore.swift */; };
+		644E74D0AB5533E257D8535E /* CloudKitRecordCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE5EC26536A5A23D016B9EE0 /* CloudKitRecordCodecTests.swift */; };
 		6A0B08C7B299373421EA1762 /* GlassleafDomain in Frameworks */ = {isa = PBXBuildFile; productRef = F710918C6DDF27ABBC6ECC8E /* GlassleafDomain */; };
 		7AA91EFE335361CD0F261B82 /* CloudSyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D5095A4EEA3053141CC983B /* CloudSyncSettingsView.swift */; };
 		7B90F52883B174C6E46116C2 /* ReaderSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEEF7115371C191B9B4C635 /* ReaderSample.swift */; };
@@ -41,6 +42,16 @@
 		F7B887ED000A8066D110FFA9 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72621FB648D03F473EE63DD5 /* AppRootView.swift */; };
 		FAD7924B32B15871DCE0C095 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CF3D331842071606C4343085 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		35CF261091DD89F57E7EAD28 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B5C57EF9D1D32043FA4803F2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 14EB1000A4BEF4B6D2FC1BB6;
+			remoteInfo = Glassleaf;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0352684D1F52DF780A508F92 /* ReaderContentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderContentsView.swift; sourceTree = "<group>"; };
@@ -68,8 +79,10 @@
 		C2D6F4C17159F612F6D59CF9 /* BookMetadataEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookMetadataEditor.swift; sourceTree = "<group>"; };
 		C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBParser.swift; sourceTree = "<group>"; };
 		C9E0572DB334A4316351219C /* PublicationSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicationSearchService.swift; sourceTree = "<group>"; };
+		CE5EC26536A5A23D016B9EE0 /* CloudKitRecordCodecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRecordCodecTests.swift; sourceTree = "<group>"; };
 		CF3D331842071606C4343085 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalBookImporter.swift; sourceTree = "<group>"; };
+		D0C2D2D6D7D31C1D56659DE0 /* GlassleafTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlassleafTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchive.swift; sourceTree = "<group>"; };
 		D4353F25B9511ACB2A6A8144 /* Glassleaf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glassleaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLibrary.swift; sourceTree = "<group>"; };
@@ -141,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				D4353F25B9511ACB2A6A8144 /* Glassleaf.app */,
+				D0C2D2D6D7D31C1D56659DE0 /* GlassleafTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -159,6 +173,7 @@
 				818B966C9188B81F2AC8F5DD /* Packages */,
 				A9CCAE4BEEBDADB3468D84EE /* Sources */,
 				239C6A0FD89452F5475A862E /* Support */,
+				D9D6EABAF9105AB5E646E72E /* Tests */,
 				593E4C3A8E7E0ED08476CBE8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -186,6 +201,14 @@
 				54951888CE3558C11C62880E /* Views */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		D9D6EABAF9105AB5E646E72E /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				CE5EC26536A5A23D016B9EE0 /* CloudKitRecordCodecTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		DCE183D49B774F2DA215E2E4 /* Shared */ = {
@@ -242,6 +265,24 @@
 			productReference = D4353F25B9511ACB2A6A8144 /* Glassleaf.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7D1BE79611D2BE6725F58B81 /* GlassleafTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3CBD0EC142D0CD3D344FCDC7 /* Build configuration list for PBXNativeTarget "GlassleafTests" */;
+			buildPhases = (
+				F9B568F56289597648F9EEE8 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CB2CD9E28F938F3C63EC4AD0 /* PBXTargetDependency */,
+			);
+			name = GlassleafTests;
+			packageProductDependencies = (
+			);
+			productName = GlassleafTests;
+			productReference = D0C2D2D6D7D31C1D56659DE0 /* GlassleafTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -271,6 +312,7 @@
 			projectRoot = "";
 			targets = (
 				14EB1000A4BEF4B6D2FC1BB6 /* Glassleaf */,
+				7D1BE79611D2BE6725F58B81 /* GlassleafTests */,
 			);
 		};
 /* End PBXProject section */
@@ -325,7 +367,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F9B568F56289597648F9EEE8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				644E74D0AB5533E257D8535E /* CloudKitRecordCodecTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CB2CD9E28F938F3C63EC4AD0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 14EB1000A4BEF4B6D2FC1BB6 /* Glassleaf */;
+			targetProxy = 35CF261091DD89F57E7EAD28 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		38D9E4AE97DEA92C013D0436 /* Release */ = {
@@ -382,6 +440,56 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		8E133F23BB9E1D01B982F4FA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				"BUNDLE_LOADER[sdk=macosx*]" = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.glassleaf.reader.tests;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glassleaf.app/Glassleaf";
+				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Glassleaf.app/Contents/MacOS/Glassleaf";
+			};
+			name = Debug;
+		};
+		AAB7364B959D3128FC5BF31E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				"BUNDLE_LOADER[sdk=macosx*]" = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.glassleaf.reader.tests;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glassleaf.app/Glassleaf";
+				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Glassleaf.app/Contents/MacOS/Glassleaf";
 			};
 			name = Release;
 		};
@@ -520,6 +628,15 @@
 			buildConfigurations = (
 				D09ED5C27C5B13FE818B1F2A /* Debug */,
 				D7BB3D89D3757C39B91130F4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3CBD0EC142D0CD3D344FCDC7 /* Build configuration list for PBXNativeTarget "GlassleafTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8E133F23BB9E1D01B982F4FA /* Debug */,
+				AAB7364B959D3128FC5BF31E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

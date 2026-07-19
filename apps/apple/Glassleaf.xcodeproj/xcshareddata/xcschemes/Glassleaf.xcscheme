@@ -40,6 +40,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "7D1BE79611D2BE6725F58B81"
+               BuildableName = "GlassleafTests.xctest"
+               BlueprintName = "GlassleafTests"
+               ReferencedContainer = "container:Glassleaf.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>
@@ -83,8 +94,6 @@
             ReferencedContainer = "container:Glassleaf.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">
