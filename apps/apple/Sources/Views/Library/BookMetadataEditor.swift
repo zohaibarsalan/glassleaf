@@ -82,14 +82,13 @@ struct BookMetadataEditor: View {
                             Text(item.name).tag(Optional(item.id))
                         }
                     }
-                    HStack {
-                        TextField("New series", text: $newSeries)
-                            .onSubmit(addSeries)
-                        Button("Add", systemImage: "plus", action: addSeries)
-                            .labelStyle(.iconOnly)
-                            .accessibilityLabel("Add series")
-                            .disabled(newSeries.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
+                    InlineOrganizerCreator(
+                        label: "New series",
+                        prompt: "Series name",
+                        buttonTitle: "Create Series",
+                        name: $newSeries,
+                        action: addSeries
+                    )
                     TextField("Position", text: $seriesIndex, prompt: Text("For example, 1.5"))
                         .disabled(seriesID == nil)
                 }
@@ -98,14 +97,13 @@ struct BookMetadataEditor: View {
                     ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
                         Toggle(tag.name, isOn: membershipBinding(tag.id, in: $tagIDs))
                     }
-                    HStack {
-                        TextField("New tag", text: $newTag)
-                            .onSubmit(addTag)
-                        Button("Add", systemImage: "plus", action: addTag)
-                            .labelStyle(.iconOnly)
-                            .accessibilityLabel("Add tag")
-                            .disabled(newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
+                    InlineOrganizerCreator(
+                        label: "New tag",
+                        prompt: "Tag name",
+                        buttonTitle: "Create Tag",
+                        name: $newTag,
+                        action: addTag
+                    )
                 }
             }
             .formStyle(.grouped)
@@ -172,6 +170,40 @@ struct BookMetadataEditor: View {
             }
         }
         dismiss()
+    }
+}
+
+private struct InlineOrganizerCreator: View {
+    let label: String
+    let prompt: String
+    let buttonTitle: String
+    @Binding var name: String
+    let action: () -> Void
+
+    private var isEmpty: Bool {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                TextField(prompt, text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        guard !isEmpty else { return }
+                        action()
+                    }
+
+                Button(buttonTitle, systemImage: "plus", action: action)
+                    .buttonStyle(.bordered)
+                    .disabled(isEmpty)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 
