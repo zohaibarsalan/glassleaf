@@ -229,7 +229,7 @@ struct SidebarView: View {
             ProgressView().controlSize(.small)
         case .synced:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .failed:
+        case .offline, .quotaExceeded, .unavailable, .failed:
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
         case .localOnly:
             Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)

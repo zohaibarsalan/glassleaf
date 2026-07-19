@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import GlassleafDomain
 import Observation
@@ -69,6 +70,9 @@ enum CloudSyncState: Equatable, Sendable {
     case preparing
     case syncing
     case synced(Date)
+    case offline
+    case quotaExceeded
+    case unavailable(String)
     case failed(String)
 
     var title: String {
@@ -77,6 +81,9 @@ enum CloudSyncState: Equatable, Sendable {
         case .preparing: "Connecting to iCloud…"
         case .syncing: "Syncing…"
         case .synced: "Synced with iCloud"
+        case .offline: "Waiting for a Connection"
+        case .quotaExceeded: "iCloud Storage Is Full"
+        case .unavailable: "iCloud Is Unavailable"
         case .failed: "iCloud Needs Attention"
         }
     }
@@ -87,6 +94,9 @@ enum CloudSyncState: Equatable, Sendable {
         case .preparing: "Checking your account"
         case .syncing: "Saving library changes"
         case .synced(let date): "Updated \(date.formatted(date: .omitted, time: .shortened))"
+        case .offline: "Changes are safe on this device and will retry later"
+        case .quotaExceeded: "Free some iCloud storage, then sync again"
+        case .unavailable(let message): message
         case .failed(let message): message
         }
     }
@@ -392,7 +402,7 @@ final class LibraryStore {
             isICloudSyncEnabled = true
             applyCloudSyncResult(result)
         } catch {
-            cloudSyncState = .failed(error.localizedDescription)
+            cloudSyncState = Self.cloudSyncFailureState(for: error)
         }
     }
 
@@ -407,7 +417,7 @@ final class LibraryStore {
             )
             applyCloudSyncResult(result)
         } catch {
-            cloudSyncState = .failed(error.localizedDescription)
+            cloudSyncState = Self.cloudSyncFailureState(for: error)
             if reportFailure {
                 importAlert = ImportAlert(title: "iCloud Sync Failed", message: error.localizedDescription)
             }
@@ -1089,6 +1099,30 @@ final class LibraryStore {
             title: "Library Changes Couldn’t Be Saved",
             message: "Your changes are still visible in this session, but they may not survive reopening Glassleaf. \(error.localizedDescription)"
         )
+    }
+
+    private static func cloudSyncFailureState(for error: Error) -> CloudSyncState {
+        if let cloudError = error as? CKError {
+            switch cloudError.code {
+            case .networkUnavailable, .networkFailure, .serviceUnavailable, .requestRateLimited, .zoneBusy:
+                return .offline
+            case .quotaExceeded:
+                return .quotaExceeded
+            case .notAuthenticated, .permissionFailure:
+                return .unavailable("Sign in to iCloud and allow Glassleaf to use iCloud Drive.")
+            default:
+                break
+            }
+        }
+        if let syncError = error as? CloudKitSyncError {
+            switch syncError {
+            case .accountUnavailable, .restrictedAccount:
+                return .unavailable(error.localizedDescription)
+            default:
+                break
+            }
+        }
+        return .failed(error.localizedDescription)
     }
 
     private func refreshPresentedBook(id: UUID) {

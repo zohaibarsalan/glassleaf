@@ -89,6 +89,9 @@ struct CloudSyncSettingsView: View {
         case .localOnly: "internaldrive"
         case .preparing, .syncing: "icloud.and.arrow.up"
         case .synced: "checkmark.icloud.fill"
+        case .offline: "wifi.slash"
+        case .quotaExceeded: "externaldrive.badge.exclamationmark"
+        case .unavailable: "icloud.slash"
         case .failed: "exclamationmark.icloud"
         }
     }
@@ -96,7 +99,7 @@ struct CloudSyncSettingsView: View {
     private var statusColor: Color {
         switch store.cloudSyncState {
         case .synced: .green
-        case .failed: .orange
+        case .offline, .quotaExceeded, .unavailable, .failed: .orange
         default: .secondary
         }
     }
