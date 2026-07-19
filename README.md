@@ -8,7 +8,7 @@ The accepted cross-platform feature roadmap, supported-format targets, free-core
 
 Glassleaf is open source and has a two-plan product model: **Free** is a complete local/offline reader and library manager, while **Paid** primarily funds the official managed Glassleaf Sync service for cross-platform book storage, transfer, web access, history, and recovery. The exact open-source license and hosted-service quotas are not yet selected.
 
-> Status: functional local-native MVP with a provider-neutral sync foundation. The universal SwiftUI app imports, organizes, searches, reads, annotates, exports, and restores DRM-free EPUB libraries entirely on-device. Sync records, offline replay, conflicts, tombstones, migration gates, and the durable journal are implemented; CloudKit, other remote provider adapters, and the web companion have not started.
+> Status: functional local-native MVP with an opt-in private CloudKit sync vertical slice. The universal SwiftUI app imports, organizes, searches, reads, annotates, exports, and restores DRM-free EPUB libraries entirely on-device. iCloud now transports the provider-neutral journal, reading state, organization, and EPUB assets; signed multi-device validation remains a release gate. Other remote providers and the web companion have not started.
 
 ## Current implementation
 
@@ -19,6 +19,7 @@ Glassleaf is open source and has a two-plan product model: **Free** is a complet
 - Safe local EPUB extraction, metadata/cover/TOC parsing, original-file preservation, streamed SHA-256 and identifier duplicate detection, and custom cover replacement.
 - A same-window WebKit EPUB reader with pagination or scrolling, TOC, full-book search, restored position, bookmarks, persistent highlights/notes, themes, typography, margins, spacing, and alignment.
 - Recoverable Trash plus a portable `.glassleaflibrary` package containing original EPUBs, covers, metadata, organization, progress, bookmarks, and notes.
+- Opt-in private iCloud sync with offline replay, deterministic conflicts, background change notifications, EPUB asset verification, and visible availability/quota status.
 - Swift Testing coverage, executable domain checks, a generated-EPUB integration check, macOS/iOS Simulator build gates, and a 50,000-book search performance gate.
 
 ## Local development
@@ -113,7 +114,7 @@ The provider-neutral contract currently lives in `GlassleafDomain` and [docs/SYN
 
 1. Finish the remaining accessibility, malformed-EPUB corpus, and real-device reliability validation around the shipped portable restore and durable import queue.
 2. Finish the remaining series, nested smart-rule, tag-color, and manual organizer-ordering work.
-3. Add iCloud as the first direct provider, starting with metadata/organization and proving the shipped sync contract with multi-device tests before enabling assets.
+3. Complete signed multi-device, interruption, account-switch, quota, and stale-client validation for the implemented iCloud provider.
 4. Add PDF and comic foundations, then MOBI, DRM-free AZW3, FB2, and DjVu behind the publication boundary.
 5. Add Google Drive only after iCloud proves provider migration and recovery behavior.
 6. Build managed Glassleaf Sync and the web reader, followed by local-first Android and Windows clients.
@@ -133,3 +134,5 @@ Do not add credentials, provisioning profiles, private keys, OAuth secrets, or u
 ## Contributor guidance
 
 Read [CONTEXT.md](./CONTEXT.md) before working on the project. It contains the current product specification, architecture boundaries, privacy requirements, UI direction, sync semantics, non-goals, and unresolved decisions.
+
+The iCloud implementation and its remaining live test matrix are documented in [docs/ICLOUD_SYNC.md](./docs/ICLOUD_SYNC.md).

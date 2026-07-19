@@ -1,6 +1,6 @@
 # Glassleaf Sync Protocol
 
-Status: local foundation. No remote provider is enabled yet.
+Status: local foundation plus an opt-in private CloudKit adapter. Signed multi-device validation is still required before release.
 
 ## Purpose
 
@@ -40,7 +40,7 @@ Reading progress is append-only. Each change is a `ReadingPositionEvent` with a 
 
 ## Provider boundary
 
-The provider interface is limited to availability, fetching changes since a cursor, and applying mutations. iCloud Drive is the first planned adapter. Google Drive can later implement the same interface without changing record identity or merge rules.
+The provider interface is limited to availability, fetching changes since a cursor, and applying mutations. The first adapter stores opaque Glassleaf records and verified EPUB assets in the user's private CloudKit database. Google Drive can later implement the same interface without changing record identity or merge rules.
 
 ## Provider migration
 
@@ -60,3 +60,5 @@ Before cutover, a failure can roll back to the source without changing authority
 - The outbox and cursor survive a repository reopen.
 - A portable library backup can be restored independently of remote state.
 - Provider disconnect, stale cursor, quota, and partial-upload failures are surfaced without data loss.
+
+The first three gates are covered by repeatable local tests and the shipped portable restore path. CloudKit-specific disconnect, stale-token, quota, partial-upload, account-switch, and concurrent two-device scenarios remain mandatory signed-device release tests; see [ICLOUD_SYNC.md](./ICLOUD_SYNC.md).
