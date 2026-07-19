@@ -19,7 +19,9 @@
 		53D20A975A53ECD2001C0490 /* GlassleafApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE862DF707A036A3A423F20C /* GlassleafApp.swift */; };
 		54AAC2A7140429F4D3EB2F5D /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320945BB73FF5890E9635ACD /* LibraryStore.swift */; };
 		6A0B08C7B299373421EA1762 /* GlassleafDomain in Frameworks */ = {isa = PBXBuildFile; productRef = F710918C6DDF27ABBC6ECC8E /* GlassleafDomain */; };
+		7AA91EFE335361CD0F261B82 /* CloudSyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D5095A4EEA3053141CC983B /* CloudSyncSettingsView.swift */; };
 		7B90F52883B174C6E46116C2 /* ReaderSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEEF7115371C191B9B4C635 /* ReaderSample.swift */; };
+		83F772E8EF444927F81CEE4B /* CloudKitNotificationBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21E58623F7AB226C0884725 /* CloudKitNotificationBridge.swift */; };
 		887F6F594441696C2C1D4CE8 /* EPUBContentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7BBBEF3C1B73F3629AB08A7 /* EPUBContentsView.swift */; };
 		8A7F33C9ED6236CF8E662D1C /* ZIPArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */; };
 		9B6E64DAB60CB497A64CE94A /* CloudKitSyncProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AED176793646EF27FC92C89 /* CloudKitSyncProvider.swift */; };
@@ -28,6 +30,7 @@
 		AD01B64CE8AC681957CED21A /* EPUBReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B07DCBFBCC7989158C5539B /* EPUBReaderView.swift */; };
 		B399D23A4B2D15C8043BAAE7 /* ReaderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2841971642089A4E9142BBE0 /* ReaderSettingsView.swift */; };
 		B7991BE0C70A555A5FB5584B /* ImportQueueService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9907991E7847158EBC668532 /* ImportQueueService.swift */; };
+		B89E84425690FD83CB8DCACF /* CloudBookAssetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBE29CCD26B80424C4037838 /* CloudBookAssetStore.swift */; };
 		B9525ACB666E0E2E31BE2E70 /* PortableLibraryArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE0131A67C3517FB714D19A /* PortableLibraryArchiveService.swift */; };
 		C7A715000760998E712BA55E /* CloudKitRecordCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D9188B46CE15378CED5250 /* CloudKitRecordCodec.swift */; };
 		E1956715325F3D9C4B23E35D /* ReaderContentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0352684D1F52DF780A508F92 /* ReaderContentsView.swift */; };
@@ -49,6 +52,7 @@
 		39227AA8AC817E87BBFDC357 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		48BE9F12990929870DBAF671 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		49ED142E8F28846D47550C4C /* BookComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookComponents.swift; sourceTree = "<group>"; };
+		5D5095A4EEA3053141CC983B /* CloudSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncSettingsView.swift; sourceTree = "<group>"; };
 		72621FB648D03F473EE63DD5 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		7314B72715874FE3CF052FDB /* domain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = domain; path = ../../packages/domain; sourceTree = SOURCE_ROOT; };
 		7A793CB4C6B40772782DBCFB /* PortableLibraryDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableLibraryDocument.swift; sourceTree = "<group>"; };
@@ -60,6 +64,7 @@
 		B7BBBEF3C1B73F3629AB08A7 /* EPUBContentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBContentsView.swift; sourceTree = "<group>"; };
 		BCE0131A67C3517FB714D19A /* PortableLibraryArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableLibraryArchiveService.swift; sourceTree = "<group>"; };
 		C058C58364BF8B28BA69C9A3 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		C21E58623F7AB226C0884725 /* CloudKitNotificationBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitNotificationBridge.swift; sourceTree = "<group>"; };
 		C2D6F4C17159F612F6D59CF9 /* BookMetadataEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookMetadataEditor.swift; sourceTree = "<group>"; };
 		C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBParser.swift; sourceTree = "<group>"; };
 		C9E0572DB334A4316351219C /* PublicationSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicationSearchService.swift; sourceTree = "<group>"; };
@@ -68,6 +73,7 @@
 		D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchive.swift; sourceTree = "<group>"; };
 		D4353F25B9511ACB2A6A8144 /* Glassleaf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glassleaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE21A26C830184B8B0F2CFE2 /* PreviewLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLibrary.swift; sourceTree = "<group>"; };
+		EBE29CCD26B80424C4037838 /* CloudBookAssetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudBookAssetStore.swift; sourceTree = "<group>"; };
 		F9D9188B46CE15378CED5250 /* CloudKitRecordCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRecordCodec.swift; sourceTree = "<group>"; };
 		FA499FF391D3BD366C109967 /* LocalLibraryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryRepository.swift; sourceTree = "<group>"; };
 		FE862DF707A036A3A423F20C /* GlassleafApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassleafApp.swift; sourceTree = "<group>"; };
@@ -97,6 +103,7 @@
 		0C8D236472A7F2B692E50174 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				EBE29CCD26B80424C4037838 /* CloudBookAssetStore.swift */,
 				F9D9188B46CE15378CED5250 /* CloudKitRecordCodec.swift */,
 				0AED176793646EF27FC92C89 /* CloudKitSyncProvider.swift */,
 				C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */,
@@ -161,6 +168,7 @@
 			children = (
 				ABD8BFE6D73C6A27679CEE88 /* BookDetailView.swift */,
 				C2D6F4C17159F612F6D59CF9 /* BookMetadataEditor.swift */,
+				5D5095A4EEA3053141CC983B /* CloudSyncSettingsView.swift */,
 				94357B64186DB854B040E9E6 /* HomeView.swift */,
 				39227AA8AC817E87BBFDC357 /* LibraryView.swift */,
 				C058C58364BF8B28BA69C9A3 /* SidebarView.swift */,
@@ -205,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				72621FB648D03F473EE63DD5 /* AppRootView.swift */,
+				C21E58623F7AB226C0884725 /* CloudKitNotificationBridge.swift */,
 				FE862DF707A036A3A423F20C /* GlassleafApp.swift */,
 			);
 			path = App;
@@ -286,8 +295,11 @@
 				EAF56C921619354548BC035E /* BookComponents.swift in Sources */,
 				417DEAA268458A6541BD7C10 /* BookDetailView.swift in Sources */,
 				16EC150A297EEDA3D3AF7E46 /* BookMetadataEditor.swift in Sources */,
+				B89E84425690FD83CB8DCACF /* CloudBookAssetStore.swift in Sources */,
+				83F772E8EF444927F81CEE4B /* CloudKitNotificationBridge.swift in Sources */,
 				C7A715000760998E712BA55E /* CloudKitRecordCodec.swift in Sources */,
 				9B6E64DAB60CB497A64CE94A /* CloudKitSyncProvider.swift in Sources */,
+				7AA91EFE335361CD0F261B82 /* CloudSyncSettingsView.swift in Sources */,
 				887F6F594441696C2C1D4CE8 /* EPUBContentsView.swift in Sources */,
 				9F61AEBD09E4190657FFA2CE /* EPUBParser.swift in Sources */,
 				AD01B64CE8AC681957CED21A /* EPUBReaderView.swift in Sources */,
@@ -441,6 +453,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Support/Glassleaf.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Support/Info.plist;
@@ -467,6 +480,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Support/Glassleaf.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Support/Info.plist;

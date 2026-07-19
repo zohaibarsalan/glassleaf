@@ -29,11 +29,14 @@ actor LibraryCloudSyncService {
         repository: LocalLibraryRepository,
         libraryID: UUID,
         deviceID: String,
-        provider: CloudKitSyncProvider = CloudKitSyncProvider()
+        provider: CloudKitSyncProvider? = nil
     ) {
+        let resolvedProvider = provider ?? CloudKitSyncProvider(
+            assetStore: CloudBookAssetStore(repository: repository)
+        )
         self.repository = repository
-        self.provider = provider
-        coordinator = SyncCoordinator(provider: provider, store: repository)
+        self.provider = resolvedProvider
+        coordinator = SyncCoordinator(provider: resolvedProvider, store: repository)
         self.libraryID = libraryID
         self.deviceID = deviceID
         encoder = JSONEncoder()
@@ -70,7 +73,7 @@ actor LibraryCloudSyncService {
     ) async throws {
         var journal = try await repository.loadSyncJournal()
         var desired = try desiredRecords(snapshot: snapshot, readerPreferences: readerPreferences, journal: journal)
-        let stateKinds = Set(SyncRecordKind.allCases).subtracting([.bookAsset, .readingEvent])
+        let stateKinds = Set(SyncRecordKind.allCases).subtracting([.readingEvent])
         let desiredIDs = Set(desired.map(\.id))
 
         for existing in journal.records
@@ -120,19 +123,15 @@ actor LibraryCloudSyncService {
         for var book in snapshot.books {
             let localProgress = book.progress
             book.progress = .notStarted
-            book.cover = nil
-            if let asset = book.asset {
-                book.asset = BookAsset(
-                    contentHash: asset.contentHash,
-                    byteCount: asset.byteCount,
-                    mediaType: asset.mediaType,
-                    originalFilename: asset.originalFilename,
-                    localRelativePath: "",
-                    readingOrder: asset.readingOrder,
-                    tableOfContents: asset.tableOfContents
-                )
-            }
             records.append(try payloadRecord(kind: .book, id: book.id, value: book))
+            if let asset = book.asset {
+                records.append(try payloadRecord(
+                    kind: .bookAsset,
+                    id: book.id,
+                    value: CloudBookAssetDescriptor(bookID: book.id, asset: asset),
+                    contentHash: asset.contentHash
+                ))
+            }
 
             let existingEvents = journal.records
                 .filter { $0.id.kind == .readingEvent && !$0.isTombstone }
@@ -180,9 +179,6 @@ actor LibraryCloudSyncService {
             if localBook?.asset?.contentHash == books[index].asset?.contentHash {
                 books[index].asset = localBook?.asset
                 books[index].cover = localBook?.cover
-            } else {
-                books[index].asset = nil
-                books[index].cover = nil
             }
             books[index].progress = ReadingPositionEvent.resolvedProgress(for: books[index].id, from: events)
         }
@@ -206,14 +202,15 @@ actor LibraryCloudSyncService {
     private func payloadRecord<Value: Encodable>(
         kind: SyncRecordKind,
         id: UUID,
-        value: Value
+        value: Value,
+        contentHash: String? = nil
     ) throws -> SyncRecord {
         let payload = try encoder.encode(value)
         return SyncRecord(
             id: SyncRecordID(kind: kind, entityID: id),
             revision: SyncRevision(generation: 0, deviceID: deviceID),
             payload: payload,
-            contentHash: SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+            contentHash: contentHash ?? SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
         )
     }
 

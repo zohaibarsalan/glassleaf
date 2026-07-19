@@ -45,6 +45,8 @@ targets:
           UIApplicationSupportsMultipleScenes: true
           UISceneConfigurations: {}
         UISupportsDocumentBrowser: false
+        UIBackgroundModes:
+          - remote-notification
         UILaunchScreen: {}
         UTExportedTypeDeclarations:
           - UTTypeConformsTo:
@@ -63,6 +65,7 @@ targets:
         PRODUCT_NAME: Glassleaf
         MARKETING_VERSION: 0.1.0
         CURRENT_PROJECT_VERSION: 1
+        CODE_SIGN_ENTITLEMENTS: Support/Glassleaf.entitlements
         SWIFT_VERSION: 6.0
         SWIFT_STRICT_CONCURRENCY: complete
         TARGETED_DEVICE_FAMILY: "1,2"

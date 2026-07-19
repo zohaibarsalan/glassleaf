@@ -8,6 +8,7 @@ struct SidebarView: View {
     @State private var renameTarget: RenameTarget?
     @State private var pendingDeletion: DeletionTarget?
     @State private var organizerSheet: OrganizerSheet?
+    @State private var showsCloudSync = false
 
     var body: some View {
         let counts = store.sidebarCounts()
@@ -37,9 +38,19 @@ struct SidebarView: View {
         .listStyle(.sidebar)
         .contentMargins(.top, 8, for: .scrollContent)
         .navigationTitle("Glassleaf")
+#if os(iOS)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("iCloud Sync", systemImage: "icloud") { showsCloudSync = true }
+            }
+        }
+#endif
 #if os(macOS)
         .safeAreaInset(edge: .bottom) { storageStatus }
 #endif
+        .sheet(isPresented: $showsCloudSync) {
+            CloudSyncSettingsView(store: store)
+        }
         .alert(creationKind?.title ?? "New Item", isPresented: creationBinding) {
             TextField("Name", text: $draftName)
             Button("Cancel", role: .cancel) { resetEditor() }
@@ -190,18 +201,39 @@ struct SidebarView: View {
 
 #if os(macOS)
     private var storageStatus: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "internaldrive")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("On This Device").font(.caption.weight(.medium))
-                Text("Local library").font(.caption2).foregroundStyle(.secondary)
+        Button {
+            showsCloudSync = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: store.isICloudSyncEnabled ? "icloud" : "internaldrive")
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(store.cloudSyncState.title).font(.caption.weight(.medium))
+                    Text(store.cloudSyncState.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                statusIndicator
             }
-            Spacer()
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            .contentShape(.rect)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens iCloud sync settings")
+    }
+
+    @ViewBuilder
+    private var statusIndicator: some View {
+        switch store.cloudSyncState {
+        case .preparing, .syncing:
+            ProgressView().controlSize(.small)
+        case .synced:
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        case .localOnly:
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
     }
 #endif
 

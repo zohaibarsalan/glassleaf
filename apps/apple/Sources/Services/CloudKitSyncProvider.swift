@@ -8,15 +8,18 @@ actor CloudKitSyncProvider: SyncProvider {
     private let container: CKContainer
     private let database: CKDatabase
     private let codec: CloudKitRecordCodec
+    private let assetStore: CloudBookAssetStore?
     private var isPrepared = false
 
     init(
         container: CKContainer = CKContainer(identifier: CloudKitSyncProvider.containerIdentifier),
-        codec: CloudKitRecordCodec = CloudKitRecordCodec()
+        codec: CloudKitRecordCodec = CloudKitRecordCodec(),
+        assetStore: CloudBookAssetStore? = nil
     ) {
         self.container = container
         database = container.privateCloudDatabase
         self.codec = codec
+        self.assetStore = assetStore
     }
 
     func accountStatus() async throws -> CKAccountStatus {
@@ -86,7 +89,11 @@ actor CloudKitSyncProvider: SyncProvider {
                 )
                 for result in batch.modificationResultsByID.values {
                     let modification = try result.get()
-                    records.append(try codec.decode(modification.record))
+                    let syncRecord = try codec.decode(modification.record)
+                    if let assetStore {
+                        try await assetStore.installDownloadedAsset(from: modification.record, syncRecord: syncRecord)
+                    }
+                    records.append(syncRecord)
                 }
                 latestToken = batch.changeToken
                 moreComing = batch.moreComing
@@ -141,7 +148,11 @@ actor CloudKitSyncProvider: SyncProvider {
                 }
             }
 
-            recordsToSave.append(codec.encode(mutation.record, mutationID: mutation.id, into: existing))
+            let cloudRecord = codec.encode(mutation.record, mutationID: mutation.id, into: existing)
+            if let assetStore {
+                try await assetStore.attachLocalAsset(to: cloudRecord, syncRecord: mutation.record)
+            }
+            recordsToSave.append(cloudRecord)
             mutationByRecordID[recordID] = mutation
         }
 

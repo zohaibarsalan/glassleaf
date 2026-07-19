@@ -8,6 +8,7 @@ struct AppRootView: View {
     @State private var store = LibraryStore.initial
     @State private var readerControlsVisible = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @ViewBuilder
     var body: some View {
@@ -135,6 +136,14 @@ struct AppRootView: View {
                 store.startReading(book)
             }
 #endif
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, store.isICloudSyncEnabled else { return }
+            Task { await store.synchronizeWithICloud(reportFailure: false) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .glassleafCloudKitDidChange)) { _ in
+            guard store.isICloudSyncEnabled else { return }
+            Task { await store.synchronizeWithICloud(reportFailure: false) }
         }
     }
 

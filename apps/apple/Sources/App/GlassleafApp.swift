@@ -2,6 +2,12 @@ import SwiftUI
 
 @main
 struct GlassleafApp: App {
+#if os(iOS)
+    @UIApplicationDelegateAdaptor(CloudKitNotificationBridge.self) private var cloudKitNotifications
+#elseif os(macOS)
+    @NSApplicationDelegateAdaptor(CloudKitNotificationBridge.self) private var cloudKitNotifications
+#endif
+
     var body: some Scene {
 #if os(macOS)
         WindowGroup {
