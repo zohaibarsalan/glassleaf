@@ -123,3 +123,43 @@ func librarySortsRemainTotal() {
         #expect(Set(ordered.map(\.id)) == Set([first.id, second.id]))
     }
 }
+
+@Test("Provider-neutral sync records preserve opaque payloads and tombstones")
+func syncRecordRoundTrip() throws {
+    let id = SyncRecordID(kind: .annotation, entityID: UUID())
+    let revision = SyncRevision(generation: 3, updatedAt: .now, deviceID: "mac")
+    let original = SyncRecord(
+        id: id,
+        revision: revision,
+        payload: Data("opaque".utf8),
+        contentHash: "content-hash",
+        isTombstone: true
+    )
+    let restored = try JSONDecoder().decode(SyncRecord.self, from: JSONEncoder().encode(original))
+    #expect(restored == original)
+    #expect(SyncRecordDescriptor(record: restored).byteCount == 6)
+}
+
+@Test("Latest reading event wins even when its fraction moves backwards")
+func readingEventsResolveByTime() {
+    let bookID = UUID()
+    let earlier = ReadingPositionEvent(
+        bookID: bookID,
+        locator: "chapter-8",
+        fraction: 0.8,
+        occurredAt: Date(timeIntervalSince1970: 100),
+        deviceID: "iphone"
+    )
+    let later = ReadingPositionEvent(
+        bookID: bookID,
+        locator: "chapter-3",
+        fraction: 0.3,
+        occurredAt: Date(timeIntervalSince1970: 200),
+        deviceID: "mac"
+    )
+
+    let resolved = ReadingPositionEvent.resolvedProgress(for: bookID, from: [earlier, later])
+    #expect(resolved.locator == "chapter-3")
+    #expect(resolved.fraction == 0.3)
+    #expect(resolved.deviceID == "mac")
+}
