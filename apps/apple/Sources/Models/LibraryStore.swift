@@ -64,6 +64,34 @@ enum LibraryLayout: String, CaseIterable, Identifiable, Sendable {
     var id: Self { self }
 }
 
+enum CloudSyncState: Equatable, Sendable {
+    case localOnly
+    case preparing
+    case syncing
+    case synced(Date)
+    case failed(String)
+
+    var title: String {
+        switch self {
+        case .localOnly: "On This Device"
+        case .preparing: "Connecting to iCloud…"
+        case .syncing: "Syncing…"
+        case .synced: "Synced with iCloud"
+        case .failed: "iCloud Needs Attention"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .localOnly: "Local library"
+        case .preparing: "Checking your account"
+        case .syncing: "Saving library changes"
+        case .synced(let date): "Updated \(date.formatted(date: .omitted, time: .shortened))"
+        case .failed(let message): message
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class LibraryStore {
@@ -104,6 +132,8 @@ final class LibraryStore {
     var isRestoring = false
     private(set) var isSearching = false
     private(set) var failedImportCount = 0
+    private(set) var isICloudSyncEnabled: Bool
+    private(set) var cloudSyncState: CloudSyncState
 
     private let isPreview: Bool
     private let repository: LocalLibraryRepository
@@ -111,9 +141,11 @@ final class LibraryStore {
     private let importQueue: ImportQueueService
     private let exporter = LibraryExportService()
     private let archives = PortableLibraryArchiveService()
+    private let cloudSync: LibraryCloudSyncService
     private var searchResultIDs: [UUID]?
     private var searchResultQuery = ""
     private var searchTask: Task<Void, Never>?
+    private var cloudSyncTask: Task<Void, Never>?
     @ObservationIgnored private var foldersByID: [UUID: Folder] = [:]
     @ObservationIgnored private var tagNamesByID: [UUID: String] = [:]
     @ObservationIgnored private var collectionNamesByID: [UUID: String] = [:]
@@ -157,6 +189,14 @@ final class LibraryStore {
         self.repository = repository
         self.importer = importer
         self.importQueue = importQueue
+        let syncEnabled = !isPreview && CloudSyncIdentityStore.isEnabled
+        isICloudSyncEnabled = syncEnabled
+        cloudSyncState = syncEnabled ? .preparing : .localOnly
+        cloudSync = LibraryCloudSyncService(
+            repository: repository,
+            libraryID: CloudSyncIdentityStore.libraryID,
+            deviceID: CloudSyncIdentityStore.deviceID
+        )
         rebuildLookupCaches()
     }
 
@@ -331,12 +371,56 @@ final class LibraryStore {
         do {
             apply(try await repository.load())
             await resumeImportQueue()
+            if isICloudSyncEnabled { await synchronizeWithICloud(reportFailure: false) }
         } catch {
             importAlert = ImportAlert(
                 title: "Library Couldn’t Be Loaded",
                 message: "Your stored books were left unchanged. Try reopening Glassleaf."
             )
         }
+    }
+
+    func enableICloudSync() async {
+        guard !isPreview, !isICloudSyncEnabled else { return }
+        cloudSyncState = .preparing
+        do {
+            guard try await cloudSync.accountIsAvailable() else {
+                throw CloudKitSyncError.accountUnavailable
+            }
+            let result = try await cloudSync.synchronize(
+                snapshot: snapshot(),
+                readerPreferences: readerPreferences
+            )
+            CloudSyncIdentityStore.isEnabled = true
+            isICloudSyncEnabled = true
+            applyCloudSyncResult(result)
+        } catch {
+            cloudSyncState = .failed(error.localizedDescription)
+        }
+    }
+
+    func synchronizeWithICloud(reportFailure: Bool = true) async {
+        guard !isPreview, isICloudSyncEnabled else { return }
+        cloudSyncState = .syncing
+        do {
+            let result = try await cloudSync.synchronize(
+                snapshot: snapshot(),
+                readerPreferences: readerPreferences
+            )
+            applyCloudSyncResult(result)
+        } catch {
+            cloudSyncState = .failed(error.localizedDescription)
+            if reportFailure {
+                importAlert = ImportAlert(title: "iCloud Sync Failed", message: error.localizedDescription)
+            }
+        }
+    }
+
+    func disableICloudSync() {
+        cloudSyncTask?.cancel()
+        CloudSyncIdentityStore.isEnabled = false
+        isICloudSyncEnabled = false
+        cloudSyncState = .localOnly
     }
 
     func requestImport() {
@@ -892,6 +976,7 @@ final class LibraryStore {
         Task {
             do {
                 try await repository.upsert(book, context: context)
+                scheduleCloudSync()
             } catch {
                 reportPersistenceFailure(error)
             }
@@ -922,6 +1007,7 @@ final class LibraryStore {
         Task {
             do {
                 try await repository.upsert(changedBooks, contexts: contexts)
+                scheduleCloudSync()
             } catch {
                 reportPersistenceFailure(error)
             }
@@ -935,6 +1021,7 @@ final class LibraryStore {
         Task {
             do {
                 try await repository.saveOrganization(value)
+                scheduleCloudSync()
             } catch {
                 reportPersistenceFailure(error)
             }
@@ -954,6 +1041,7 @@ final class LibraryStore {
                     annotations: bookAnnotations,
                     context: context
                 )
+                scheduleCloudSync()
             } catch {
                 reportPersistenceFailure(error)
             }
@@ -964,9 +1052,27 @@ final class LibraryStore {
         guard !isPreview else { return }
         do {
             try await repository.save(snapshot())
+            scheduleCloudSync()
         } catch {
             reportPersistenceFailure(error)
         }
+    }
+
+    private func scheduleCloudSync() {
+        guard isICloudSyncEnabled else { return }
+        cloudSyncTask?.cancel()
+        cloudSyncTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await self?.synchronizeWithICloud(reportFailure: false)
+        }
+    }
+
+    private func applyCloudSyncResult(_ result: CloudSyncResult) {
+        apply(result.snapshot)
+        readerPreferences = result.readerPreferences
+        ReaderPreferenceStore.save(result.readerPreferences)
+        cloudSyncState = .synced(result.syncedAt)
     }
 
     private func reportPersistenceFailure(_ error: Error) {
