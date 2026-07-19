@@ -20,6 +20,14 @@ func readerPreferencesDefaultToScrolling() {
     #expect(ReaderPreferences().mode == .scrolling)
 }
 
+@Test("Series membership removes a book from Inbox")
+func seriesMembershipOrganizesBook() {
+    let series = Series(name: "Field Notes")
+    let book = Book(title: "Volume One", author: "Ada", seriesID: series.id)
+    #expect(!book.isInInbox)
+    #expect(Book(title: "Loose Book", author: "Ada").isInInbox)
+}
+
 @Test("Nested smart-collection predicates honor all and any groups")
 func nestedSmartCollectionRules() {
     let tag = Tag(name: "Research")

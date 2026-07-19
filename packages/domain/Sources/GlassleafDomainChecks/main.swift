@@ -110,6 +110,7 @@ check(SmartCollectionRule.series(series.id).includes(organized), "smart series r
 check(SmartCollectionRule.folder(folder.id).includes(organized), "smart folder rules match membership")
 check(SmartCollectionRule.collection(collection.id).includes(organized), "smart collection rules match membership")
 check(!organized.isInInbox, "organized books leave the inbox")
+check(!Book(title: "Volume One", author: "Writer", seriesID: series.id).isInInbox, "series membership leaves the inbox")
 check(Book(title: "New", author: "Writer").isInInbox, "unclassified books appear in the inbox")
 
 let snapshot = LibrarySnapshot(books: [organized], folders: [folder], tags: [tag], collections: [collection], series: [series])

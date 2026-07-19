@@ -79,7 +79,12 @@ public struct Book: Identifiable, Codable, Hashable, Sendable {
     }
 
     public var isInInbox: Bool {
-        folderID == nil && collectionIDs.isEmpty && tagIDs.isEmpty && legacyTagNames.isEmpty
+        folderID == nil
+            && collectionIDs.isEmpty
+            && tagIDs.isEmpty
+            && legacyTagNames.isEmpty
+            && seriesID == nil
+            && legacySeriesName == nil
     }
 
     public var hasLegacyOrganizationIdentity: Bool {
