@@ -50,7 +50,7 @@ actor PortableLibraryArchiveService {
 
     func makeArchive(snapshot: LibrarySnapshot) throws -> PreparedArchive {
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .deferredToDate
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         let metadata = FileWrapper(regularFileWithContents: try encoder.encode(snapshot))
         metadata.preferredFilename = "library.json"
@@ -120,11 +120,9 @@ actor PortableLibraryArchiveService {
             throw ArchiveError.missingMetadata
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         let decoded: LibrarySnapshot
         do {
-            decoded = try decoder.decode(LibrarySnapshot.self, from: metadata)
+            decoded = try decodeSnapshot(from: metadata)
         } catch {
             throw ArchiveError.invalidPackage
         }
@@ -270,6 +268,17 @@ actor PortableLibraryArchiveService {
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func decodeSnapshot(from data: Data) throws -> LibrarySnapshot {
+        let numericDecoder = JSONDecoder()
+        numericDecoder.dateDecodingStrategy = .deferredToDate
+        if let snapshot = try? numericDecoder.decode(LibrarySnapshot.self, from: data) {
+            return snapshot
+        }
+        let legacyDecoder = JSONDecoder()
+        legacyDecoder.dateDecodingStrategy = .iso8601
+        return try legacyDecoder.decode(LibrarySnapshot.self, from: data)
     }
 
     private func libraryRoot() throws -> URL {

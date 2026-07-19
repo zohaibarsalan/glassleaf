@@ -49,8 +49,6 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.books</string>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<false/>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>UIApplicationSceneManifest</key>

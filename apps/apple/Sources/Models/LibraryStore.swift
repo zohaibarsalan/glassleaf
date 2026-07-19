@@ -103,10 +103,12 @@ final class LibraryStore {
     var pendingRestoreURL: URL?
     var isRestoring = false
     private(set) var isSearching = false
+    private(set) var failedImportCount = 0
 
     private let isPreview: Bool
     private let repository: LocalLibraryRepository
     private let importer: LocalBookImporter
+    private let importQueue: ImportQueueService
     private let exporter = LibraryExportService()
     private let archives = PortableLibraryArchiveService()
     private var searchResultIDs: [UUID]?
@@ -129,7 +131,8 @@ final class LibraryStore {
         readerPreferences: ReaderPreferences = ReaderPreferenceStore.load(),
         isPreview: Bool = false,
         repository: LocalLibraryRepository = LocalLibraryRepository(),
-        importer: LocalBookImporter = LocalBookImporter()
+        importer: LocalBookImporter = LocalBookImporter(),
+        importQueue: ImportQueueService = ImportQueueService()
     ) {
         let migrated = LibrarySnapshot(
             books: books,
@@ -153,6 +156,7 @@ final class LibraryStore {
         self.isPreview = isPreview
         self.repository = repository
         self.importer = importer
+        self.importQueue = importQueue
         rebuildLookupCaches()
     }
 
@@ -326,6 +330,7 @@ final class LibraryStore {
         guard !isPreview else { return }
         do {
             apply(try await repository.load())
+            await resumeImportQueue()
         } catch {
             importAlert = ImportAlert(
                 title: "Library Couldn’t Be Loaded",
@@ -372,6 +377,7 @@ final class LibraryStore {
             readerBook = nil
             selectedBookIDs.removeAll()
             isSelecting = false
+            await refreshFailedImportCount()
             importAlert = ImportAlert(
                 title: "Library Restored",
                 message: result.backupURL == nil
@@ -397,50 +403,162 @@ final class LibraryStore {
     }
 
     func importBooks(from urls: [URL]) async {
-        guard !urls.isEmpty else { return }
+        guard !urls.isEmpty, !isImporting, !isRestoring else { return }
         isImporting = true
         defer { isImporting = false }
 
-        var existingHashes = Set(books.compactMap(\.asset?.contentHash))
-        var existingIdentifiers = Set(books.flatMap(\.identifiers).map {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        })
+        do {
+            let enqueued = try await importQueue.enqueue(urls)
+            let processed = await processQueuedImports()
+            if processed.importedCount > 0 {
+                selection = .inbox
+                scheduleSearch()
+            }
+            let failures = enqueued.failures + processed.failures
+            if !failures.isEmpty {
+                importAlert = ImportAlert(
+                    title: processed.importedCount > 0 ? "Some Books Weren’t Imported" : "Import Failed",
+                    message: Self.importFailureMessage(failures)
+                )
+            }
+        } catch {
+            importAlert = ImportAlert(title: "Import Queue Failed", message: error.localizedDescription)
+        }
+        await refreshFailedImportCount()
+    }
+
+    func retryFailedImports() async {
+        guard !isImporting, !isRestoring else { return }
+        isImporting = true
+        defer { isImporting = false }
+        do {
+            try await importQueue.retryFailedJobs()
+            let processed = await processQueuedImports()
+            if processed.importedCount > 0 {
+                selection = .inbox
+                scheduleSearch()
+            }
+            if !processed.failures.isEmpty {
+                importAlert = ImportAlert(
+                    title: "Some Books Still Couldn’t Be Imported",
+                    message: Self.importFailureMessage(processed.failures)
+                )
+            }
+        } catch {
+            importAlert = ImportAlert(title: "Import Queue Failed", message: error.localizedDescription)
+        }
+        await refreshFailedImportCount()
+    }
+
+    private func resumeImportQueue() async {
+        guard !isImporting, !isRestoring else { return }
+        isImporting = true
+        let processed = await processQueuedImports()
+        isImporting = false
+        if processed.importedCount > 0 {
+            selection = .inbox
+            scheduleSearch()
+        }
+        if !processed.failures.isEmpty {
+            importAlert = ImportAlert(
+                title: processed.importedCount > 0 ? "Import Resumed With Errors" : "Queued Import Failed",
+                message: Self.importFailureMessage(processed.failures)
+            )
+        }
+        await refreshFailedImportCount()
+    }
+
+    private struct ImportProcessingResult {
         var importedCount = 0
-        var failures: [String] = []
-        for url in urls {
+        var failures: [ImportQueueFailure] = []
+    }
+
+    private func processQueuedImports() async -> ImportProcessingResult {
+        let jobs: [ImportQueueJob]
+        do {
+            jobs = try await importQueue.jobsReadyForProcessing()
+        } catch {
+            return ImportProcessingResult(failures: [
+                ImportQueueFailure(filename: "Import Queue", message: error.localizedDescription)
+            ])
+        }
+
+        var result = ImportProcessingResult()
+        for job in jobs {
+            if books.contains(where: { $0.id == job.id }) {
+                do {
+                    try await importQueue.complete(job.id)
+                } catch {
+                    result.failures.append(ImportQueueFailure(
+                        filename: job.sourceFilename,
+                        message: "The book was already imported, but its queue entry could not be cleared: \(error.localizedDescription)"
+                    ))
+                }
+                continue
+            }
+
+            var importedBook: Book?
             do {
+                try await importQueue.markProcessing(job.id)
+                let source = try await importQueue.stagedURL(for: job)
+                let existingHashes = Set(books.compactMap(\.asset?.contentHash))
+                let existingIdentifiers = Set(books.flatMap(\.identifiers).map {
+                    $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                })
                 var book = try await importer.importBook(
-                    from: url,
+                    from: source,
                     existingHashes: existingHashes,
-                    existingIdentifiers: existingIdentifiers
+                    existingIdentifiers: existingIdentifiers,
+                    bookID: job.id
                 )
                 let migrated = LibrarySnapshot(books: [book], tags: tags, series: series)
                     .migratingOrganizationIdentity()
                 book = migrated.books[0]
-                tags = migrated.tags
-                series = migrated.series
-                rebuildLookupCaches()
-                books.insert(book, at: 0)
-                if let hash = book.asset?.contentHash { existingHashes.insert(hash) }
-                existingIdentifiers.formUnion(book.identifiers.map {
-                    $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                })
-                importedCount += 1
+                importedBook = book
+
+                var candidate = snapshot()
+                candidate.books.insert(book, at: 0)
+                candidate.tags = migrated.tags
+                candidate.series = migrated.series
+                try await repository.save(candidate)
+                apply(candidate)
+                result.importedCount += 1
             } catch {
-                failures.append(error.localizedDescription)
+                if let importedBook { try? await importer.removeAssets(for: [importedBook]) }
+                let message = error.localizedDescription
+                do {
+                    try await importQueue.markFailed(job.id, message: message)
+                    result.failures.append(ImportQueueFailure(filename: job.sourceFilename, message: message))
+                } catch {
+                    result.failures.append(ImportQueueFailure(
+                        filename: job.sourceFilename,
+                        message: "\(message) Glassleaf also could not save the retry state: \(error.localizedDescription)"
+                    ))
+                }
+                continue
+            }
+
+            do {
+                try await importQueue.complete(job.id)
+            } catch {
+                result.failures.append(ImportQueueFailure(
+                    filename: job.sourceFilename,
+                    message: "The book was imported, but its completed queue entry could not be cleared."
+                ))
             }
         }
-        if importedCount > 0 {
-            selection = .inbox
-            await persistSnapshot()
-            scheduleSearch()
-        }
-        if !failures.isEmpty {
-            importAlert = ImportAlert(
-                title: importedCount > 0 ? "Some Books Weren’t Imported" : "Import Failed",
-                message: Array(Set(failures)).sorted().joined(separator: "\n")
-            )
-        }
+        return result
+    }
+
+    private func refreshFailedImportCount() async {
+        failedImportCount = (try? await importQueue.failedJobs().count) ?? failedImportCount
+    }
+
+    private static func importFailureMessage(_ failures: [ImportQueueFailure]) -> String {
+        Array(Set(failures))
+            .sorted { lhs, rhs in lhs.filename.localizedStandardCompare(rhs.filename) == .orderedAscending }
+            .map { "\($0.filename): \($0.message)" }
+            .joined(separator: "\n")
     }
 
     func replaceCover(for bookID: UUID, data: Data, filename: String) async {

@@ -39,7 +39,6 @@ targets:
             LSHandlerRank: Owner
             LSItemContentTypes:
               - app.glassleaf.library
-        LSSupportsOpeningDocumentsInPlace: false
         LSApplicationCategoryType: public.app-category.books
         NSHumanReadableCopyright: ""
         UIApplicationSceneManifest:

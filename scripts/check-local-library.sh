@@ -33,11 +33,12 @@ xcrun --sdk macosx swiftc \
     -o "$module_root/libGlassleafDomain.a"
 
 xcrun --sdk macosx swiftc \
-    -O \
+    -Onone \
     -target "$(uname -m)-apple-macosx26.0" \
     -I "$module_root" \
     apps/apple/Sources/Services/ZIPArchive.swift \
     apps/apple/Sources/Services/EPUBParser.swift \
+    apps/apple/Sources/Services/ImportQueueService.swift \
     apps/apple/Sources/Services/LocalBookImporter.swift \
     apps/apple/Sources/Services/LocalLibraryRepository.swift \
     apps/apple/Sources/Services/PortableLibraryArchiveService.swift \

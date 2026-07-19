@@ -11,6 +11,35 @@ struct LocalLibraryCheck {
         let library = URL(filePath: CommandLine.arguments[2], directoryHint: .isDirectory)
         let importer = LocalBookImporter(rootURL: library)
 
+        let invalidEPUB = library.deletingLastPathComponent().appending(path: "Invalid.epub")
+        try Data("not an epub".utf8).write(to: invalidEPUB)
+        do {
+            _ = try await importer.importBook(from: invalidEPUB, existingHashes: [])
+            fatalError("Malformed EPUB was accepted")
+        } catch LocalBookImporter.ImportError.invalidEPUB {}
+
+        let queueRoot = library.deletingLastPathComponent().appending(path: "queue", directoryHint: .isDirectory)
+        let queue = ImportQueueService(rootURL: queueRoot)
+        let enqueueResult = try await queue.enqueue([source])
+        precondition(enqueueResult.jobs.count == 1)
+        precondition(enqueueResult.failures.isEmpty)
+        let queuedJob = enqueueResult.jobs[0]
+        try await queue.markProcessing(queuedJob.id)
+        let relaunchedQueue = ImportQueueService(rootURL: queueRoot)
+        let resumedJobs = try await relaunchedQueue.jobsReadyForProcessing()
+        precondition(resumedJobs.map(\.id) == [queuedJob.id])
+        try await relaunchedQueue.markFailed(queuedJob.id, message: "Test failure")
+        let failedJobs = try await relaunchedQueue.failedJobs()
+        precondition(failedJobs.map(\.id) == [queuedJob.id])
+        try await relaunchedQueue.retryFailedJobs()
+        let retriedJobs = try await relaunchedQueue.jobsReadyForProcessing()
+        precondition(retriedJobs.map(\.id) == [queuedJob.id])
+        let stagedJobURL = try await relaunchedQueue.stagedURL(for: queuedJob)
+        precondition(FileManager.default.fileExists(atPath: stagedJobURL.path))
+        try await relaunchedQueue.complete(queuedJob.id)
+        let completedJobs = try await relaunchedQueue.jobsReadyForProcessing()
+        precondition(completedJobs.isEmpty)
+
         let book = try await importer.importBook(from: source, existingHashes: [])
         guard let asset = book.asset else { fatalError("Missing imported asset") }
         precondition(asset.contentHash.count == 64)

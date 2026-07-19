@@ -42,7 +42,8 @@ actor LocalBookImporter {
     func importBook(
         from sourceURL: URL,
         existingHashes: Set<String>,
-        existingIdentifiers: Set<String> = []
+        existingIdentifiers: Set<String> = [],
+        bookID: UUID = UUID()
     ) throws -> Book {
         guard sourceURL.pathExtension.lowercased() == "epub" else {
             throw ImportError.unsupportedFormat
@@ -78,7 +79,7 @@ actor LocalBookImporter {
             throw ImportError.duplicate
         }
 
-        let id = UUID()
+        let id = bookID
         let relativePath = "Books/\(id.uuidString)/\(sourceURL.lastPathComponent)"
         let destinationURL = try libraryRoot()
             .appending(path: relativePath, directoryHint: .notDirectory)
@@ -86,6 +87,9 @@ actor LocalBookImporter {
         let publicationRelativePath = "Books/\(id.uuidString)/Publication"
         let publicationURL = try libraryRoot().appending(path: publicationRelativePath, directoryHint: .isDirectory)
 
+        if fileManager.fileExists(atPath: bookDirectory.path) {
+            try fileManager.removeItem(at: bookDirectory)
+        }
         try fileManager.createDirectory(at: bookDirectory, withIntermediateDirectories: true)
         do {
             try fileManager.copyItem(at: sourceURL, to: destinationURL)

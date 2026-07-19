@@ -174,6 +174,14 @@ struct LibraryView: View {
                 }
                 .disabled(store.isImporting || store.isExporting || store.isRestoring)
 
+                if store.failedImportCount > 0 {
+                    Divider()
+                    Button("Retry Failed Imports (\(store.failedImportCount))", systemImage: "arrow.clockwise") {
+                        Task { await store.retryFailedImports() }
+                    }
+                    .disabled(store.isImporting || store.isRestoring)
+                }
+
                 if destination == .trash && hasVisibleBooks {
                     Divider()
                     Button("Empty Trash", systemImage: "trash.slash", role: .destructive) {
