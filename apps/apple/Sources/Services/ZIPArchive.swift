@@ -87,7 +87,7 @@ struct ZIPArchive: Sendable {
                 try fileManager.createDirectory(at: outputURL, withIntermediateDirectories: true)
             } else {
                 try fileManager.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try data(for: entry).write(to: outputURL, options: [.atomic, .completeFileProtection])
+                try data(for: entry).write(to: outputURL, options: .atomic)
             }
         }
     }

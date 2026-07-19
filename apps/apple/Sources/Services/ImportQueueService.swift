@@ -201,7 +201,7 @@ actor ImportQueueService {
     private func saveJobs(_ jobs: [ImportQueueJob]) throws {
         let url = try jobsURL()
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try encoder.encode(jobs).write(to: url, options: [.atomic, .completeFileProtection])
+        try encoder.encode(jobs).write(to: url, options: .atomic)
     }
 
     private func jobsURL() throws -> URL {

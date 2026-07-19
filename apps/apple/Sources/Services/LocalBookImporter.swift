@@ -163,7 +163,7 @@ actor LocalBookImporter {
         let fileExtension = type.preferredFilenameExtension ?? suppliedExtension
         let relativePath = "Books/\(bookID.uuidString)/CustomCover.\(fileExtension)"
         let destination = try libraryRoot().appending(path: relativePath)
-        try data.write(to: destination, options: [.atomic, .completeFileProtection])
+        try data.write(to: destination, options: .atomic)
         let obsoleteCovers = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?
             .filter { $0.lastPathComponent.hasPrefix("CustomCover.") && $0.standardizedFileURL != destination.standardizedFileURL } ?? []
         for oldCover in obsoleteCovers { try fileManager.removeItem(at: oldCover) }

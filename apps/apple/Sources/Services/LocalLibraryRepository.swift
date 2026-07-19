@@ -181,7 +181,7 @@ actor LocalLibraryRepository: SyncJournalStore {
     func exportSnapshot(to destination: URL) throws {
         let snapshot = try load()
         let data = try encoder.encode(snapshot)
-        try data.write(to: destination, options: [.atomic, .completeFileProtection])
+        try data.write(to: destination, options: .atomic)
     }
 
     struct RestoreResult: Sendable {

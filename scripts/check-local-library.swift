@@ -21,8 +21,9 @@ struct LocalLibraryCheck {
         let queueRoot = library.deletingLastPathComponent().appending(path: "queue", directoryHint: .isDirectory)
         let queue = ImportQueueService(rootURL: queueRoot)
         let enqueueResult = try await queue.enqueue([source])
-        precondition(enqueueResult.jobs.count == 1)
-        precondition(enqueueResult.failures.isEmpty)
+        guard enqueueResult.jobs.count == 1, enqueueResult.failures.isEmpty else {
+            fatalError("Queue staging failed: \(enqueueResult.failures)")
+        }
         let queuedJob = enqueueResult.jobs[0]
         try await queue.markProcessing(queuedJob.id)
         let relaunchedQueue = ImportQueueService(rootURL: queueRoot)
