@@ -77,10 +77,14 @@ struct SidebarView: View {
 
     private func organizationSection(counts: [SidebarDestination: Int]) -> some View {
         Section("Organize") {
-            Label("Folders", systemImage: "folder")
-                .foregroundStyle(.secondary)
+            row(.organizer(.folders), icon: OrganizerKind.folders.systemImage, count: counts[.organizer(.folders)])
             ForEach(store.foldersByPath) { folder in
-                row(.folder(folder.id), icon: "folder", count: counts[.folder(folder.id)], indentation: min(store.folderDepth(for: folder.id), 4))
+                row(
+                    .folder(folder.id),
+                    icon: "folder",
+                    count: counts[.folder(folder.id)],
+                    indentation: 1 + min(store.folderDepth(for: folder.id), 4)
+                )
                     .dropDestination(for: String.self) { values, _ in
                         store.moveBooks(Set(values.compactMap(UUID.init(uuidString:))), to: folder.id)
                         return !values.isEmpty
@@ -93,10 +97,9 @@ struct SidebarView: View {
                     }
             }
 
-            Label("Collections", systemImage: "rectangle.stack")
-                .foregroundStyle(.secondary)
+            row(.organizer(.collections), icon: OrganizerKind.collections.systemImage, count: counts[.organizer(.collections)])
             ForEach(store.collections.sorted(by: { $0.sortOrder < $1.sortOrder })) { collection in
-                row(.collection(collection.id), icon: "rectangle.stack", count: counts[.collection(collection.id)])
+                row(.collection(collection.id), icon: "rectangle.stack", count: counts[.collection(collection.id)], indentation: 1)
                     .dropDestination(for: String.self) { values, _ in
                         store.assignCollection(collection.id, to: Set(values.compactMap(UUID.init(uuidString:))))
                         return !values.isEmpty
@@ -107,10 +110,9 @@ struct SidebarView: View {
                     }
             }
 
-            Label("Tags", systemImage: "tag")
-                .foregroundStyle(.secondary)
+            row(.organizer(.tags), icon: OrganizerKind.tags.systemImage, count: counts[.organizer(.tags)])
             ForEach(store.tags.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })) { tag in
-                row(.tag(tag.id), icon: "tag", count: counts[.tag(tag.id)])
+                row(.tag(tag.id), icon: "tag", count: counts[.tag(tag.id)], indentation: 1)
                     .dropDestination(for: String.self) { values, _ in
                         store.assignTag(tag.id, to: Set(values.compactMap(UUID.init(uuidString:))))
                         return !values.isEmpty
@@ -121,10 +123,9 @@ struct SidebarView: View {
                     }
             }
 
-            Label("Series", systemImage: "square.stack.3d.up")
-                .foregroundStyle(.secondary)
+            row(.organizer(.series), icon: OrganizerKind.series.systemImage, count: counts[.organizer(.series)])
             ForEach(store.series.sorted(by: { $0.sortOrder < $1.sortOrder })) { item in
-                row(.series(item.id), icon: "square.stack.3d.up", count: counts[.series(item.id)])
+                row(.series(item.id), icon: "square.stack.3d.up", count: counts[.series(item.id)], indentation: 1)
                     .dropDestination(for: String.self) { values, _ in
                         store.assignSeries(item.id, to: Set(values.compactMap(UUID.init(uuidString:))))
                         return !values.isEmpty

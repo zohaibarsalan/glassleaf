@@ -7,6 +7,8 @@ struct LibraryView: View {
     @State private var batchTagName = ""
     @State private var showsBatchTagEditor = false
     @State private var confirmsEmptyTrash = false
+    @State private var organizerName = ""
+    @State private var showsOrganizerCreator = false
 
     private let columns = [
         GridItem(.adaptive(minimum: 138, maximum: 196), spacing: 24, alignment: .top),
@@ -53,6 +55,16 @@ struct LibraryView: View {
         } message: {
             Text("This permanently removes every book in Trash, including its local EPUB, cover, bookmarks, and notes. This can’t be undone.")
         }
+        .alert("New \(organizerKind?.singularTitle ?? "Organizer")", isPresented: $showsOrganizerCreator) {
+            TextField("Name", text: $organizerName)
+            Button("Cancel", role: .cancel) { organizerName = "" }
+            Button("Create", action: createOrganizer)
+                .disabled(organizerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } message: {
+            if let organizerKind {
+                Text("Create a \(organizerKind.singularTitle.lowercased()) in your local library.")
+            }
+        }
     }
 
     private var emptyState: some View {
@@ -61,7 +73,12 @@ struct LibraryView: View {
         } description: {
             Text(emptyDescription)
         } actions: {
-            if store.searchText.isEmpty && destination != .trash {
+            if store.searchText.isEmpty, let organizerKind {
+                Button("New \(organizerKind.singularTitle)", systemImage: organizerKind.creationSystemImage) {
+                    beginOrganizerCreation()
+                }
+                .buttonStyle(.borderedProminent)
+            } else if store.searchText.isEmpty && destination != .trash {
                 Button("Import EPUBs", systemImage: "plus") { store.requestImport() }
                     .buttonStyle(.borderedProminent)
             }
@@ -162,6 +179,14 @@ struct LibraryView: View {
             .labelStyle(.iconOnly)
             .controlSize(.large)
             .help("Export original EPUBs, metadata, and reading data")
+
+            if let organizerKind {
+                Button("New \(organizerKind.singularTitle)", systemImage: organizerKind.creationSystemImage) {
+                    beginOrganizerCreation()
+                }
+                .controlSize(.large)
+                .help("Create a new \(organizerKind.singularTitle.lowercased())")
+            }
 
             Button("Import", systemImage: "plus") { store.requestImport() }
                 .controlSize(.large)
@@ -288,10 +313,27 @@ struct LibraryView: View {
         }
     }
 
+    private var organizerKind: OrganizerKind? {
+        guard case .organizer(let kind) = destination else { return nil }
+        return kind
+    }
+
+    private func beginOrganizerCreation() {
+        organizerName = ""
+        showsOrganizerCreator = true
+    }
+
+    private func createOrganizer() {
+        guard let organizerKind else { return }
+        store.createOrganizer(organizerKind, name: organizerName)
+        organizerName = ""
+    }
+
     private var emptyTitle: String {
         if !store.searchText.isEmpty { return "No Results" }
         if destination == .trash { return "Trash is Empty" }
         if destination == .inbox { return "Inbox Zero" }
+        if let organizerKind { return "No \(organizerKind.title) Yet" }
         return "Nothing Here Yet"
     }
 
@@ -299,6 +341,7 @@ struct LibraryView: View {
         if !store.searchText.isEmpty { return "magnifyingglass" }
         if destination == .trash { return "trash" }
         if destination == .inbox { return "tray" }
+        if let organizerKind { return organizerKind.systemImage }
         return "books.vertical"
     }
 
@@ -306,6 +349,9 @@ struct LibraryView: View {
         if !store.searchText.isEmpty { return "Try another title, author, series, folder, collection, or tag." }
         if destination == .trash { return "Books moved to Trash can be restored here." }
         if destination == .inbox { return "Every imported book has been organized." }
+        if let organizerKind {
+            return "Create a \(organizerKind.singularTitle.lowercased()), then add books to it from Book Details or the library menus."
+        }
         return "Import a DRM-free EPUB or move books into this organizer."
     }
 }

@@ -2,10 +2,54 @@ import Foundation
 import GlassleafDomain
 import Observation
 
+enum OrganizerKind: String, CaseIterable, Hashable, Sendable {
+    case folders
+    case collections
+    case tags
+    case series
+
+    var title: String {
+        switch self {
+        case .folders: "Folders"
+        case .collections: "Collections"
+        case .tags: "Tags"
+        case .series: "Series"
+        }
+    }
+
+    var singularTitle: String {
+        switch self {
+        case .folders: "Folder"
+        case .collections: "Collection"
+        case .tags: "Tag"
+        case .series: "Series"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .folders: "folder"
+        case .collections: "rectangle.stack"
+        case .tags: "tag"
+        case .series: "square.stack.3d.up"
+        }
+    }
+
+    var creationSystemImage: String {
+        switch self {
+        case .folders: "folder.badge.plus"
+        case .collections: "rectangle.stack.badge.plus"
+        case .tags: "tag"
+        case .series: "square.stack.3d.up"
+        }
+    }
+}
+
 enum SidebarDestination: Hashable, Sendable {
     case home
     case library(LibraryFilter)
     case inbox
+    case organizer(OrganizerKind)
     case folder(UUID)
     case tag(UUID)
     case collection(UUID)
@@ -153,8 +197,16 @@ final class LibraryStore {
             if book.isInInbox { counts[.inbox, default: 0] += 1 }
             counts[.library(book.readingState.libraryFilter), default: 0] += 1
             if book.isFavorite { counts[.library(.favorites), default: 0] += 1 }
-            if let id = book.folderID { counts[.folder(id), default: 0] += 1 }
-            if let id = book.seriesID { counts[.series(id), default: 0] += 1 }
+            if let id = book.folderID {
+                counts[.organizer(.folders), default: 0] += 1
+                counts[.folder(id), default: 0] += 1
+            }
+            if let id = book.seriesID {
+                counts[.organizer(.series), default: 0] += 1
+                counts[.series(id), default: 0] += 1
+            }
+            if !book.tagIDs.isEmpty { counts[.organizer(.tags), default: 0] += 1 }
+            if !book.collectionIDs.isEmpty { counts[.organizer(.collections), default: 0] += 1 }
             for id in book.tagIDs { counts[.tag(id), default: 0] += 1 }
             for id in book.collectionIDs { counts[.collection(id), default: 0] += 1 }
             for collection in smartCollections where collection.rule.includes(book, tags: tags, series: series) {
@@ -361,6 +413,15 @@ final class LibraryStore {
     func moveBooks(_ ids: Set<UUID>, to folderID: UUID?) {
         updateBooks(ids: ids) { $0.folderID = folderID }
         selectedBookIDs.removeAll()
+    }
+
+    func createOrganizer(_ kind: OrganizerKind, name: String) {
+        switch kind {
+        case .folders: createFolder(name: name)
+        case .collections: createCollection(name: name)
+        case .tags: createTag(name: name)
+        case .series: createSeries(name: name)
+        }
     }
 
     func assignTag(named name: String, to ids: Set<UUID>) {
@@ -821,6 +882,10 @@ extension SidebarDestination {
         case .home: book.deletedAt == nil
         case .library(let filter): book.deletedAt == nil && filter.includes(book)
         case .inbox: book.deletedAt == nil && book.isInInbox
+        case .organizer(.folders): book.deletedAt == nil && book.folderID != nil
+        case .organizer(.collections): book.deletedAt == nil && !book.collectionIDs.isEmpty
+        case .organizer(.tags): book.deletedAt == nil && !book.tagIDs.isEmpty
+        case .organizer(.series): book.deletedAt == nil && book.seriesID != nil
         case .folder(let id): book.deletedAt == nil && book.folderID == id
         case .tag(let id): book.deletedAt == nil && book.tagIDs.contains(id)
         case .collection(let id): book.deletedAt == nil && book.collectionIDs.contains(id)
@@ -841,6 +906,7 @@ extension SidebarDestination {
         case .home: "Home"
         case .library(let filter): filter.title
         case .inbox: "Inbox"
+        case .organizer(let kind): kind.title
         case .folder(let id): store.folders.first(where: { $0.id == id })?.name ?? "Folder"
         case .tag(let id): store.tags.first(where: { $0.id == id })?.name ?? "Tag"
         case .collection(let id): store.collections.first(where: { $0.id == id })?.name ?? "Collection"
