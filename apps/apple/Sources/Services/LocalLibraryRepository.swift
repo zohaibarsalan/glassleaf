@@ -278,35 +278,37 @@ actor LocalLibraryRepository: SyncJournalStore {
     }
 
     private func createSchema(_ database: OpaquePointer) throws {
-        try execute(database, sql: """
-            CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS books (id TEXT PRIMARY KEY, data BLOB NOT NULL);
-            CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY, data BLOB NOT NULL);
-            CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, data BLOB NOT NULL);
-            CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, data BLOB NOT NULL);
-            CREATE TABLE IF NOT EXISTS series (id TEXT PRIMARY KEY, data BLOB NOT NULL);
-            CREATE TABLE IF NOT EXISTS smart_collections (id TEXT PRIMARY KEY, data BLOB NOT NULL);
-            CREATE TABLE IF NOT EXISTS bookmarks (id TEXT PRIMARY KEY, book_id TEXT NOT NULL, data BLOB NOT NULL);
-            CREATE INDEX IF NOT EXISTS bookmarks_book_id ON bookmarks(book_id);
-            CREATE TABLE IF NOT EXISTS annotations (id TEXT PRIMARY KEY, book_id TEXT NOT NULL, data BLOB NOT NULL);
-            CREATE INDEX IF NOT EXISTS annotations_book_id ON annotations(book_id);
-            CREATE TABLE IF NOT EXISTS sync_journal (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                data BLOB NOT NULL
-            );
-            CREATE VIRTUAL TABLE IF NOT EXISTS book_search USING fts5(
-                book_id UNINDEXED,
-                title,
-                author,
-                series,
-                tags,
-                folder,
-                collections,
-                tokenize = 'unicode61 remove_diacritics 2',
-                prefix = '2 3 4'
-            );
-            INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', '3');
-            """)
+        try transaction(database) {
+            try execute(database, sql: """
+                CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS books (id TEXT PRIMARY KEY, data BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY, data BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, data BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, data BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS series (id TEXT PRIMARY KEY, data BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS smart_collections (id TEXT PRIMARY KEY, data BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS bookmarks (id TEXT PRIMARY KEY, book_id TEXT NOT NULL, data BLOB NOT NULL);
+                CREATE INDEX IF NOT EXISTS bookmarks_book_id ON bookmarks(book_id);
+                CREATE TABLE IF NOT EXISTS annotations (id TEXT PRIMARY KEY, book_id TEXT NOT NULL, data BLOB NOT NULL);
+                CREATE INDEX IF NOT EXISTS annotations_book_id ON annotations(book_id);
+                CREATE TABLE IF NOT EXISTS sync_journal (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    data BLOB NOT NULL
+                );
+                CREATE VIRTUAL TABLE IF NOT EXISTS book_search USING fts5(
+                    book_id UNINDEXED,
+                    title,
+                    author,
+                    series,
+                    tags,
+                    folder,
+                    collections,
+                    tokenize = 'unicode61 remove_diacritics 2',
+                    prefix = '2 3 4'
+                );
+                INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', '3');
+                """)
+        }
     }
 
     private func migrateLegacyCatalogIfNeeded(_ database: OpaquePointer) throws {
