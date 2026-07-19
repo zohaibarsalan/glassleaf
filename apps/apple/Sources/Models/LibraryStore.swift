@@ -141,7 +141,7 @@ final class LibraryStore {
     private let importQueue: ImportQueueService
     private let exporter = LibraryExportService()
     private let archives = PortableLibraryArchiveService()
-    private let cloudSync: LibraryCloudSyncService
+    @ObservationIgnored private var cloudSync: LibraryCloudSyncService?
     private var searchResultIDs: [UUID]?
     private var searchResultQuery = ""
     private var searchTask: Task<Void, Never>?
@@ -192,11 +192,7 @@ final class LibraryStore {
         let syncEnabled = !isPreview && CloudSyncIdentityStore.isEnabled
         isICloudSyncEnabled = syncEnabled
         cloudSyncState = syncEnabled ? .preparing : .localOnly
-        cloudSync = LibraryCloudSyncService(
-            repository: repository,
-            libraryID: CloudSyncIdentityStore.libraryID,
-            deviceID: CloudSyncIdentityStore.deviceID
-        )
+        cloudSync = nil
         rebuildLookupCaches()
     }
 
@@ -384,6 +380,7 @@ final class LibraryStore {
         guard !isPreview, !isICloudSyncEnabled else { return }
         cloudSyncState = .preparing
         do {
+            let cloudSync = cloudSyncService()
             guard try await cloudSync.accountIsAvailable() else {
                 throw CloudKitSyncError.accountUnavailable
             }
@@ -403,6 +400,7 @@ final class LibraryStore {
         guard !isPreview, isICloudSyncEnabled else { return }
         cloudSyncState = .syncing
         do {
+            let cloudSync = cloudSyncService()
             let result = try await cloudSync.synchronize(
                 snapshot: snapshot(),
                 readerPreferences: readerPreferences
@@ -1066,6 +1064,17 @@ final class LibraryStore {
             guard !Task.isCancelled else { return }
             await self?.synchronizeWithICloud(reportFailure: false)
         }
+    }
+
+    private func cloudSyncService() -> LibraryCloudSyncService {
+        if let cloudSync { return cloudSync }
+        let service = LibraryCloudSyncService(
+            repository: repository,
+            libraryID: CloudSyncIdentityStore.libraryID,
+            deviceID: CloudSyncIdentityStore.deviceID
+        )
+        cloudSync = service
+        return service
     }
 
     private func applyCloudSyncResult(_ result: CloudSyncResult) {
