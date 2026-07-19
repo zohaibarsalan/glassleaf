@@ -45,6 +45,8 @@ Glassleaf is not an ebook store. It is a reader and personal library manager.
 6. **Native restraint.** Use system patterns and Liquid Glass where they improve hierarchy and interaction. Avoid decorative glass everywhere.
 7. **No lock-in.** Users must be able to export original EPUBs, covers, metadata, annotations, and reading history.
 8. **Accessibility is core.** Dynamic Type, VoiceOver, keyboard navigation, contrast, and reduced motion are release requirements.
+9. **Open source.** Clients, the core domain, portable library format, and sync specification are developed openly; the exact license remains to be selected.
+10. **Two plans only.** Free is a complete local reader and library manager. Paid primarily funds the official managed Glassleaf Sync infrastructure.
 
 ## Target platforms
 
@@ -73,13 +75,22 @@ These are intentionally the first platform releases with Liquid Glass. Glassleaf
 - Must connect directly to the selected storage provider wherever possible.
 - Vercel must not become the default storage or bandwidth proxy for EPUB files.
 
-### Future possibilities, not initial commitments
+### Planned platform expansion
 
 - Android
 - Windows
+
+These are accepted product targets after the portable sync model and managed Glassleaf Sync service are proven. Their applications must remain useful locally without requiring a paid account.
+
+### Future possibilities, not initial commitments
+
 - Linux
-- OPDS server/client workflows
-- Self-hosted sync provider
+
+### Planned open ecosystem
+
+- OPDS and Calibre interoperability.
+- A documented portable sync protocol.
+- A self-hostable sync implementation or compatible reference server after the managed protocol is stable.
 
 ## Core architecture
 
@@ -114,11 +125,12 @@ Page rendering happens locally. CloudKit or Google Drive traffic should go direc
 
 ## Storage and sync providers
 
-Glassleaf exposes storage as a provider abstraction. The initial user choice is:
+Glassleaf exposes storage as a provider abstraction. The target choices are:
 
 1. Local only
 2. iCloud
 3. Google Drive
+4. Glassleaf Sync
 
 The choice belongs to a library, not necessarily to the whole installation. A future user may maintain multiple separate libraries with different providers, but each individual library has exactly one active authority.
 
@@ -129,7 +141,7 @@ Each provider implementation must support, or explicitly declare that it cannot 
 - Account or container availability.
 - Initial library creation.
 - Listing and fetching the library manifest.
-- Uploading and downloading EPUB assets and covers.
+- Uploading and downloading publication assets and covers.
 - Metadata, folder, tag, series, progress, bookmark, and annotation synchronization.
 - Content hashing and deduplication.
 - Tombstones for deletions.
@@ -162,6 +174,15 @@ Provider-specific identifiers must not leak into the core domain model.
 - Avoid requesting access to the user's entire Drive.
 - Support native Apple applications and the web companion.
 - Keep authentication tokens out of source control and logs.
+
+### Glassleaf Sync provider
+
+- Optional managed service for mixed-platform libraries spanning Apple, Android, Windows, Linux, and web.
+- Included with the single Paid plan because book storage, transfer, history, and web access create recurring infrastructure costs.
+- Local reading, organization, supported formats, annotations, accessibility, export, and direct-provider modes must not require this plan.
+- Must support offline-first clients, complete export, account deletion, recoverable cloud Trash, version history, and transparent quotas.
+- Encrypt transport and stored assets; complete an end-to-end-encryption feasibility and recovery study before launch.
+- Must not inspect library content for advertising, recommendations, analytics, or model training.
 
 ### Provider switching and migration
 
@@ -251,6 +272,7 @@ Do not hard-code content categories. Users create their own folders and tags. Gl
 ### Reader
 
 - Reflowable EPUB support.
+- Planned DRM-free PDF, MOBI/PRC, AZW3/KF8, DjVu, FB2/FB2.ZIP, CBZ, CBR, and comic EPUB support, with per-format quality gates.
 - Paginated and continuous vertical reading modes.
 - Table of contents and chapter navigation.
 - Font family, font size, line height, margins, alignment, and theme controls.
@@ -261,6 +283,8 @@ Do not hard-code content categories. Users create their own folders and tags. Gl
 - Restore position reliably after app termination or device switching.
 - Offline reading.
 - Sensible handling of malformed EPUBs with actionable errors.
+- Use curated light, paper/sepia, dark, and true-black themes; a user-authored theme builder is deferred.
+- Specialized vertical Japanese/Chinese text layout and language-specific CJK typography are not product targets.
 
 ### Sync and portability
 
@@ -329,15 +353,16 @@ The benchmark is **Apple Books, but calmer and substantially better organized**.
 - Simultaneous two-way iCloud and Google Drive authority for one library.
 - Storing the canonical library on Vercel.
 - Supporting every document format before EPUB quality is excellent.
+- Specialized vertical Japanese or Chinese reading layouts.
+- A custom theme editor in the current roadmap.
 
 ## Suggested delivery phases
 
 ### Phase 0 — Technical spikes
 
-- Validate Readium Swift integration in SwiftUI on iPhone, iPad, and Mac.
+- Define the format-neutral publication interface and spike PDF and comic rendering on Apple platforms.
 - Validate CloudKit private records and EPUB assets.
 - Validate CloudKit JS access to the same private library.
-- Validate Google Drive `drive.file` OAuth and asset synchronization.
 - Define the provider-neutral manifest and conflict model.
 - Prototype Liquid Glass library and reader chrome.
 
@@ -347,27 +372,48 @@ The benchmark is **Apple Books, but calmer and substantially better organized**.
 - Deliver excellent reader controls and offline behavior.
 - No cloud dependency.
 
-### Phase 2 — iCloud provider
+### Phase 2 — Organization and reliability hardening
 
-- CloudKit synchronization, conflicts, migration, and recovery.
-- Multi-device Apple testing.
+- Stable ID-based tag and series membership, editable smart collections, complete batch actions, and visible persistence errors.
+- Accessibility, malformed-file, migration, backup/restore, and real-device testing.
 
-### Phase 3 — Google Drive provider
+### Phase 3 — Provider-neutral sync foundation
 
-- OAuth, dedicated file set, sync, and provider migration.
+- Versioned portable manifest, stable locators, revisions, tombstones, conflicts, offline outbox, and migration protocol.
+- Complete portable snapshot restore and deterministic provider tests before a cloud provider becomes authoritative.
 
-### Phase 4 — Web companion
+### Phase 4 — iCloud provider
+
+- CloudKit synchronization, conflicts, migration, recovery, and multi-device Apple testing.
+
+### Phase 5 — PDF, comics, and additional formats
+
+- PDF, CBZ, and CBR using shared fixed-page foundations and a dedicated comic experience.
+- MOBI/PRC, DRM-free AZW3/KF8, FB2/FB2.ZIP, and DjVu behind the publication boundary.
+
+### Phase 6 — Google Drive provider
+
+- Google Drive OAuth, dedicated file set, sync, and provider migration after iCloud proves the provider contract.
+
+### Phase 7 — Glassleaf Sync and web reader
 
 - Vercel-hosted web catalog and reader.
-- CloudKit and Google Drive provider support.
+- CloudKit, Google Drive, and managed Glassleaf Sync support where feasible.
+- Managed cross-platform storage, progress, organization, bookmarks, annotations, history, and recovery.
 
-### Phase 5 — Hardening
+### Phase 8 — Android and Windows
+
+- Local/offline applications that do not require a Glassleaf account.
+- Optional Glassleaf Sync for mixed-device libraries.
+
+### Phase 9 — Hardening and ecosystem
 
 - Accessibility audit.
 - Sync chaos and offline testing.
 - Privacy review.
 - Large-library performance testing.
 - Export/restore disaster-recovery testing.
+- OPDS, Calibre, knowledge-export, and e-ink interoperability work.
 
 ## Engineering expectations
 
@@ -379,6 +425,7 @@ The benchmark is **Apple Books, but calmer and substantially better organized**.
 - Treat sync migrations and deletion as destructive operations requiring previews and recovery paths.
 - Do not deploy, create cloud resources, enable paid services, or change external accounts without explicit user approval.
 - Keep customer-facing naming as `Glassleaf` and technical identifiers lowercase where appropriate.
+- Keep source, protocol, and format documentation suitable for public open-source development; never commit user data or operational secrets.
 
 ## Decisions still open
 
@@ -386,5 +433,6 @@ The benchmark is **Apple Books, but calmer and substantially better organized**.
 - Final web EPUB rendering engine.
 - Whether Google Drive content encryption is default, optional, or deferred.
 - Native app distribution strategy: private device install, TestFlight, unlisted App Store, or public App Store.
-- Business model and which features, if any, are paid.
+- Exact Glassleaf Sync quotas and pricing. The product principle is settled: basic local reading and library features remain free; recurring infrastructure may be paid.
+- Exact open-source license and which official-service deployment components, if any, remain operational rather than distributable source.
 - Final brand, icon, domain, and trademark clearance for Glassleaf.
