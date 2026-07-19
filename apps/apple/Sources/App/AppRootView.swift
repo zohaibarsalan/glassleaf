@@ -63,9 +63,24 @@ struct AppRootView: View {
                 )
             }
         }
+        .fileImporter(
+            isPresented: $store.showsRestoreImporter,
+            allowedContentTypes: [.glassleafLibrary],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first { store.proposeRestore(from: url) }
+            case .failure(let error):
+                store.importAlert = .init(title: "Restore Failed", message: error.localizedDescription)
+            }
+        }
         .onOpenURL { url in
-            guard url.pathExtension.lowercased() == "epub" else { return }
-            Task { await store.importBooks(from: [url]) }
+            switch url.pathExtension.lowercased() {
+            case "epub": Task { await store.importBooks(from: [url]) }
+            case "glassleaflibrary": store.proposeRestore(from: url)
+            default: break
+            }
         }
         .fileExporter(
             isPresented: $store.showsExporter,
@@ -78,16 +93,35 @@ struct AppRootView: View {
             }
             store.exportDocument = nil
         }
-        .alert(item: $store.importAlert) { issue in
-            Alert(
-                title: Text(issue.title),
-                message: Text(issue.message),
-                dismissButton: .default(Text("OK"))
+        .confirmationDialog(
+            "Replace Local Library?",
+            isPresented: Binding(
+                get: { store.pendingRestoreURL != nil },
+                set: { if !$0 { store.cancelRestore() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Restore Library", role: .destructive) {
+                Task { await store.restoreLibrary() }
+            }
+            Button("Cancel", role: .cancel) { store.cancelRestore() }
+        } message: {
+            Text("Glassleaf will validate the package first, preserve the current library as a local backup, and then replace it with the restored library.")
+        }
+        .alert(
+            store.importAlert?.title ?? "Glassleaf",
+            isPresented: Binding(
+                get: { store.importAlert != nil },
+                set: { if !$0 { store.importAlert = nil } }
             )
+        ) {
+            Button("OK") { store.importAlert = nil }
+        } message: {
+            Text(store.importAlert?.message ?? "")
         }
         .overlay(alignment: .bottom) {
-            if store.isImporting || store.isExporting {
-                ProgressView(store.isImporting ? "Importing…" : "Preparing Export…")
+            if store.isImporting || store.isExporting || store.isRestoring {
+                ProgressView(operationTitle)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .glassEffect(.regular, in: .capsule)
@@ -102,6 +136,12 @@ struct AppRootView: View {
             }
 #endif
         }
+    }
+
+    private var operationTitle: String {
+        if store.isRestoring { return "Validating and Restoring…" }
+        if store.isImporting { return "Importing…" }
+        return "Preparing Export…"
     }
 
     private var libraryRoot: some View {

@@ -81,7 +81,7 @@ struct LocalLibraryCheck {
         try await repository.save(portableSnapshot)
 
         let archiveService = PortableLibraryArchiveService(rootURL: library)
-        let archiveWrapper = try await archiveService.makeArchive(snapshot: portableSnapshot)
+        let archiveWrapper = try await archiveService.makeArchive(snapshot: portableSnapshot).wrapper
         let package = library.deletingLastPathComponent().appending(
             path: "Export.glassleaflibrary",
             directoryHint: .isDirectory

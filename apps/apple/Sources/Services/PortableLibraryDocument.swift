@@ -28,6 +28,6 @@ actor LibraryExportService {
     private let archives = PortableLibraryArchiveService()
 
     func makeDocument(snapshot: LibrarySnapshot) async throws -> PortableLibraryDocument {
-        PortableLibraryDocument(wrapper: try await archives.makeArchive(snapshot: snapshot))
+        PortableLibraryDocument(wrapper: try await archives.makeArchive(snapshot: snapshot).wrapper)
     }
 }

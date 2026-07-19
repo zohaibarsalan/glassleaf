@@ -99,12 +99,16 @@ final class LibraryStore {
     var exportDocument: PortableLibraryDocument?
     var showsExporter = false
     var isExporting = false
+    var showsRestoreImporter = false
+    var pendingRestoreURL: URL?
+    var isRestoring = false
     private(set) var isSearching = false
 
     private let isPreview: Bool
     private let repository: LocalLibraryRepository
     private let importer: LocalBookImporter
     private let exporter = LibraryExportService()
+    private let archives = PortableLibraryArchiveService()
     private var searchResultIDs: [UUID]?
     private var searchResultQuery = ""
     private var searchTask: Task<Void, Never>?
@@ -332,6 +336,52 @@ final class LibraryStore {
 
     func requestImport() {
         showsImporter = true
+    }
+
+    func requestRestore() {
+        guard !isImporting, !isExporting, !isRestoring else { return }
+        showsRestoreImporter = true
+    }
+
+    func proposeRestore(from url: URL) {
+        pendingRestoreURL = url
+    }
+
+    func cancelRestore() {
+        pendingRestoreURL = nil
+    }
+
+    func restoreLibrary() async {
+        guard let source = pendingRestoreURL, !isRestoring else { return }
+        pendingRestoreURL = nil
+        isRestoring = true
+        defer { isRestoring = false }
+
+        var prepared: PortableLibraryArchiveService.PreparedRestore?
+        do {
+            let root = try await repository.libraryRootURL()
+            let restore = try await archives.prepareRestore(
+                from: source,
+                destinationParent: root.deletingLastPathComponent()
+            )
+            prepared = restore
+            let result = try await repository.installPreparedLibrary(at: restore.stagedRoot)
+            apply(result.snapshot)
+            selection = .home
+            presentedBook = nil
+            readerBook = nil
+            selectedBookIDs.removeAll()
+            isSelecting = false
+            importAlert = ImportAlert(
+                title: "Library Restored",
+                message: result.backupURL == nil
+                    ? "The portable library was validated and restored."
+                    : "The portable library was validated and restored. Your previous local library remains available in Glassleaf Backups."
+            )
+        } catch {
+            if let prepared { await archives.discard(prepared) }
+            importAlert = ImportAlert(title: "Restore Failed", message: error.localizedDescription)
+        }
     }
 
     func prepareExport() async {

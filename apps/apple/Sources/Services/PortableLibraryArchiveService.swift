@@ -3,6 +3,10 @@ import Foundation
 import GlassleafDomain
 
 actor PortableLibraryArchiveService {
+    struct PreparedArchive: @unchecked Sendable {
+        let wrapper: FileWrapper
+    }
+
     struct PreparedRestore: Sendable {
         let stagedRoot: URL
     }
@@ -44,7 +48,7 @@ actor PortableLibraryArchiveService {
         self.rootOverride = rootURL
     }
 
-    func makeArchive(snapshot: LibrarySnapshot) throws -> FileWrapper {
+    func makeArchive(snapshot: LibrarySnapshot) throws -> PreparedArchive {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -87,12 +91,14 @@ actor PortableLibraryArchiveService {
             """.utf8))
         readme.preferredFilename = "README.txt"
 
-        return FileWrapper(directoryWithFileWrappers: [
-            "library.json": metadata,
-            "Originals": FileWrapper(directoryWithFileWrappers: originals),
-            "Covers": FileWrapper(directoryWithFileWrappers: covers),
-            "README.txt": readme,
-        ])
+        return PreparedArchive(
+            wrapper: FileWrapper(directoryWithFileWrappers: [
+                "library.json": metadata,
+                "Originals": FileWrapper(directoryWithFileWrappers: originals),
+                "Covers": FileWrapper(directoryWithFileWrappers: covers),
+                "README.txt": readme,
+            ])
+        )
     }
 
     func prepareRestore(from packageURL: URL, destinationParent: URL) async throws -> PreparedRestore {
@@ -139,7 +145,7 @@ actor PortableLibraryArchiveService {
             for book in snapshot.books {
                 try stageAssets(for: book, originals: originals, covers: covers, under: stagedRoot)
             }
-            let stagedRepository = LocalLibraryRepository(fileManager: fileManager, rootURL: stagedRoot)
+            let stagedRepository = LocalLibraryRepository(rootURL: stagedRoot)
             try await stagedRepository.save(snapshot)
             try await stagedRepository.close()
             return PreparedRestore(stagedRoot: stagedRoot)

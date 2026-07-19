@@ -169,6 +169,11 @@ struct LibraryView: View {
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
 
+                Button("Restore Library…", systemImage: "arrow.clockwise.icloud") {
+                    store.requestRestore()
+                }
+                .disabled(store.isImporting || store.isExporting || store.isRestoring)
+
                 if destination == .trash && hasVisibleBooks {
                     Divider()
                     Button("Empty Trash", systemImage: "trash.slash", role: .destructive) {
