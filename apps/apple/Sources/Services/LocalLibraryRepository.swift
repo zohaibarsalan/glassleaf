@@ -157,6 +157,56 @@ actor LocalLibraryRepository {
         try data.write(to: destination, options: [.atomic, .completeFileProtection])
     }
 
+    struct RestoreResult: Sendable {
+        let snapshot: LibrarySnapshot
+        let backupURL: URL?
+    }
+
+    func libraryRootURL() throws -> URL {
+        try libraryRoot()
+    }
+
+    func close() throws {
+        connection = nil
+    }
+
+    func installPreparedLibrary(at stagedRoot: URL) throws -> RestoreResult {
+        let root = try libraryRoot().standardizedFileURL
+        let staged = stagedRoot.standardizedFileURL
+        let parent = root.deletingLastPathComponent()
+        guard staged.deletingLastPathComponent() == parent, staged != root else {
+            throw RepositoryError.open("The prepared restore is not on the local library volume.")
+        }
+
+        connection = nil
+        let backups = parent.appending(path: "Glassleaf Backups", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: backups, withIntermediateDirectories: true)
+        let backup = backups.appending(
+            path: "Library-\(Self.backupTimestamp())-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        var movedExistingLibrary = false
+
+        do {
+            if fileManager.fileExists(atPath: root.path) {
+                try fileManager.moveItem(at: root, to: backup)
+                movedExistingLibrary = true
+            }
+            try fileManager.moveItem(at: staged, to: root)
+            let restored = try load()
+            return RestoreResult(snapshot: restored, backupURL: movedExistingLibrary ? backup : nil)
+        } catch {
+            connection = nil
+            if fileManager.fileExists(atPath: root.path) {
+                try? fileManager.removeItem(at: root)
+            }
+            if movedExistingLibrary, fileManager.fileExists(atPath: backup.path) {
+                try? fileManager.moveItem(at: backup, to: root)
+            }
+            throw error
+        }
+    }
+
     struct SearchContext: Sendable {
         var seriesName: String = ""
         var tagNames: String = ""
@@ -389,6 +439,15 @@ actor LocalLibraryRepository {
                 return "\"\(escaped)\"*"
             }
             .joined(separator: " AND ")
+    }
+
+    private static func backupTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: .now)
     }
 
     private func databaseURL() throws -> URL {

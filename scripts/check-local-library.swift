@@ -67,6 +67,44 @@ struct LocalLibraryCheck {
         let cover = try await importer.storeCover(data: onePixelPNG, filename: "cover.png", for: organized.id)
         precondition(FileManager.default.fileExists(atPath: library.appending(path: cover.localRelativePath).path))
 
-        print("PASS: safe EPUB import, metadata, assets, cover replacement, SQLite round-trip, FTS, and hash/identifier deduplication")
+        organized.cover = cover
+        let bookmark = Bookmark(bookID: organized.id, locator: "OEBPS/chapter.xhtml#progress=0.4", label: "Return here")
+        let annotation = Annotation(bookID: organized.id, locator: bookmark.locator, note: "Portable note")
+        let portableSnapshot = LibrarySnapshot(
+            books: [organized],
+            folders: [folder],
+            tags: [tag],
+            collections: [collection],
+            bookmarks: [bookmark],
+            annotations: [annotation]
+        )
+        try await repository.save(portableSnapshot)
+
+        let archiveService = PortableLibraryArchiveService(rootURL: library)
+        let archiveWrapper = try await archiveService.makeArchive(snapshot: portableSnapshot)
+        let package = library.deletingLastPathComponent().appending(
+            path: "Export.glassleaflibrary",
+            directoryHint: .isDirectory
+        )
+        try archiveWrapper.write(to: package, options: .atomic, originalContentsURL: nil)
+
+        let restoredRoot = library.deletingLastPathComponent().appending(path: "restored", directoryHint: .isDirectory)
+        let restoredRepository = LocalLibraryRepository(rootURL: restoredRoot)
+        let replacedBook = Book(title: "Replace Me", author: "Glassleaf Checks")
+        try await restoredRepository.save(LibrarySnapshot(books: [replacedBook]))
+        let prepared = try await archiveService.prepareRestore(
+            from: package,
+            destinationParent: restoredRoot.deletingLastPathComponent()
+        )
+        let result = try await restoredRepository.installPreparedLibrary(at: prepared.stagedRoot)
+        precondition(result.snapshot.books == [organized])
+        precondition(result.snapshot.bookmarks == [bookmark])
+        precondition(result.snapshot.annotations == [annotation])
+        precondition(result.backupURL.map { FileManager.default.fileExists(atPath: $0.path) } == true)
+        precondition(FileManager.default.fileExists(atPath: restoredRoot.appending(path: asset.localRelativePath).path))
+        precondition(FileManager.default.fileExists(atPath: restoredRoot.appending(path: asset.extractedRelativePath!).appending(path: "OEBPS/chapter.xhtml").path))
+        precondition(FileManager.default.fileExists(atPath: restoredRoot.appending(path: cover.localRelativePath).path))
+
+        print("PASS: safe EPUB import, metadata, assets, portable backup/restore, rollback backup, SQLite round-trip, FTS, and deduplication")
     }
 }

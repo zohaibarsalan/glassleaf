@@ -40,6 +40,7 @@ xcrun --sdk macosx swiftc \
     apps/apple/Sources/Services/EPUBParser.swift \
     apps/apple/Sources/Services/LocalBookImporter.swift \
     apps/apple/Sources/Services/LocalLibraryRepository.swift \
+    apps/apple/Sources/Services/PortableLibraryArchiveService.swift \
     scripts/check-local-library.swift \
     "$module_root/libGlassleafDomain.a" \
     -lsqlite3 \

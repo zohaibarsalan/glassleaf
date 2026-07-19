@@ -223,6 +223,8 @@ public enum LibrarySort: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 public struct LibrarySnapshot: Codable, Hashable, Sendable {
+    public static let currentSchemaVersion = 3
+
     public var schemaVersion: Int
     public var exportedAt: Date
     public var books: [Book]
@@ -235,7 +237,7 @@ public struct LibrarySnapshot: Codable, Hashable, Sendable {
     public var annotations: [Annotation]
 
     public init(
-        schemaVersion: Int = 3,
+        schemaVersion: Int = LibrarySnapshot.currentSchemaVersion,
         exportedAt: Date = .now,
         books: [Book] = [],
         folders: [Folder] = [],
@@ -338,7 +340,7 @@ public struct LibrarySnapshot: Codable, Hashable, Sendable {
             )
             return value
         }
-        migrated.schemaVersion = max(schemaVersion, 3)
+        migrated.schemaVersion = max(schemaVersion, Self.currentSchemaVersion)
         return migrated
     }
 }
