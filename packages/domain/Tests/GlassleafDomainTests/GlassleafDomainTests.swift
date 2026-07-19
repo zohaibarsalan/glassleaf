@@ -260,3 +260,45 @@ func providerRetriesAreIdempotent() async throws {
     #expect(second.acknowledgedMutationIDs == [mutation.id])
     #expect(await provider.record(for: record.id) == record)
 }
+
+@Test("Provider cutover requires a verified backup and destination")
+func providerMigrationIsGated() throws {
+    let libraryID = UUID()
+    var plan = try ProviderMigrationPlan(
+        libraryID: libraryID,
+        source: .local,
+        destination: .iCloud,
+        sourceCursor: SyncCursor(rawValue: "42")
+    )
+
+    #expect(throws: ProviderMigrationError.invalidTransition(
+        expected: .destinationVerified,
+        actual: .planned
+    )) {
+        try plan.completeCutover()
+    }
+    try plan.markBackupVerified(fingerprint: "portable-backup-sha256")
+    try plan.markDestinationImported(manifest: SyncManifest(
+        libraryID: libraryID,
+        generation: 8,
+        records: []
+    ))
+    try plan.markDestinationVerified()
+    let authority = try plan.completeCutover()
+
+    #expect(plan.phase == .completed)
+    #expect(authority.activeProvider == .iCloud)
+    #expect(authority.previousProvider == .local)
+    #expect(authority.libraryID == libraryID)
+}
+
+@Test("A library cannot migrate to its current provider")
+func providerMigrationRejectsSameProvider() {
+    #expect(throws: ProviderMigrationError.sameProvider) {
+        _ = try ProviderMigrationPlan(
+            libraryID: UUID(),
+            source: .iCloud,
+            destination: .iCloud
+        )
+    }
+}

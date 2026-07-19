@@ -42,6 +42,18 @@ Reading progress is append-only. Each change is a `ReadingPositionEvent` with a 
 
 The provider interface is limited to availability, fetching changes since a cursor, and applying mutations. iCloud Drive is the first planned adapter. Google Drive can later implement the same interface without changing record identity or merge rules.
 
+## Provider migration
+
+A library has exactly one active sync authority. Migration is an explicit state machine:
+
+1. Record the source provider and its last durable cursor.
+2. Create and verify a portable backup fingerprint.
+3. Import a compatible manifest into the destination.
+4. Verify the destination record set and required assets.
+5. Cut over authority only after all earlier gates succeed.
+
+Before cutover, a failure can roll back to the source without changing authority. Glassleaf never operates iCloud and Google Drive as simultaneous writers for one library.
+
 ## Safety gates before enabling iCloud
 
 - Deterministic merge, tombstone, conflict, and retry tests pass.
