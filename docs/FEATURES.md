@@ -367,6 +367,8 @@ The portable sync model is implemented and tested before any provider adapter be
 - A provider protocol exercised first by an in-memory or local test provider.
 - Portable snapshot restore and validation before provider migration is enabled.
 
+**Implementation checkpoint (2026-07-19):** the versioned record/manifest model, append-only reading events, deterministic merge policy, conflict preservation, tombstones, durable SQLite outbox/cursor journal, idempotent in-memory provider, and backup-gated migration state machine are implemented and tested. No remote provider is authoritative yet. CloudKit remains the next provider adapter and must pass real multi-device, interruption, quota, and stale-client testing before release.
+
 ### Managed-sync privacy target
 
 - Encrypt transport and stored assets.

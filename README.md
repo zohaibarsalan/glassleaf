@@ -8,7 +8,7 @@ The accepted cross-platform feature roadmap, supported-format targets, free-core
 
 Glassleaf is open source and has a two-plan product model: **Free** is a complete local/offline reader and library manager, while **Paid** primarily funds the official managed Glassleaf Sync service for cross-platform book storage, transfer, web access, history, and recovery. The exact open-source license and hosted-service quotas are not yet selected.
 
-> Status: functional local-native MVP. The universal SwiftUI app imports, organizes, searches, reads, annotates, and exports DRM-free EPUB libraries entirely on-device. Cloud providers and the web companion have not started.
+> Status: functional local-native MVP with a provider-neutral sync foundation. The universal SwiftUI app imports, organizes, searches, reads, annotates, exports, and restores DRM-free EPUB libraries entirely on-device. Sync records, offline replay, conflicts, tombstones, migration gates, and the durable journal are implemented; CloudKit, other remote provider adapters, and the web companion have not started.
 
 ## Current implementation
 
@@ -107,17 +107,16 @@ glassleaf/
 └── README.md
 ```
 
-The planned web app and portable sync-spec package will be added only when their delivery phases begin. Native and web implementations may use different languages, but they must share a versioned domain and sync specification.
+The provider-neutral contract currently lives in `GlassleafDomain` and [docs/SYNC_PROTOCOL.md](./docs/SYNC_PROTOCOL.md). A separately consumable sync-spec package and the planned web app can be added when a non-Swift client begins. Native and web implementations may use different languages, but they must share the versioned record and migration semantics.
 
 ## Next delivery phases
 
-1. Harden portable restore, migration safety, durable imports, accessibility, malformed-EPUB handling, and real-device behavior.
+1. Finish the remaining accessibility, malformed-EPUB corpus, and real-device reliability validation around the shipped portable restore and durable import queue.
 2. Finish the remaining series, nested smart-rule, tag-color, and manual organizer-ordering work.
-3. Define and chaos-test the provider-neutral manifest, revisions, offline outbox, tombstones, conflicts, and migration protocol.
-4. Add iCloud as the first direct provider and prove the contract with multi-device tests.
-5. Add PDF and comic foundations, then MOBI, DRM-free AZW3, FB2, and DjVu behind the publication boundary.
-6. Add Google Drive only after iCloud proves provider migration and recovery behavior.
-7. Build managed Glassleaf Sync and the web reader, followed by local-first Android and Windows clients.
+3. Add iCloud as the first direct provider, starting with metadata/organization and proving the shipped sync contract with multi-device tests before enabling assets.
+4. Add PDF and comic foundations, then MOBI, DRM-free AZW3, FB2, and DjVu behind the publication boundary.
+5. Add Google Drive only after iCloud proves provider migration and recovery behavior.
+6. Build managed Glassleaf Sync and the web reader, followed by local-first Android and Windows clients.
 
 ## Development prerequisites
 

@@ -18,7 +18,7 @@ The working product name is **Glassleaf**. The repository name is `glassleaf`.
 - The local WebKit reader renders imported EPUB XHTML/resources offline with pagination/scrolling, TOC/search, position restore, bookmarks, annotations, and persisted appearance controls.
 - Hierarchical folders, tags, collections, series, smart collections, Inbox, batch organization, recoverable Trash, metadata/custom-cover editing, and portable export are implemented.
 - Formal domain tests, generated-EPUB/SQLite integration checks, macOS and generic iOS Simulator builds, and a 50,000-book indexed-search benchmark pass locally.
-- CloudKit, Google Drive, web, synchronization, migration, and deployment have not started.
+- Provider-neutral synchronization has started: versioned opaque records, revisions, append-only reading events, an offline outbox, tombstones, recoverable conflicts, deterministic provider tests, a durable SQLite journal, and gated provider migration are implemented. CloudKit, Google Drive, web, and remote deployment have not started.
 
 ## Product vision
 
