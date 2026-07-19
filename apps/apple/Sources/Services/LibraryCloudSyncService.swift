@@ -54,6 +54,24 @@ actor LibraryCloudSyncService {
         snapshot localSnapshot: LibrarySnapshot,
         readerPreferences: ReaderPreferences
     ) async throws -> CloudSyncResult {
+        if localSnapshot.isEmptyForCloudBootstrap {
+            let journal = try await repository.loadSyncJournal()
+            if journal.records.isEmpty, journal.outbox.isEmpty {
+                let bootstrapSummary = try await coordinator.synchronize()
+                let remoteJournal = try await repository.loadSyncJournal()
+                if !remoteJournal.records.isEmpty {
+                    let remote = try materialize(journal: remoteJournal, preservingAssetsFrom: localSnapshot)
+                    try await repository.save(remote.snapshot)
+                    return CloudSyncResult(
+                        snapshot: remote.snapshot,
+                        readerPreferences: remote.readerPreferences,
+                        summary: bootstrapSummary,
+                        syncedAt: .now
+                    )
+                }
+            }
+        }
+
         try await stageLocalChanges(snapshot: localSnapshot, readerPreferences: readerPreferences)
         let summary = try await coordinator.synchronize()
         let journal = try await repository.loadSyncJournal()
@@ -114,6 +132,11 @@ actor LibraryCloudSyncService {
         journal: SyncJournal
     ) throws -> [SyncRecord] {
         var records: [SyncRecord] = []
+        let existingEvents: [ReadingPositionEvent] = journal.records
+            .lazy
+            .filter { $0.id.kind == .readingEvent && !$0.isTombstone }
+            .compactMap { try? decoder.decode(ReadingPositionEvent.self, from: $0.payload) }
+        let eventsByBook = Dictionary(grouping: existingEvents, by: \.bookID)
         records.append(try payloadRecord(
             kind: .library,
             id: libraryID,
@@ -133,11 +156,10 @@ actor LibraryCloudSyncService {
                 ))
             }
 
-            let existingEvents = journal.records
-                .filter { $0.id.kind == .readingEvent && !$0.isTombstone }
-                .compactMap { try? decoder.decode(ReadingPositionEvent.self, from: $0.payload) }
-                .filter { $0.bookID == book.id }
-            let resolved = ReadingPositionEvent.resolvedProgress(for: book.id, from: existingEvents)
+            let resolved = ReadingPositionEvent.resolvedProgress(
+                for: book.id,
+                from: eventsByBook[book.id, default: []]
+            )
             if resolved != localProgress {
                 let event = ReadingPositionEvent(
                     bookID: book.id,
@@ -225,6 +247,19 @@ actor LibraryCloudSyncService {
 
     private func nextRevision(after revision: SyncRevision) -> SyncRevision {
         SyncRevision(generation: revision.generation + 1, deviceID: deviceID)
+    }
+}
+
+private extension LibrarySnapshot {
+    var isEmptyForCloudBootstrap: Bool {
+        books.isEmpty
+            && folders.isEmpty
+            && tags.isEmpty
+            && collections.isEmpty
+            && series.isEmpty
+            && smartCollections.isEmpty
+            && bookmarks.isEmpty
+            && annotations.isEmpty
     }
 }
 
