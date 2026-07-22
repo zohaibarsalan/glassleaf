@@ -80,8 +80,8 @@
 		C51BAA4C17D7B1715A69D06C /* EPUBParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBParser.swift; sourceTree = "<group>"; };
 		C9E0572DB334A4316351219C /* PublicationSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicationSearchService.swift; sourceTree = "<group>"; };
 		CE5EC26536A5A23D016B9EE0 /* CloudKitRecordCodecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRecordCodecTests.swift; sourceTree = "<group>"; };
-		CF3D331842071606C4343085 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CECED367D1F5FBB68C89C2C5 /* LocalBookImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalBookImporter.swift; sourceTree = "<group>"; };
+		CF3D331842071606C4343085 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D0C2D2D6D7D31C1D56659DE0 /* GlassleafTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlassleafTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0FA25F89C1E084F9140BA6D /* ZIPArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPArchive.swift; sourceTree = "<group>"; };
 		D4353F25B9511ACB2A6A8144 /* Glassleaf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glassleaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
