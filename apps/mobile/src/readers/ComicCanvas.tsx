@@ -13,11 +13,13 @@ export function ComicCanvas({
   uris,
   zoom,
   onTap,
+  onTurn,
   onError,
 }: {
   uris: string[];
   zoom: number;
   onTap: () => void;
+  onTurn: (direction: number) => void;
   onError: () => void;
 }) {
   const { width, height } = useWindowDimensions();
@@ -62,6 +64,15 @@ export function ComicCanvas({
         Math.max(baseY.value + event.translationY, -limitY),
         limitY,
       );
+    })
+    .onEnd((event) => {
+      if (
+        scale.value <= 1 &&
+        Math.abs(event.translationX) > 60 &&
+        Math.abs(event.translationX) > Math.abs(event.translationY) * 1.3
+      ) {
+        runOnJS(onTurn)(event.translationX < 0 ? 1 : -1);
+      }
     });
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)

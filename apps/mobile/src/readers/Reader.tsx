@@ -159,7 +159,7 @@ export function Reader({
     <SafeAreaView
       style={{
         flex: 1,
-        backgroundColor: book.format === "epub" ? c.bg : "#171D1A",
+        backgroundColor: c.bg,
       }}
       edges={["top", "bottom"]}
     >
@@ -267,6 +267,14 @@ export function Reader({
             )}
             zoom={zoom}
             onTap={() => setControls((v) => !v)}
+            onTurn={(swipe) => {
+              const delta = rightToLeft ? -swipe : swipe;
+              const step =
+                book.layout === "spread" && (delta > 0 ? page > 0 : page > 1)
+                  ? 2
+                  : 1;
+              turn(delta * step);
+            }}
             onError={() =>
               setError(
                 "This page image could not be decoded. You can continue to another page.",
@@ -304,7 +312,7 @@ export function Reader({
           >
             <IconButton
               icon={previousIcon}
-              label={book.format === "epub" ? "Previous page" : "Previous page"}
+              label="Previous page"
               onPress={() =>
                 book.format === "epub"
                   ? setCommand({ id: Date.now(), delta: -1 })
