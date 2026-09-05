@@ -1,0 +1,9 @@
+{
+  "name": "glassleaf", "private": true, "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "mobile": "pnpm --filter @glassleaf/mobile start",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @glassleaf/library test",
+    "mcp": "pnpm --filter @glassleaf/mcp start"
+  }
+}

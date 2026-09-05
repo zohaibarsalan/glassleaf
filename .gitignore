@@ -20,3 +20,12 @@ Package.resolved
 .env
 .env.*
 !.env.example
+
+# React Native and tooling
+node_modules/
+.expo/
+dist/
+apps/mobile/ios/
+apps/mobile/android/
+*.tsbuildinfo
+.playwright/
