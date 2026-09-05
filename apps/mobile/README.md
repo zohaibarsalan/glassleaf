@@ -22,7 +22,7 @@ After installation, `pnpm mobile` starts Metro. Settings → Sample library impo
 - Offline EPUB, PDF, and CBZ import, duplicate detection, preserved originals, archive traversal/size checks.
 - EPUB pagination/scrolling, chapter navigation, text sizing, saved position; native PDF rendering/zoom; comic pages, cover-aware spreads, scrolling, RTL order, pinch/pan and double-tap zoom.
 - Bookmarks and notes, reading states, favorites, recoverable trash, title/author/series metadata, story types independent of file format, overlapping tags and collections.
-- Indexed SQLite search, bounded 60-book pages, recycled lists, cached covers, three themes, phone/tablet layouts.
+- Indexed SQLite search, bounded 60-book pages, recycled lists, cached covers, four built-in themes, phone/tablet layouts.
 - Optional Google Drive integration for originals, metadata, notes, and reading progress, with an offline outbox and deterministic record merging.
 - External MCP organization through exported snapshots and reviewable, atomic, revision-checked plans with undo.
 
@@ -74,3 +74,13 @@ Tests cover atomic plans and undo, stale changes, remote replay/outbox acknowled
 This branch starts a new mobile implementation; it does not automatically migrate the Swift app's database. The Swift source remains in `apps/apple`. Full Swift feature parity is unfinished: CBR/RAR, DRM, Japanese vertical typesetting, publisher navigation/styles fidelity, full-book text search, highlight rendering, nested/smart collections, complete-library backup/restore, durable background import, and a conflict recovery UI are not implemented. Physical-device performance/accessibility and signed two-device Drive sync still need validation.
 
 For personal Android installation, build `assembleRelease` from the generated Android project (with `-PreactNativeArchitectures=arm64-v8a` for an ARM64 phone). The generated project's release signing currently uses the development key: suitable for personal evaluation, not store publication. iPhone installation uses Xcode signing on your own device; a simulator build cannot be installed on a phone.
+
+## Theme studio and organization (September 6 refinement)
+
+Settings → Appearance offers Paper, Midnight, Forest, and Tokyo Night. Select a starting palette, choose Create theme, edit its name/colors, then Save and apply. Custom themes are stored on the device and survive relaunch. Import/export uses the versioned JSON examples in `themes/`. Unknown fields, malformed colors, and insufficient text contrast are rejected. Custom themes can be edited or removed; removing the current one returns to Paper. Theme sync between devices is not yet implemented.
+
+Library → Filters & sort combines file format, story type, reading state, favorite status, collection, tag, and sorting. Active filter chips can be removed individually. Library → Select books → Organize selected adds tags/collections to multiple books without removing existing values, and can change their story type. The transaction checks every revision; Settings → Undo last organization batch reverses it when no intervening edits exist. The Organize tab browses collections and tags.
+
+`flows/` contains a small set of Maestro native journeys for appearance, custom theme persistence, bulk organization/filtering, and comic navigation. These run on an installed development app seeded with the original sample library. They intentionally modify sample metadata and reading positions. Do not run them against a personal library.
+
+The dated screenshot journal is in `docs/ui-gallery`. Run `python3 scripts/build-ui-gallery.py` to rebuild its index, and `python3 -m http.server 8787 --directory docs/ui-gallery` from the repository root to view it. Preserve older dated captures instead of replacing them.

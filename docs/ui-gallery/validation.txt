@@ -1,0 +1,28 @@
+Glassleaf iPhone gallery — September 6, 2026
+
+Screenshots are native captures from iPhone 17 Pro Max / iOS 26.5 Simulator.
+Books shown are original generated fixtures. The gallery preserves the previous
+iteration under 2026-09-06-before and the new iteration under 2026-09-06-refined.
+
+Confirmed with Maestro native UI actions:
+- Paper, Midnight and Tokyo Night theme switching, Settings and library rendering.
+- Tokyo Night EPUB chapter rendering.
+- Filtered result count changes to one matching story.
+- Filter sheet opens and exposes sort, format, collections, tags and status.
+- Two selected books receive a tag and collection. Combining the collection
+  with CBZ format includes the comic and excludes the EPUB.
+- Custom theme creation, persistence after restart, and removal were exercised.
+- CBZ page jump, next page, RTL swipe, cover-aware spreads, zoom control, scroll.
+
+Confirmed in code checks:
+- Four palette import/export round trips; unreadable and malformed colors rejected.
+- All tested text/background pairs in built-in palettes reach 4.5:1 contrast.
+- Strict TypeScript, existing focused catalog/MCP checks, Android release build.
+
+Not yet claimed: physical phone frame times, Android gesture/accessibility coverage,
+pinch gesture automation, CBR/RAR support, or complex third-party comic archives.
+Two-page screenshots preserve the original fixture art without recoloring it.
+
+The gallery is a screenshot journal, not the React Native app running in a browser.
+Its layout and theme filters were checked at a 430px phone viewport, with no
+horizontal overflow. The gallery shell follows the phone's light/dark setting.
