@@ -1,6 +1,21 @@
 {
-  "name": "@glassleaf/mcp", "version": "0.1.0", "private": true, "type": "module",
-  "scripts": { "start": "tsx src/index.ts", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@glassleaf/library": "workspace:*", "@modelcontextprotocol/sdk": "^1.17.0", "zod": "^4.0.0" },
-  "devDependencies": { "tsx": "^4.20.0", "typescript": "~6.0.3", "@types/node": "^24.0.0" }
+  "name": "@glassleaf/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx src/check.ts"
+  },
+  "dependencies": {
+    "@glassleaf/library": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "~6.0.3",
+    "@types/node": "^24.0.0"
+  }
 }

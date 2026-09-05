@@ -1,5 +1,11 @@
 # Glassleaf
 
+The active cross-platform app is now **React Native for iOS and Android**, in [`apps/mobile`](apps/mobile/README.md). It includes EPUB/PDF/CBZ readers, a themed library, Google Drive integration awaiting OAuth setup, and an external MCP organization workflow. See the mobile README for setup, validation, and remaining scope.
+
+The sections below describe the earlier Swift application, preserved in `apps/apple`; they are not a feature-parity claim for the React Native app.
+
+## Legacy Apple implementation
+
 <p align="center">
   <strong>A fast, local-first reading library for Apple platforms.</strong><br>
   Apple Books simplicity, deeper organization, user-controlled storage, and no required bookstore.
@@ -125,9 +131,9 @@ Near-term priorities are:
 
 1. Finish accessibility, malformed-EPUB, and real-device reliability validation.
 2. Complete remaining organizer polish and manual ordering workflows.
-3. Pass the signed iCloud multi-device, interruption, quota, account-switch, and stale-client matrix.
+3. Implement and validate Google Drive sync using the user's storage, without waiting for Apple Developer Program membership.
 4. Add PDF and comic foundations, followed by MOBI, DRM-free AZW3, FB2, and DjVu.
-5. Add Google Drive after iCloud proves migration and recovery behavior.
+5. Complete signed iCloud multi-device, interruption, quota, account-switch, and stale-client validation when developer provisioning is available.
 6. Build the optional managed sync service and web reader, followed by Android and Windows clients.
 
 Roadmap items are commitments of direction, not claims about the current build.
