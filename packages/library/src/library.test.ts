@@ -155,6 +155,7 @@ test("10,000-book indexed paging and FTS search return bounded, stable results",
     db.exec("BEGIN");
     for (let i = 0; i < 10000; i++) {
       const record = book(String(i).padStart(5, "0"));
+      if (i === 9999) record.format = "pdf";
       insert.run(record.id, JSON.stringify(record));
     }
     db.exec("COMMIT");
@@ -166,6 +167,14 @@ test("10,000-book indexed paging and FTS search return bounded, stable results",
     assert.equal(second.length, 60);
     assert.equal(new Set([...first, ...second].map((b) => b.id)).size, 120);
     assert.equal(result[0]?.id, "09999");
+    assert.equal(
+      (await repo.list({ kind: "manga", format: "pdf" }))[0]?.id,
+      "09999",
+    );
+    assert.equal(
+      (await repo.list({ search: "Book 09999", format: "cbz" })).length,
+      0,
+    );
     assert.equal((await repo.stats()).total, 10000);
     console.log(
       `10k library: two pages + FTS + counts in ${(performance.now() - start).toFixed(1)} ms (host SQLite; not a device UI benchmark)`,

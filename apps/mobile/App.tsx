@@ -800,6 +800,11 @@ function LibraryApp({
               wide={wide}
               stats={stats}
               onCollection={selectCollection}
+              onOrganize={() => {
+                setTab("library");
+                setSelecting(true);
+                setSelection(new Map());
+              }}
               onTag={(tag) => {
                 setQuery({ tag });
                 setTab("library");

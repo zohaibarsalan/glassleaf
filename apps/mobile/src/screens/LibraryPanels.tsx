@@ -19,31 +19,40 @@ export function CollectionsPanel({
   stats,
   onCollection,
   onTag,
+  onOrganize,
 }: {
   wide: boolean;
   stats: Stats;
   onCollection: (name: string) => void;
   onTag: (tag: string) => void;
+  onOrganize: () => void;
 }) {
   const c = usePalette();
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         paddingHorizontal: wide ? 40 : 20,
         paddingBottom: 30,
         gap: 14,
       }}
     >
-      <Box padding="l" backgroundColor="accentSoft" borderRadius="l" gap="s">
-        <Layers size={26} color={c.accent} />
-        <Text variant="heading">Build your shelves</Text>
-        <Text color="secondary">
-          Select books in your library to add tags and collections in bulk. A
-          book can belong to several collections, regardless of its file format.
+      <Box gap="m" marginBottom="m">
+        <Text variant="caption">
+          Group books across formats. Tags and collections can overlap.
         </Text>
+        <Button secondary icon={Layers} onPress={onOrganize}>
+          Tag or collect books
+        </Button>
       </Box>
-      {stats.collections.map((name, index) => (
-        <Pressable key={name} onPress={() => onCollection(name)}>
+      <Text variant="eyebrow">COLLECTIONS</Text>
+      {stats.collections.map((name) => (
+        <Pressable
+          key={name}
+          accessibilityRole="button"
+          accessibilityLabel={name}
+          onPress={() => onCollection(name)}
+        >
           <Box
             padding="l"
             backgroundColor="surface"
@@ -52,10 +61,8 @@ export function CollectionsPanel({
             gap="l"
             alignItems="center"
           >
-            <Text variant="title" color="secondary">
-              {String(index + 1).padStart(2, "0")}
-            </Text>
-            <Text variant="heading" flex={1}>
+            <Layers size={22} color={c.secondary} />
+            <Text variant="label" fontSize={16} flex={1}>
               {name}
             </Text>
             <ChevronRight size={20} color={c.secondary} />
@@ -96,6 +103,7 @@ export function NotesPanel({
   const c = usePalette();
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         paddingHorizontal: wide ? 40 : 20,
         gap: 20,
@@ -172,6 +180,7 @@ export function SettingsPanel({
 }) {
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         paddingHorizontal: wide ? 40 : 20,
         gap: 28,
