@@ -30,11 +30,10 @@
       "expo-sqlite",
       "expo-sharing",
       "expo-image",
-      "expo-web-browser",
-      "expo-secure-store",
       "expo-font",
       "@config-plugins/react-native-blob-util",
-      "@config-plugins/react-native-pdf"
+      "@config-plugins/react-native-pdf",
+      "expo-asset"
     ],
     "scheme": "glassleaf"
   }
