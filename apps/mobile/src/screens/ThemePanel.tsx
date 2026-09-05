@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { randomUUID } from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
@@ -36,7 +37,13 @@ export function ThemePanel({
     try {
       await work();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Theme could not be saved.");
+      setError(
+        e instanceof ZodError
+          ? (e.issues[0]?.message ?? "This theme file is invalid.")
+          : e instanceof Error
+            ? e.message
+            : "Theme could not be saved.",
+      );
     } finally {
       setBusy(false);
     }

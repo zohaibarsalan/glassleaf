@@ -242,6 +242,7 @@ export function Sheet({
             width: "100%",
             maxWidth: 560,
             maxHeight: "90%",
+            flexShrink: 1,
             backgroundColor: c.bg,
             borderRadius: 24,
             paddingBottom: width > 700 ? 20 : 34,
@@ -254,6 +255,7 @@ export function Sheet({
             <IconButton icon={X} label="Close" onPress={onClose} />
           </Box>
           <ScrollView
+            style={{ flexGrow: 0, flexShrink: 1, minHeight: 0 }}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{
               paddingHorizontal: 20,

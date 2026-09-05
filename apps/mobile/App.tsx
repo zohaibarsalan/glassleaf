@@ -181,6 +181,10 @@ export default function App() {
                       ...customThemes.filter((t) => t.id !== definition.id),
                       definition,
                     ];
+                    if (next.length > 100)
+                      throw new Error(
+                        "Remove a custom theme before adding another; the limit is 100.",
+                      );
                     await repo.setSetting(
                       "custom-themes",
                       JSON.stringify(next),
@@ -410,6 +414,16 @@ function LibraryApp({
   };
   const contentWidth = width - (wide ? 244 : 0) - (wide ? 72 : 40);
   const columns = Math.max(2, Math.min(6, Math.floor(contentWidth / 145)));
+  const hasFilters = !!(
+    query.search?.trim() ||
+    query.kind ||
+    query.format ||
+    query.tag ||
+    query.collection ||
+    query.status ||
+    query.favorite ||
+    query.trash
+  );
   const title = query.trash
     ? "Trash"
     : (query.collection ??
@@ -554,7 +568,9 @@ function LibraryApp({
                 </Text>
                 <Text variant="caption" marginTop="s">
                   {tab === "library"
-                    ? `${stats.total} ${stats.total === 1 ? "story" : "stories"} · ${stats.reading} in progress`
+                    ? hasFilters
+                      ? `${books.length}${more ? "+" : ""} matching ${books.length === 1 ? "story" : "stories"}`
+                      : `${stats.total} ${stats.total === 1 ? "story" : "stories"} · ${stats.reading} in progress`
                     : tab === "collections"
                       ? "Collections, tags, and story types."
                       : tab === "notes"
@@ -975,26 +991,46 @@ function LibraryApp({
         />
       )}
       {sortSheet && (
-        <Sheet title="Filters & sort" onClose={() => setSortSheet(false)}>
+        <Sheet
+          title="Filters & sort"
+          onClose={() => setSortSheet(false)}
+          footer={
+            <Box gap="s">
+              <Button onPress={() => setSortSheet(false)}>Show books</Button>
+              <Button
+                secondary
+                onPress={() => {
+                  setQuery({});
+                  setSearch("");
+                  setSortSheet(false);
+                }}
+              >
+                Reset filters
+              </Button>
+            </Box>
+          }
+        >
           <Text variant="eyebrow">SORT BY</Text>
-          {(["added", "title", "author", "series", "progress"] as Sort[]).map(
-            (sort) => (
-              <Chip
-                key={sort}
-                label={
-                  {
-                    added: "Recently added",
-                    title: "Title A–Z",
-                    author: "Author",
-                    series: "Series & volume",
-                    progress: "Reading progress",
-                  }[sort]
-                }
-                active={(query.sort ?? "added") === sort}
-                onPress={() => setQuery((q) => ({ ...q, sort }))}
-              />
-            ),
-          )}
+          <Box flexDirection="row" flexWrap="wrap" gap="s">
+            {(["added", "title", "author", "series", "progress"] as Sort[]).map(
+              (sort) => (
+                <Chip
+                  key={sort}
+                  label={
+                    {
+                      added: "Recently added",
+                      title: "Title A–Z",
+                      author: "Author",
+                      series: "Series & volume",
+                      progress: "Reading progress",
+                    }[sort]
+                  }
+                  active={(query.sort ?? "added") === sort}
+                  onPress={() => setQuery((q) => ({ ...q, sort }))}
+                />
+              ),
+            )}
+          </Box>
           <Text variant="eyebrow">FILE FORMAT</Text>
           <Box flexDirection="row" gap="s">
             {(["epub", "pdf", "cbz"] as const).map((format) => (
@@ -1065,17 +1101,6 @@ function LibraryApp({
               onPress={() => setQuery((q) => ({ ...q, favorite: !q.favorite }))}
             />
           </Box>
-          <Button onPress={() => setSortSheet(false)}>Show books</Button>
-          <Button
-            secondary
-            onPress={() => {
-              setQuery({});
-              setSearch("");
-              setSortSheet(false);
-            }}
-          >
-            Reset filters
-          </Button>
         </Sheet>
       )}
       {plan && (
