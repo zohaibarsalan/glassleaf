@@ -1,9 +1,12 @@
+import { builtinThemes, contrast } from "./themeDefinition";
 import { createBox, createText, createTheme, useTheme } from "@shopify/restyle";
 import type { LucideIcon } from "lucide-react-native";
 import { X } from "lucide-react-native";
 import type { PropsWithChildren, ReactNode } from "react";
 import {
   Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   TextInput,
@@ -12,26 +15,14 @@ import {
   type TextInputProps,
 } from "react-native";
 
-const paper = {
-  bg: "#F8F7F3",
-  surface: "#FFFFFF",
-  muted: "#EDEDE6",
-  line: "#E1E3DA",
-  text: "#202D27",
-  secondary: "#67716A",
-  accent: "#285B43",
-  accentSoft: "#E3EBDF",
-  onAccent: "#FFFFFF",
-  danger: "#A8473E",
-  gold: "#BC8941",
-};
-const base = createTheme({
+const paper = builtinThemes[0]!.colors;
+export const base = createTheme({
   colors: paper,
   spacing: { none: 0, xs: 4, s: 8, m: 12, l: 20, xl: 28, xxl: 40 },
   borderRadii: { s: 8, m: 14, l: 22, pill: 999 },
   textVariants: {
     defaults: { fontFamily: "DM", fontSize: 15, lineHeight: 22, color: "text" },
-    title: { fontFamily: "Lora", fontSize: 34, lineHeight: 43, color: "text" },
+    title: { fontFamily: "Lora", fontSize: 27, lineHeight: 35, color: "text" },
     heading: {
       fontFamily: "DMBold",
       fontSize: 19,
@@ -62,42 +53,13 @@ const base = createTheme({
   breakpoints: { phone: 0, tablet: 700, desktop: 1000 },
 });
 export type Theme = typeof base;
-export type ThemeName = "paper" | "midnight" | "forest";
-export const themes: Record<ThemeName, Theme> = {
-  paper: base,
-  midnight: {
-    ...base,
-    colors: {
-      ...paper,
-      bg: "#171C1B",
-      surface: "#222927",
-      muted: "#2D3631",
-      line: "#374039",
-      text: "#EFEFE6",
-      secondary: "#A8B4A9",
-      accent: "#B8D3A8",
-      accentSoft: "#2E4135",
-      onAccent: "#17251C",
-      danger: "#E8A298",
-    },
-  },
-  forest: {
-    ...base,
-    colors: {
-      ...paper,
-      bg: "#152C25",
-      surface: "#203B30",
-      muted: "#2D493D",
-      line: "#395549",
-      text: "#F1F0DE",
-      secondary: "#B4C4AE",
-      accent: "#D6DDA7",
-      accentSoft: "#354F3F",
-      onAccent: "#1C3526",
-      danger: "#E8A298",
-    },
-  },
-};
+export type ThemeName = string;
+export const themes: Record<string, Theme> = Object.fromEntries(
+  builtinThemes.map((t) => [t.id, { ...base, colors: t.colors }]),
+);
+export const themeNames: Record<string, string> = Object.fromEntries(
+  builtinThemes.map((t) => [t.id, t.name]),
+);
 export const Box = createBox<Theme>();
 export const Text = createText<Theme>();
 export const usePalette = () => useTheme<Theme>().colors;
@@ -216,6 +178,12 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
       <Text variant="label">{label}</Text>
       <TextInput
         accessibilityLabel={label}
+        testID={`field-${label}`}
+        keyboardAppearance={
+          contrast(c.bg, "#FFFFFF") > contrast(c.bg, "#000000")
+            ? "dark"
+            : "light"
+        }
         placeholderTextColor={c.secondary}
         {...props}
         style={[
@@ -253,7 +221,8 @@ export function Sheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{
           flex: 1,
           backgroundColor: "#00000066",
@@ -296,7 +265,7 @@ export function Sheet({
           </ScrollView>
           {footer && <Box paddingHorizontal="l">{footer}</Box>}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

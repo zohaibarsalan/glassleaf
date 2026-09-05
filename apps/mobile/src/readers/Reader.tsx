@@ -132,6 +132,8 @@ export function Reader({
   ) {
     try {
       setBook(await repo.update(book.id, patch));
+      if (patch.layout === "spread")
+        setPage((p) => (p > 0 ? 1 + Math.floor((p - 1) / 2) * 2 : 0));
     } catch (e) {
       setError(String(e));
     }

@@ -1,6 +1,12 @@
 import type { Book } from "@glassleaf/library";
 import { Image } from "expo-image";
-import { Heart, Leaf, Library, MoreHorizontal } from "lucide-react-native";
+import {
+  Check,
+  Heart,
+  Leaf,
+  Library,
+  MoreHorizontal,
+} from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { fileURI } from "../data/files";
 import { Box, Text, usePalette } from "./theme";
@@ -8,8 +14,8 @@ export function Brand() {
   const c = usePalette();
   return (
     <Box flexDirection="row" alignItems="center" gap="s">
-      <Leaf color={c.accent} size={26} strokeWidth={1.6} />
-      <Text fontFamily="DMBold" fontSize={21} letterSpacing={-0.6}>
+      <Leaf color={c.accent} size={22} strokeWidth={1.6} />
+      <Text fontFamily="DMBold" fontSize={18} letterSpacing={-0.4}>
         glassleaf
       </Text>
     </Box>
@@ -65,11 +71,13 @@ export function BookTile({
   list,
   onOpen,
   onMenu,
+  selected,
 }: {
   book: Book;
   list: boolean;
   onOpen: () => void;
   onMenu: () => void;
+  selected?: boolean;
 }) {
   const c = usePalette();
   return (
@@ -78,7 +86,8 @@ export function BookTile({
         onPress={onOpen}
         onLongPress={onMenu}
         accessibilityRole="button"
-        accessibilityLabel={`Read ${book.title}, ${book.author}`}
+        accessibilityLabel={`${selected !== undefined ? "Select" : "Read"} ${book.title}, ${book.author}`}
+        accessibilityState={{ selected }}
         style={{
           flexDirection: list ? "row" : "column",
           gap: list ? 16 : 0,
@@ -124,6 +133,25 @@ export function BookTile({
               </Text>
             </Box>
           )}
+          {selected !== undefined && (
+            <View
+              style={{
+                position: "absolute",
+                top: 8,
+                left: 8,
+                width: 26,
+                height: 26,
+                borderRadius: 13,
+                backgroundColor: selected ? c.accent : c.surface,
+                borderWidth: 1,
+                borderColor: c.line,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {selected && <Check size={16} color={c.onAccent} />}
+            </View>
+          )}
           {book.favorite && (
             <Box
               position="absolute"
@@ -158,7 +186,7 @@ export function BookTile({
           </Text>
           <Box flexDirection="row" alignItems="center" marginTop="xs">
             <Text variant="eyebrow" flex={1} fontSize={9} letterSpacing={0.8}>
-              {book.format}{" "}
+              {book.format.toUpperCase()}{" "}
               {book.progress > 0
                 ? ` · ${Math.round(book.progress * 100)}%`
                 : ""}

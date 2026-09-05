@@ -2,7 +2,6 @@ import type { Book, LibraryRepository, Stats } from "@glassleaf/library";
 import {
   Bookmark,
   BookOpen,
-  Check,
   ChevronRight,
   Download,
   Layers,
@@ -11,17 +10,10 @@ import {
   Undo2,
   Upload,
 } from "lucide-react-native";
-import { Pressable, ScrollView, View } from "react-native";
+import type { ReactNode } from "react";
+import { Pressable, ScrollView } from "react-native";
 import { DriveSettings } from "../sync/DriveSettings";
-import {
-  Box,
-  Button,
-  Chip,
-  Text,
-  themes,
-  usePalette,
-  type ThemeName,
-} from "../ui/theme";
+import { Box, Button, Chip, Text, usePalette } from "../ui/theme";
 export function CollectionsPanel({
   wide,
   stats,
@@ -44,10 +36,10 @@ export function CollectionsPanel({
     >
       <Box padding="l" backgroundColor="accentSoft" borderRadius="l" gap="s">
         <Layers size={26} color={c.accent} />
-        <Text variant="heading">Stories don’t fit in one box.</Text>
+        <Text variant="heading">Build your shelves</Text>
         <Text color="secondary">
-          Connect a manga to its light novel. Build a reading list across
-          formats. Add collection names from any book’s edit menu.
+          Select books in your library to add tags and collections in bulk. A
+          book can belong to several collections, regardless of its file format.
         </Text>
       </Box>
       {stats.collections.map((name, index) => (
@@ -159,8 +151,7 @@ export function NotesPanel({
 }
 export function SettingsPanel({
   wide,
-  theme,
-  changeTheme,
+  appearance,
   repo,
   onSynced,
   onExport,
@@ -170,8 +161,7 @@ export function SettingsPanel({
   onTrash,
 }: {
   wide: boolean;
-  theme: ThemeName;
-  changeTheme: (theme: ThemeName) => void;
+  appearance: ReactNode;
   repo: LibraryRepository;
   onSynced: () => void;
   onExport: () => void;
@@ -180,7 +170,6 @@ export function SettingsPanel({
   onSamples: () => void;
   onTrash: () => void;
 }) {
-  const c = usePalette();
   return (
     <ScrollView
       contentContainerStyle={{
@@ -189,64 +178,7 @@ export function SettingsPanel({
         paddingBottom: 36,
       }}
     >
-      <Box gap="m">
-        <Text variant="eyebrow">APPEARANCE</Text>
-        <Box flexDirection="row" gap="m">
-          {(["paper", "midnight", "forest"] as const).map((name) => (
-            <Pressable
-              key={name}
-              accessibilityRole="button"
-              accessibilityLabel={`${name} theme`}
-              accessibilityState={{ selected: theme === name }}
-              onPress={() => changeTheme(name)}
-              style={{ flex: 1 }}
-            >
-              <View
-                style={{
-                  height: 82,
-                  borderRadius: 16,
-                  padding: 14,
-                  backgroundColor: themes[name].colors.bg,
-                  borderWidth: theme === name ? 2 : 1,
-                  borderColor: theme === name ? c.accent : c.line,
-                }}
-              >
-                <View
-                  style={{
-                    height: 9,
-                    width: 32,
-                    borderRadius: 3,
-                    backgroundColor: themes[name].colors.accent,
-                    marginBottom: 9,
-                  }}
-                />
-                <View
-                  style={{
-                    height: 4,
-                    width: "70%",
-                    backgroundColor: themes[name].colors.secondary,
-                    opacity: 0.5,
-                  }}
-                />
-                {theme === name && (
-                  <Check
-                    size={18}
-                    color={themes[name].colors.accent}
-                    style={{
-                      position: "absolute",
-                      bottom: 12,
-                      right: 12,
-                    }}
-                  />
-                )}
-              </View>
-              <Text variant="label" textAlign="center" marginTop="s">
-                {name.charAt(0).toUpperCase() + name.slice(1)}
-              </Text>
-            </Pressable>
-          ))}
-        </Box>
-      </Box>
+      {appearance}
       <DriveSettings repo={repo} onSynced={onSynced} />
       <Box gap="m">
         <Text variant="eyebrow">AGENT ORGANIZATION</Text>

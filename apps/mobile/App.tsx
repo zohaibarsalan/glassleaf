@@ -1,5 +1,3 @@
-import { AppState } from "react-native";
-import { syncDrive } from "./src/sync/drive";
 import {
   DMSans_400Regular,
   DMSans_500Medium,
@@ -41,9 +39,11 @@ import {
   Trash2,
   X,
 } from "lucide-react-native";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   Pressable,
   ScrollView,
@@ -58,29 +58,38 @@ import { importBook, readExternal, writeExport } from "./src/data/files";
 import { loadSamples } from "./src/data/samples";
 import { Reader } from "./src/readers/Reader";
 import { BookEditor } from "./src/screens/BookEditor";
+import { BulkOrganize } from "./src/screens/BulkOrganize";
 import {
   CollectionsPanel,
   NotesPanel,
   SettingsPanel,
 } from "./src/screens/LibraryPanels";
 import { PlanReview } from "./src/screens/PlanReview";
+import { ThemePanel } from "./src/screens/ThemePanel";
+import { syncDrive } from "./src/sync/drive";
 import { BookTile, Brand, NavRow } from "./src/ui/LibraryComponents";
 import {
+  base,
   Box,
   Button,
   Chip,
   IconButton,
   Sheet,
   Text,
+  themeNames,
   themes,
   usePalette,
   type ThemeName,
 } from "./src/ui/theme";
+import {
+  themeDefinitionSchema,
+  type ThemeDefinition,
+} from "./src/ui/themeDefinition";
 
 type Tab = "library" | "collections" | "notes" | "settings";
 const tabs = [
   { id: "library", title: "Library", icon: Library },
-  { id: "collections", title: "Collections", icon: Layers },
+  { id: "collections", title: "Organize", icon: Layers },
   { id: "notes", title: "Notes", icon: NotebookPen },
   { id: "settings", title: "Settings", icon: Settings },
 ] as const;
@@ -97,6 +106,19 @@ export default function App() {
   const [repo, setRepo] = useState<LibraryRepository>();
   const [error, setError] = useState("");
   const [theme, setTheme] = useState<ThemeName>("paper");
+  const [customThemes, setCustomThemes] = useState<ThemeDefinition[]>([]);
+  const definitions: ThemeDefinition[] = [
+    ...Object.entries(themes).map(([id, t]) => ({
+      version: 1 as const,
+      id,
+      name: themeNames[id] ?? id,
+      mode: id === "paper" ? ("light" as const) : ("dark" as const),
+      colors: t.colors,
+    })),
+    ...customThemes,
+  ];
+  const activeTheme =
+    definitions.find((t) => t.id === theme) ?? definitions[0]!;
   const [fonts, fontError] = useFonts({
     DM: DMSans_400Regular,
     DMMedium: DMSans_500Medium,
@@ -107,7 +129,17 @@ export default function App() {
     void openLibrary()
       .then(async (r) => {
         const value = await r.setting("theme");
-        if (value && value in themes) setTheme(value as ThemeName);
+        if (value) setTheme(value);
+        const saved = await r.setting("custom-themes");
+        if (saved) {
+          try {
+            setCustomThemes(
+              themeDefinitionSchema.array().max(100).parse(JSON.parse(saved)),
+            );
+          } catch {
+            /* Invalid preferences must not prevent opening books. */
+          }
+        }
         if (__DEV__ && process.env.EXPO_PUBLIC_SAMPLE_LIBRARY === "1")
           await loadSamples(r);
         setRepo(r);
@@ -121,8 +153,8 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider theme={themes[theme]}>
-          <StatusBar style={theme === "paper" ? "dark" : "light"} />
+        <ThemeProvider theme={{ ...base, colors: activeTheme.colors }}>
+          <StatusBar style={activeTheme.mode === "light" ? "dark" : "light"} />
           {error ? (
             <Box
               flex={1}
@@ -137,7 +169,37 @@ export default function App() {
               <Text>{error}</Text>
             </Box>
           ) : repo && (fonts || fontError) ? (
-            <LibraryApp repo={repo} theme={theme} changeTheme={changeTheme} />
+            <LibraryApp
+              repo={repo}
+              appearance={
+                <ThemePanel
+                  definitions={definitions}
+                  selected={activeTheme.id}
+                  onSelect={changeTheme}
+                  onSave={async (definition) => {
+                    const next = [
+                      ...customThemes.filter((t) => t.id !== definition.id),
+                      definition,
+                    ];
+                    await repo.setSetting(
+                      "custom-themes",
+                      JSON.stringify(next),
+                    );
+                    setCustomThemes(next);
+                    changeTheme(definition.id);
+                  }}
+                  onRemove={async (id) => {
+                    const next = customThemes.filter((t) => t.id !== id);
+                    await repo.setSetting(
+                      "custom-themes",
+                      JSON.stringify(next),
+                    );
+                    setCustomThemes(next);
+                    if (theme === id) changeTheme("paper");
+                  }}
+                />
+              }
+            />
           ) : (
             <Box
               flex={1}
@@ -155,12 +217,10 @@ export default function App() {
 }
 function LibraryApp({
   repo,
-  theme,
-  changeTheme,
+  appearance,
 }: {
   repo: LibraryRepository;
-  theme: ThemeName;
-  changeTheme: (t: ThemeName) => void;
+  appearance: ReactNode;
 }) {
   const c = usePalette();
   const { width } = useWindowDimensions();
@@ -180,6 +240,17 @@ function LibraryApp({
   const [editor, setEditor] = useState<Book>();
   const [menu, setMenu] = useState<Book>();
   const [sortSheet, setSortSheet] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selection, setSelection] = useState<Map<string, Book>>(new Map());
+  const [bulk, setBulk] = useState(false);
+  function toggleBook(book: Book) {
+    setSelection((current) => {
+      const next = new Map(current);
+      if (next.has(book.id)) next.delete(book.id);
+      else next.set(book.id, book);
+      return next;
+    });
+  }
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [plan, setPlan] = useState<OrganizationPlan>();
@@ -448,14 +519,14 @@ function LibraryApp({
           <Box
             paddingHorizontal={wide ? "xxl" : "l"}
             paddingTop={wide ? "xl" : "m"}
-            paddingBottom="l"
+            paddingBottom="m"
           >
             {!wide && (
               <Box
                 flexDirection="row"
                 justifyContent="space-between"
                 alignItems="center"
-                marginBottom="xl"
+                marginBottom="s"
               >
                 <Brand />
                 <IconButton
@@ -472,28 +543,23 @@ function LibraryApp({
               gap="m"
             >
               <Box flex={1}>
-                <Text variant="eyebrow" marginBottom="s">
-                  {tab === "library"
-                    ? "ALL YOUR WORLDS, TOGETHER"
-                    : "MAKE ROOM FOR WHAT YOU LOVE"}
-                </Text>
-                <Text variant="title">
+                <Text variant="heading" fontSize={24} lineHeight={32}>
                   {tab === "library"
                     ? title
                     : tab === "collections"
-                      ? "Made for your mind"
+                      ? "Organize"
                       : tab === "notes"
-                        ? "Between the lines"
-                        : "Make it yours"}
+                        ? "Notes & bookmarks"
+                        : "Settings"}
                 </Text>
                 <Text variant="caption" marginTop="s">
                   {tab === "library"
                     ? `${stats.total} ${stats.total === 1 ? "story" : "stories"} · ${stats.reading} in progress`
                     : tab === "collections"
-                      ? "Different shelves. Endless connections."
+                      ? "Collections, tags, and story types."
                       : tab === "notes"
                         ? "The thoughts and pages you want to keep."
-                        : "Your library, your way."}
+                        : "Appearance, sync, and library tools."}
                 </Text>
               </Box>
               {wide && tab === "library" && (
@@ -507,7 +573,7 @@ function LibraryApp({
             <>
               <Box
                 paddingHorizontal={wide ? "xxl" : "l"}
-                gap="l"
+                gap="m"
                 paddingBottom="l"
               >
                 <Box flexDirection="row" alignItems="center" gap="s">
@@ -544,12 +610,6 @@ function LibraryApp({
                     )}
                   </Box>
                   <IconButton
-                    icon={SlidersHorizontal}
-                    label="Sort and filter"
-                    active={!!query.status || !!query.favorite || !!query.trash}
-                    onPress={() => setSortSheet(true)}
-                  />
-                  <IconButton
                     icon={layout === "grid" ? List : LayoutGrid}
                     label={layout === "grid" ? "List view" : "Grid view"}
                     onPress={() =>
@@ -557,6 +617,71 @@ function LibraryApp({
                     }
                   />
                 </Box>
+                <Box flexDirection="row" gap="s" alignItems="center">
+                  <Box flex={1}>
+                    <Button
+                      secondary
+                      icon={SlidersHorizontal}
+                      onPress={() => setSortSheet(true)}
+                    >
+                      Filters & sort
+                    </Button>
+                  </Box>
+                  <Box flex={1}>
+                    <Button
+                      secondary
+                      onPress={() => {
+                        setSelecting((v) => !v);
+                        setSelection(new Map());
+                      }}
+                    >
+                      {selecting ? "Cancel selection" : "Select books"}
+                    </Button>
+                  </Box>
+                </Box>
+                {selecting && (
+                  <Box flexDirection="row" gap="s" alignItems="center">
+                    <Text variant="label" flex={1}>
+                      {selection.size} selected
+                    </Text>
+                    <Button
+                      disabled={!selection.size}
+                      onPress={() => setBulk(true)}
+                    >
+                      Organize selected
+                    </Button>
+                  </Box>
+                )}
+                {(query.tag ||
+                  query.collection ||
+                  query.status ||
+                  query.format ||
+                  query.favorite) && (
+                  <Box flexDirection="row" flexWrap="wrap" gap="s">
+                    {(["tag", "collection", "status", "format"] as const).map(
+                      (key) =>
+                        query[key] ? (
+                          <Chip
+                            key={key}
+                            label={`${query[key]} ×`}
+                            active
+                            onPress={() =>
+                              setQuery((q) => ({ ...q, [key]: undefined }))
+                            }
+                          />
+                        ) : null,
+                    )}
+                    {query.favorite && (
+                      <Chip
+                        label="Favorites ×"
+                        active
+                        onPress={() =>
+                          setQuery((q) => ({ ...q, favorite: undefined }))
+                        }
+                      />
+                    )}
+                  </Box>
+                )}
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -584,17 +709,6 @@ function LibraryApp({
                     />
                   ))}
                 </ScrollView>
-                {!!query.collection && (
-                  <Pressable
-                    onPress={() =>
-                      setQuery((q) => ({ ...q, collection: undefined }))
-                    }
-                  >
-                    <Text variant="label" color="accent">
-                      {query.collection} ×
-                    </Text>
-                  </Pressable>
-                )}
               </Box>
               {loading ? (
                 <Box flex={1} justifyContent="center">
@@ -604,6 +718,7 @@ function LibraryApp({
                 <FlashList
                   key={`${layout}-${columns}`}
                   data={books}
+                  extraData={{ selecting, selection }}
                   numColumns={layout === "grid" ? columns : 1}
                   keyExtractor={(b) => b.id}
                   onEndReached={() => void nextPage()}
@@ -616,7 +731,10 @@ function LibraryApp({
                     <BookTile
                       book={item}
                       list={layout === "list"}
-                      onOpen={() => setReader(item)}
+                      onOpen={() =>
+                        selecting ? toggleBook(item) : setReader(item)
+                      }
+                      selected={selecting ? selection.has(item.id) : undefined}
                       onMenu={() => setMenu(item)}
                     />
                   )}
@@ -694,8 +812,7 @@ function LibraryApp({
           {tab === "settings" && (
             <SettingsPanel
               wide={wide}
-              theme={theme}
-              changeTheme={changeTheme}
+              appearance={appearance}
               repo={repo}
               onSynced={reload}
               onExport={() => void shareSnapshot()}
@@ -839,8 +956,21 @@ function LibraryApp({
           }}
         />
       )}
+      {bulk && (
+        <BulkOrganize
+          books={[...selection.values()]}
+          repo={repo}
+          onClose={() => setBulk(false)}
+          onSaved={() => {
+            setBulk(false);
+            setSelecting(false);
+            setSelection(new Map());
+            reload();
+          }}
+        />
+      )}
       {sortSheet && (
-        <Sheet title="Find your next read" onClose={() => setSortSheet(false)}>
+        <Sheet title="Filters & sort" onClose={() => setSortSheet(false)}>
           <Text variant="eyebrow">SORT BY</Text>
           {(["added", "title", "author", "series", "progress"] as Sort[]).map(
             (sort) => (
@@ -860,6 +990,55 @@ function LibraryApp({
               />
             ),
           )}
+          <Text variant="eyebrow">FILE FORMAT</Text>
+          <Box flexDirection="row" gap="s">
+            {(["epub", "pdf", "cbz"] as const).map((format) => (
+              <Chip
+                key={format}
+                label={format.toUpperCase()}
+                active={query.format === format}
+                onPress={() =>
+                  setQuery((q) => ({
+                    ...q,
+                    format: q.format === format ? undefined : format,
+                  }))
+                }
+              />
+            ))}
+          </Box>
+          <Text variant="eyebrow">COLLECTIONS</Text>
+          <Box flexDirection="row" flexWrap="wrap" gap="s">
+            {stats.collections.map((collection) => (
+              <Chip
+                key={collection}
+                label={collection}
+                active={query.collection === collection}
+                onPress={() =>
+                  setQuery((q) => ({
+                    ...q,
+                    collection:
+                      q.collection === collection ? undefined : collection,
+                  }))
+                }
+              />
+            ))}
+          </Box>
+          <Text variant="eyebrow">TAGS</Text>
+          <Box flexDirection="row" flexWrap="wrap" gap="s">
+            {stats.tags.map((tag) => (
+              <Chip
+                key={tag}
+                label={tag}
+                active={query.tag === tag}
+                onPress={() =>
+                  setQuery((q) => ({
+                    ...q,
+                    tag: q.tag === tag ? undefined : tag,
+                  }))
+                }
+              />
+            ))}
+          </Box>
           <Text variant="eyebrow">READING STATUS</Text>
           <Box flexDirection="row" flexWrap="wrap" gap="s">
             {(["unread", "reading", "finished"] as const).map((status) => (

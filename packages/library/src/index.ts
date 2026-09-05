@@ -113,6 +113,7 @@ export const snapshotSchema = z.object({
 export type LibrarySnapshot = z.infer<typeof snapshotSchema>;
 export type Sort = "added" | "title" | "author" | "series" | "progress";
 export type LibraryQuery = {
+  format?: Book["format"];
   search?: string;
   kind?: StoryKind;
   status?: Book["status"];
@@ -227,6 +228,10 @@ export class LibraryRepository {
   async list(query: LibraryQuery = {}): Promise<Book[]> {
     const params: (string | number | null)[] = [];
     const where = [query.trash ? "deleted IS NOT NULL" : "deleted IS NULL"];
+    if (query.format) {
+      where.push("json_extract(data,'$.format')=?");
+      params.push(query.format);
+    }
     if (query.kind) {
       where.push("kind=?");
       params.push(query.kind);
