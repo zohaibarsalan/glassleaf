@@ -138,7 +138,7 @@ export function Reader({
   }
   function turn(delta: number) {
     setPage((p) => Math.min(Math.max(p + delta, 0), count - 1));
-    setFraction(0);
+    setFraction(book.format === "epub" && delta < 0 ? 1 : 0);
     setZoom(1);
   }
   const locator = `${page}:${fraction}`;
@@ -304,9 +304,7 @@ export function Reader({
           >
             <IconButton
               icon={previousIcon}
-              label={
-                book.format === "epub" ? "Previous chapter" : "Previous page"
-              }
+              label={book.format === "epub" ? "Previous page" : "Previous page"}
               onPress={() =>
                 book.format === "epub"
                   ? setCommand({ id: Date.now(), delta: -1 })
