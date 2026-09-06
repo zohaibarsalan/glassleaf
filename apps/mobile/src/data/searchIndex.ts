@@ -22,6 +22,10 @@ export async function indexLocalChapters(
   signal: AbortSignal,
   status: (message: string) => void,
 ) {
+  if ((await repo.setting("chapter-index-version")) !== "2") {
+    await repo.retryChapters();
+    await repo.setSetting("chapter-index-version", "2");
+  }
   let indexed = 0;
   while (!signal.aborted) {
     const jobs = await repo.pendingChapters();
@@ -30,10 +34,15 @@ export async function indexLocalChapters(
       if (signal.aborted) return;
       const path = `${book.id}/content/${relative}`;
       try {
-        if (
-          !nativeFile(path).exists ||
-          nativeFile(path).size > 2 * 1024 * 1024
-        ) {
+        if (!nativeFile(path).exists) {
+          await repo.skipChapter(book.id, relative);
+          continue;
+        }
+        if (/\.(jpe?g|png|gif|webp|svg)$/i.test(relative)) {
+          await repo.indexChapter(book, index, "");
+          continue;
+        }
+        if (nativeFile(path).size > 2 * 1024 * 1024) {
           await repo.skipChapter(book.id, relative);
           continue;
         }
