@@ -1,0 +1,26 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Filters & sort"
+    timeout: 20000
+- waitForAnimationToEnd
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element: "Catppuccin Latte theme"
+    direction: DOWN
+- tapOn: "Catppuccin Latte theme"
+- takeScreenshot: catppuccin-latte-settings
+- tapOn: "Library"
+- takeScreenshot: catppuccin-latte-library
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element: "Catppuccin Mocha theme"
+    direction: DOWN
+- tapOn: "Catppuccin Mocha theme"
+- takeScreenshot: catppuccin-mocha-settings
+- tapOn: "Library"
+- takeScreenshot: catppuccin-mocha-library

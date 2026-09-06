@@ -1,3 +1,4 @@
+import { importTheme, MAX_THEME_SIZE } from "../ui/themeImport";
 import { ZodError } from "zod";
 import { randomUUID } from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
@@ -52,7 +53,8 @@ export function ThemePanel({
     <Box gap="m">
       <Text variant="heading">Appearance</Text>
       <Text variant="caption">
-        Choose a palette, or make your own. Reader colors follow your theme.
+        Community palettes for your library and reader. Import Base16, Base24,
+        or Glassleaf themes as YAML or JSON.
       </Text>
       <Box flexDirection="row" flexWrap="wrap" gap="m">
         {definitions.map((t) => (
@@ -132,12 +134,14 @@ export function ThemePanel({
             onPress={() =>
               void action(async () => {
                 const result = await DocumentPicker.getDocumentAsync({
-                  type: "application/json",
+                  type: "*/*",
                   copyToCacheDirectory: true,
                 });
                 if (result.canceled) return;
-                const imported = validateTheme(
-                  JSON.parse(await readExternal(result.assets[0]!.uri)),
+                if ((result.assets[0]!.size ?? 0) > MAX_THEME_SIZE)
+                  throw new Error("Theme files must be smaller than 64 KB.");
+                const imported = importTheme(
+                  await readExternal(result.assets[0]!.uri),
                 );
                 setDraft({ ...imported, id: `custom-${randomUUID()}` });
               })

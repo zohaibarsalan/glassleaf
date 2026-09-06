@@ -76,12 +76,11 @@ import {
   IconButton,
   Sheet,
   Text,
-  themeNames,
-  themes,
   usePalette,
   type ThemeName,
 } from "./src/ui/theme";
 import {
+  builtinThemes,
   themeDefinitionSchema,
   type ThemeDefinition,
 } from "./src/ui/themeDefinition";
@@ -107,16 +106,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [theme, setTheme] = useState<ThemeName>("paper");
   const [customThemes, setCustomThemes] = useState<ThemeDefinition[]>([]);
-  const definitions: ThemeDefinition[] = [
-    ...Object.entries(themes).map(([id, t]) => ({
-      version: 1 as const,
-      id,
-      name: themeNames[id] ?? id,
-      mode: id === "paper" ? ("light" as const) : ("dark" as const),
-      colors: t.colors,
-    })),
-    ...customThemes,
-  ];
+  const definitions: ThemeDefinition[] = [...builtinThemes, ...customThemes];
   const activeTheme =
     definitions.find((t) => t.id === theme) ?? definitions[0]!;
   const [fonts, fontError] = useFonts({

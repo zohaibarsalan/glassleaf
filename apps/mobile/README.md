@@ -84,3 +84,7 @@ Library → Filters & sort combines file format, story type, reading state, favo
 `flows/` contains a small set of Maestro native journeys for appearance, custom theme persistence, bulk organization/filtering, and comic navigation. These run on an installed development app seeded with the original sample library. They intentionally modify sample metadata and reading positions. Do not run them against a personal library.
 
 The dated screenshot journal is in `docs/ui-gallery`. Run `python3 scripts/build-ui-gallery.py` to rebuild its index, and `python3 -m http.server 8787 --directory docs/ui-gallery` from the repository root to view it. Preserve older dated captures instead of replacing them.
+
+### Community themes
+
+Appearance includes all four Catppuccin flavors, Nord, Dracula and Gruvbox alongside the original themes. Import downloaded Base16/Base24 YAML or JSON (including legacy flat Base16) from Settings → Appearance → Import. Review/edit the mapped colors and choose Save and apply. Existing Glassleaf JSON imports and exports remain supported. See [format support and palette attribution](themes/community/README.md). Editor extensions and arbitrary application theme files are not interchangeable with these scheme formats.
