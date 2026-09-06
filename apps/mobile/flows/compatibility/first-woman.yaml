@@ -1,0 +1,39 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Read First Woman CBZ, Unknown author"
+- extendedWaitUntil:
+    visible: "Page 1 of 44"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: mocha-first-woman-cbz-cover
+- swipe:
+    start: 75%, 50%
+    end: 25%, 50%
+    duration: 400
+- assertVisible: "Page 2 of 44"
+- tapOn: "Contents and bookmarks"
+- tapOn:
+    id: "field-Go to page"
+- inputText: "20"
+- tapOn: "Go"
+- assertVisible: "Page 20 of 44"
+- waitForAnimationToEnd
+- takeScreenshot: mocha-first-woman-cbz-page20
+- tapOn: "Back to library"
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "first-woman"
+- tapOn: "book: first-woman"
+- extendedWaitUntil:
+    visible: "Page 1 of 44"
+    timeout: 30000
+- tapOn: "Contents and bookmarks"
+- tapOn:
+    id: "field-Go to page"
+- inputText: "20"
+- tapOn: "Go"
+- assertVisible: "Page 20 of 44"
+- waitForAnimationToEnd
+- takeScreenshot: mocha-first-woman-pdf-page20
+- tapOn: "Back to library"

@@ -32,3 +32,6 @@ apps/mobile/android/
 
 # Local mobile screenshots and evaluation packages
 /outputs/react-native/
+
+# Downloaded reader compatibility corpus
+/outputs/compatibility/

@@ -1,0 +1,45 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "attention"
+- extendedWaitUntil:
+    visible: "book: attention"
+    timeout: 15000
+- tapOn: "book: attention"
+- extendedWaitUntil:
+    visible: "Page 1 of 15"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: mocha-attention-pdf-first
+- tapOn: "Contents and bookmarks"
+- tapOn:
+    id: "field-Go to page"
+- inputText: "8"
+- tapOn: "Go"
+- assertVisible: "Page 8 of 15"
+- takeScreenshot: mocha-attention-pdf-page8
+- tapOn: "Next page"
+- assertVisible: "Page 9 of 15"
+- tapOn: "Back to library"
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "alice"
+- extendedWaitUntil:
+    visible: "book: alice"
+    timeout: 15000
+- tapOn: "book: alice"
+- extendedWaitUntil:
+    visible: "Page 1 of 105"
+    timeout: 20000
+- takeScreenshot: mocha-alice-pdf-cover
+- tapOn: "Contents and bookmarks"
+- tapOn:
+    id: "field-Go to page"
+- inputText: "10"
+- tapOn: "Go"
+- assertVisible: "Page 10 of 105"
+- takeScreenshot: mocha-alice-pdf-page10
+- tapOn: "Back to library"

@@ -1,0 +1,67 @@
+{
+  "downloadedAt": "2026-09-06",
+  "files": [
+    {
+      "file": "alice.epub",
+      "bytes": 188960,
+      "sha256": "12cbc3610260503383ad7ecf800beb0d885a6011e15900b2bf61cecfc571d6c8",
+      "source": "https://www.gutenberg.org/ebooks/11.epub3.images"
+    },
+    {
+      "file": "alice.pdf",
+      "bytes": 3083601,
+      "sha256": "1c0c562156d0cc0d61f42e5c3c05585399b1507c5a65fcec7949b298385f8715",
+      "source": "https://www.adobe.com/be_en/active-use/pdf/Alice_in_Wonderland.pdf"
+    },
+    {
+      "file": "alice.txt",
+      "bytes": 174311,
+      "sha256": "01b38ea4c710a84bc18d0bd41271a5a1a92b94e97b2812f4dece97d4a694725e",
+      "source": "https://www.gutenberg.org/cache/epub/11/pg11.txt"
+    },
+    {
+      "file": "attention.pdf",
+      "bytes": 2215244,
+      "sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+      "source": "https://arxiv.org/pdf/1706.03762"
+    },
+    {
+      "file": "first-woman.cbz",
+      "bytes": 12586432,
+      "sha256": "cf1e63117cbee58ff1371a9ec36dc0ba267e92475fedabca72eafa91156c7a6f",
+      "derivedFrom": "first-woman.pdf",
+      "conversion": "44 JPEGs rendered with pdftoppm -jpeg -scale-to 1600; ComicInfo title First Woman CBZ, publisher NASA, en, Manga No."
+    },
+    {
+      "file": "first-woman.pdf",
+      "bytes": 80474456,
+      "sha256": "e89e310eaa9c086522d37aede5be5481271de1c726d5a8a7bb815950f6ebaaf9",
+      "source": "https://firstwomancomic.com/pdf/nasa-firstwoman-issue1-english-oct2023.pdf"
+    },
+    {
+      "file": "haruko-html-jpeg.epub",
+      "bytes": 2247393,
+      "sha256": "87b5eaff288e238864d817ea54b4600dc8c6f96789d0efb946b8545d7ad2f0c0",
+      "source": "https://github.com/IDPF/epub3-samples/releases/download/20230704/haruko-html-jpeg.epub"
+    },
+    {
+      "file": "haruko-jpeg.epub",
+      "bytes": 2268455,
+      "sha256": "5e9fc05e366d99607acc4b312c76b6e8928578ced0121fd5d8befa85e219703e",
+      "source": "https://github.com/IDPF/epub3-samples/releases/download/20230704/haruko-jpeg.epub"
+    },
+    {
+      "file": "haruko.cbz",
+      "bytes": 2236257,
+      "sha256": "7963727c2017a1fedd5834d2b300d1b0db6470627c463bea92a0f4e4c568fd8d",
+      "derivedFrom": "haruko-html-jpeg.epub",
+      "conversion": "Original 12 OPS/images JPEGs, numeric order; ComicInfo title Haruko CBZ, ja, YesAndRightToLeft. Artwork by 倉塚りこ."
+    },
+    {
+      "file": "kusamakura.epub",
+      "bytes": 17940673,
+      "sha256": "6d4d4ed5eda3f612e3263c54fa0f74ccfa87260f43e81bb58ea658636e52eeb7",
+      "source": "https://github.com/IDPF/epub3-samples/releases/download/20230704/kusamakura-japanese-vertical-writing.epub"
+    }
+  ]
+}
