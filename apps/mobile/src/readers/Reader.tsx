@@ -39,10 +39,12 @@ export function Reader({
   book: initialBook,
   repo,
   onClose,
+  onSearch,
 }: {
   book: Book;
   repo: LibraryRepository;
   onClose: () => void;
+  onSearch: (book: Book) => void;
 }) {
   const [book, setBook] = useState(initialBook);
   const c = usePalette();
@@ -383,6 +385,16 @@ export function Reader({
       )}
       {settings && (
         <Sheet title="Settle into the story" onClose={() => setSettings(false)}>
+          <Button
+            secondary
+            onPress={() => {
+              void save()
+                .then(() => onSearch(book))
+                .catch((e) => setError(String(e)));
+            }}
+          >
+            Find in this book
+          </Button>
           {book.format === "epub" && (
             <Box
               flexDirection="row"

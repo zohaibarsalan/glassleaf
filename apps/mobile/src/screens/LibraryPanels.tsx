@@ -180,6 +180,7 @@ export function SettingsPanel({
   onTrash: () => void;
 }) {
   const [section, setSection] = useState<string>();
+  const [error, setError] = useState("");
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
@@ -235,6 +236,19 @@ export function SettingsPanel({
             <Button secondary icon={Download} onPress={onPlan}>
               Review an organization plan
             </Button>
+            <Button
+              secondary
+              icon={Undo2}
+              onPress={() =>
+                void repo
+                  .undoStructure()
+                  .then(onSynced)
+                  .catch((e) => setError(String(e)))
+              }
+            >
+              Undo view, list or group edit
+            </Button>
+            {!!error && <Text color="danger">{error}</Text>}
             <Button secondary icon={Undo2} onPress={onUndo}>
               Undo last organization batch
             </Button>

@@ -4,7 +4,11 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
-import { bookSchema, planSchema } from "@glassleaf/library";
+import {
+  bookSchema,
+  planSchema,
+  structurePlanSchema,
+} from "@glassleaf/library";
 const folder = await mkdtemp(join(tmpdir(), "glassleaf-mcp-check-"));
 const path = join(folder, "snapshot.json");
 const book = bookSchema.parse({
@@ -53,7 +57,12 @@ try {
     }),
   );
   const tools = await client.listTools();
-  assert.equal(tools.tools.length, 2);
+  assert.deepEqual(tools.tools.map((t) => t.name).sort(), [
+    "list_organization",
+    "prepare_organization",
+    "prepare_structure",
+    "search_library",
+  ]);
   const result = await client.callTool({
     name: "search_library",
     arguments: { query: "Shared" },
@@ -79,6 +88,66 @@ try {
     JSON.parse(await readFile(output.path, "utf8")),
   );
   assert.equal(plan.changes[0]?.patch.series, "Shared");
+  const structured = await client.callTool({
+    name: "prepare_structure",
+    arguments: {
+      title: "Reading order",
+      changes: [
+        {
+          id: "reading-order",
+          expectedRevision: null,
+          value: {
+            kind: "reading-list",
+            name: "Crossover",
+            bookIds: [book.id],
+          },
+          deleted: false,
+        },
+      ],
+    },
+  });
+  assert.equal(structured.isError, undefined);
+  const structureOutput = JSON.parse(
+    (structured.content as { text: string }[])[0]!.text,
+  ) as { path: string };
+  assert.equal(
+    structurePlanSchema.parse(
+      JSON.parse(await readFile(structureOutput.path, "utf8")),
+    ).changes[0]?.value.kind,
+    "reading-list",
+  );
+  const stale = await client.callTool({
+    name: "prepare_structure",
+    arguments: {
+      title: "Stale",
+      changes: [
+        {
+          id: "reading-order",
+          expectedRevision: 12,
+          value: {
+            kind: "reading-list",
+            name: "Crossover",
+            bookIds: [book.id],
+          },
+        },
+      ],
+    },
+  });
+  assert.equal(stale.isError, true);
+  const scoped = await client.callTool({
+    name: "search_library",
+    arguments: {
+      query: "Shared",
+      rules: {
+        match: "all",
+        conditions: [{ field: "language", operator: "is", value: "en" }],
+      },
+    },
+  });
+  assert.equal(
+    JSON.parse((scoped.content as { text: string }[])[0]!.text).total,
+    0,
+  );
   assert.equal(await readFile(path, "utf8"), original);
   console.log(
     "MCP protocol check passed: search, revision-checked plan, original snapshot unchanged.",

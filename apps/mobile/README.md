@@ -56,7 +56,7 @@ Drive files live in a Glassleaf folder in your own storage. There is no Glasslea
 }
 ```
 
-3. Ask the agent to use `search_library` and `prepare_organization`. Search results omit reading notes and file paths. The server writes a plan file without modifying the exported snapshot or original books.
+3. Ask the agent to use `search_library`, `list_organization`, `prepare_organization` (book metadata), and `prepare_structure` (views and ordered lists). Search results omit reading notes and file paths. The server writes a plan file without modifying the exported snapshot or original books.
 4. Transfer that JSON back to the phone, import it in Settings, review before/after changes, and apply. If any book changed since export, the entire plan is rejected. Undo likewise refuses to overwrite intervening edits.
 
 This is an explicit file-transfer workflow, not a live remote-control connection to the phone.
@@ -93,8 +93,14 @@ Appearance includes all four Catppuccin flavors, Nord, Dracula and Gruvbox along
 
 The app opens on Home (continue reading, recent additions, saved views). Library keeps books in focus: View options edits filters/sort; Library actions contains layout and bulk selection. Settings is available from the gear and opens individual sections.
 
-Organize separates story types, manual collections, tags and live saved views. Rules match all or any conditions, with is/is-not across kind, format, tag, collection, author, series, language, status and favorite. Open a saved view and change View options to edit its name/rules/sort. Removing a view never removes books. Views are currently device-local; Drive and MCP still exchange book metadata, not saved-view definitions.
+Organize separates series, collections, ordered reading lists, smart views, tags and story types. One book can belong to overlapping groups without duplicating files or progress. Reading lists preserve a manual cross-series order. Series browsing sorts by volume. Collection and tag menus rename or merge membership in one undoable transaction; nested saved rules follow the rename.
 
-Search indexes book metadata, notes, bookmarks, chapter titles and local EPUB text. Results open their saved location or chapter start. Book matches precede notes/bookmarks/chapters in All; each section is also searchable separately. The index is built incrementally after launch and import, paused while reading, with no file scans on keystrokes. Changing the query or reopening Search picks up newly indexed chapters. Chapter files over 2 MB are skipped. PDF page text, comic OCR, Japanese segmentation and exact passage highlighting are not implemented.
+View options supports nested all/any groups and is/is-not across kind, format, tag, collection, author, series, language, status and favorite. A view retains its parent collection/list/series scope. Pin selected views to Home; continue reading uses lastReadAt rather than metadata modification time. Library actions → Search this view narrows full-text discovery to the current results; Reader settings → Find in this book narrows it to the open book.
+
+Organization records have stable IDs, revisions, tombstones, a durable outbox and conditional acknowledgement. The prepared Drive integration exchanges them in immutable batches alongside books. Concurrent edits choose a deterministic whole-record winner and retain the loser as a conflict; reading orders are not automatically interleaved. Live Google sign-in/multi-device sync still needs OAuth configuration and verification. Settings → Agent organization can review version 2 structure plans and undo the most recent structure/group edit.
+
+Search indexes book metadata, notes, bookmarks, chapter titles and local EPUB text. Results open their saved location or chapter start. Book matches precede notes/bookmarks/chapters in All; each section is also searchable separately. The index uses a persisted chapter-job queue after launch and import, paused while reading, with no file scans on keystrokes. Completed work survives restart; unavailable files can be retried from Search. Changing the query or reopening Search picks up newly indexed chapters. Chapter files over 2 MB are skipped. PDF page text, comic OCR, Japanese segmentation and exact passage highlighting are not implemented.
 
 Research and rationale: [core experience decisions](../../docs/research/2026-09-06-library-experience.md). Current native checks: flows/core-navigation.yaml, core-light-search.yaml and core-dark-gallery.yaml. Earlier flows document the previous navigation and require updating before reuse.
+
+Implementation follow-up: [organization rebuild and verification](../../docs/ORGANIZATION_REBUILD.md).

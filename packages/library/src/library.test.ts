@@ -419,3 +419,85 @@ test("Reading recency is not changed by metadata edits and facets follow current
     db.close();
   }
 });
+
+test("Collection merges update memberships and scoped views atomically, and undo restores both", async () => {
+  const { repo, db } = setup();
+  try {
+    await repo.initialize();
+    await repo.add({ ...book("a"), collections: ["Old"] });
+    await repo.add({ ...book("b"), collections: ["New"] });
+    const old = (await repo.organization()).find(
+      (r) => r.value.kind === "collection" && r.value.name === "Old",
+    )!;
+    const destination = (await repo.organization()).find(
+      (r) => r.value.kind === "collection" && r.value.name === "New",
+    )!;
+    await repo.saveView({
+      id: "scoped",
+      name: "Scoped",
+      sort: "title",
+      scope: { collectionId: old.id },
+      rules: {
+        match: "all",
+        conditions: [
+          {
+            match: "any",
+            conditions: [{ field: "collection", operator: "is", value: "Old" }],
+          },
+        ],
+      },
+    });
+    await repo.renameFacet("collection", "Old", "New");
+    assert.deepEqual((await repo.get("a"))?.collections, ["New"]);
+    const view = (await repo.savedViews())[0]!;
+    assert.equal(view.scope?.collectionId, destination.id);
+    assert.equal(
+      (await repo.list({ ...view.scope, rules: view.rules })).length,
+      2,
+    );
+    await repo.undoStructure();
+    assert.deepEqual((await repo.get("a"))?.collections, ["Old"]);
+    assert.equal((await repo.savedViews())[0]?.scope?.collectionId, old.id);
+    await repo.renameFacet("collection", "Old", "Renamed");
+    assert.equal((await repo.list({ collectionId: old.id }))[0]?.id, "a");
+    await repo.add({ ...book("c"), collections: ["Old"] });
+    const reused = (await repo.organization()).find(
+      (r) => r.value.kind === "collection" && r.value.name === "Old",
+    )!;
+    assert.notEqual(reused.id, old.id);
+    assert.deepEqual(
+      (await repo.list({ collectionId: reused.id })).map((b) => b.id),
+      ["c"],
+    );
+  } finally {
+    db.close();
+  }
+});
+test("Chapter jobs resume, retry unavailable files, and reject stale asset work", async () => {
+  const { repo, db } = setup();
+  try {
+    await repo.initialize();
+    const a = book("a");
+    a.asset.chapters = [
+      { path: "one.xhtml", title: "One" },
+      { path: "two.xhtml", title: "Two" },
+    ];
+    await repo.add(a);
+    assert.equal((await repo.pendingChapters()).length, 2);
+    await repo.indexChapter(a, 0, "Nebula passage");
+    await repo.skipChapter("a", "two.xhtml");
+    await repo.initialize();
+    assert.equal((await repo.pendingChapters()).length, 0);
+    assert.equal(await repo.unavailableChapters(), 1);
+    await repo.retryChapters();
+    assert.equal((await repo.pendingChapters())[0]?.index, 1);
+    await repo.mergeRemote([
+      { ...a, revision: 2, asset: { ...a.asset, hash: "replacement" } },
+    ]);
+    await repo.indexChapter(a, 0, "Stale passage");
+    assert.equal((await repo.discover("Stale")).length, 0);
+    assert.equal((await repo.pendingChapters()).length, 2);
+  } finally {
+    db.close();
+  }
+});

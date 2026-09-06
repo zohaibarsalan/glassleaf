@@ -34,6 +34,8 @@ export const fieldLabels: Record<Rule["field"], string> = {
   favorite: "Favorite",
 };
 export const sortLabels: Record<Sort, string> = {
+  "last-read": "Last read",
+  "list-order": "Reading list order",
   added: "Recently added",
   updated: "Recently updated",
   title: "Title A–Z",
@@ -48,7 +50,14 @@ export function ViewEditor({
   onApply,
   onSave,
 }: {
-  initial: { rules: Rules; sort: Sort; id?: string; name?: string };
+  initial: {
+    rules: Rules;
+    sort: Sort;
+    id?: string;
+    name?: string;
+    pinned?: boolean;
+    scope?: SavedView["scope"];
+  };
   stats: Stats;
   onClose: () => void;
   onApply: (rules: Rules, sort: Sort) => void;
@@ -60,18 +69,22 @@ export function ViewEditor({
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   const [picker, setPicker] = useState<"field" | "sort" | Rule["field"]>();
+  const [groupPath, setGroupPath] = useState<number[]>([]);
+  const [pinned, setPinned] = useState(initial.pinned ?? false);
   const [value, setValue] = useState("");
   const [exclude, setExclude] = useState(false);
   const c = usePalette();
   function add(field: Rule["field"], value: string) {
     if (!value.trim()) return;
-    setRules((r) => ({
-      ...r,
-      conditions: [
-        ...r.conditions,
-        { field, operator: exclude ? "is-not" : "is", value: value.trim() },
-      ],
-    }));
+    setRules((tree) =>
+      updateGroup(tree, groupPath, (r) => ({
+        ...r,
+        conditions: [
+          ...r.conditions,
+          { field, operator: exclude ? "is-not" : "is", value: value.trim() },
+        ],
+      })),
+    );
     setPicker(undefined);
     setValue("");
     setExclude(false);
@@ -109,7 +122,14 @@ export function ViewEditor({
             disabled={!name.trim() || saving}
             onPress={() => {
               setSaving(true);
-              void onSave({ id: initial.id ?? randomUUID(), name, rules, sort })
+              void onSave({
+                id: initial.id ?? randomUUID(),
+                name,
+                rules,
+                sort,
+                pinned,
+                scope: initial.scope,
+              })
                 .then(() => onApply(rules, sort))
                 .catch((e) => setError(String(e)))
                 .finally(() => setSaving(false));
@@ -139,53 +159,15 @@ export function ViewEditor({
           <ChevronRight color={c.secondary} size={20} />
         </Box>
       </Pressable>
-      <Box flexDirection="row" gap="s">
-        <Chip
-          label="Match all"
-          active={rules.match === "all"}
-          onPress={() => setRules((r) => ({ ...r, match: "all" }))}
-        />
-        <Chip
-          label="Match any"
-          active={rules.match === "any"}
-          onPress={() => setRules((r) => ({ ...r, match: "any" }))}
-        />
-      </Box>
-      {rules.conditions.map((r, i) => (
-        <Box
-          key={i}
-          backgroundColor="surface"
-          borderRadius="m"
-          padding="m"
-          flexDirection="row"
-          alignItems="center"
-        >
-          <Box flex={1}>
-            <Text variant="caption">
-              {fieldLabels[r.field]} {r.operator === "is" ? "is" : "is not"}
-            </Text>
-            <Text variant="label">{r.value}</Text>
-          </Box>
-          <IconButton
-            icon={X}
-            label={`Remove condition ${i + 1}`}
-            onPress={() =>
-              setRules((old) => ({
-                ...old,
-                conditions: old.conditions.filter((_, j) => i !== j),
-              }))
-            }
-          />
-        </Box>
-      ))}
-      <Button
-        secondary
-        icon={Plus}
-        disabled={rules.conditions.length >= 30}
-        onPress={() => setPicker("field")}
-      >
-        Add condition
-      </Button>
+      <RuleGroup
+        rules={rules}
+        path={[]}
+        onChange={(fn) => setRules(fn)}
+        onAdd={(path) => {
+          setGroupPath(path);
+          setPicker("field");
+        }}
+      />
       {!!rules.conditions.length && (
         <Button
           secondary
@@ -201,6 +183,11 @@ export function ViewEditor({
           value={name}
           onChangeText={setName}
           placeholder="Japanese fantasy, Weekend reading…"
+        />
+        <Chip
+          label="Pin to Home"
+          active={pinned}
+          onPress={() => setPinned((v) => !v)}
         />
         {!!error && <Text color="danger">{error}</Text>}
       </Box>
@@ -286,5 +273,132 @@ export function ViewEditor({
         </Sheet>
       )}
     </Sheet>
+  );
+}
+
+function updateGroup(
+  tree: Rules,
+  path: number[],
+  change: (group: Rules) => Rules,
+): Rules {
+  if (!path.length) return change(tree);
+  const [head, ...tail] = path;
+  return {
+    ...tree,
+    conditions: tree.conditions.map((node, i) =>
+      i === head && !("field" in node) ? updateGroup(node, tail, change) : node,
+    ),
+  };
+}
+function RuleGroup({
+  rules,
+  path,
+  onChange,
+  onAdd,
+}: {
+  rules: Rules;
+  path: number[];
+  onChange: (fn: (root: Rules) => Rules) => void;
+  onAdd: (path: number[]) => void;
+}) {
+  const change = (fn: (group: Rules) => Rules) =>
+    onChange((root) => updateGroup(root, path, fn));
+  return (
+    <Box
+      gap="m"
+      paddingLeft={path.length ? "m" : "xs"}
+      borderLeftWidth={path.length ? 1 : 0}
+      borderLeftColor="line"
+    >
+      <Box flexDirection="row" gap="s">
+        <Chip
+          label="Match all"
+          active={rules.match === "all"}
+          onPress={() => change((r) => ({ ...r, match: "all" }))}
+        />
+        <Chip
+          label="Match any"
+          active={rules.match === "any"}
+          onPress={() => change((r) => ({ ...r, match: "any" }))}
+        />
+      </Box>
+      {rules.conditions.map((node, i) => (
+        <Box key={i} gap="s">
+          {"field" in node ? (
+            <Box
+              flexDirection="row"
+              backgroundColor="surface"
+              padding="m"
+              borderRadius="m"
+              alignItems="center"
+            >
+              <Box flex={1}>
+                <Text variant="caption">
+                  {fieldLabels[node.field]}{" "}
+                  {node.operator === "is" ? "is" : "is not"}
+                </Text>
+                <Text variant="label">{node.value}</Text>
+              </Box>
+              <IconButton
+                icon={X}
+                label={`Remove condition ${[...path, i + 1].join(".")}`}
+                onPress={() =>
+                  change((r) => ({
+                    ...r,
+                    conditions: r.conditions.filter((_, j) => i !== j),
+                  }))
+                }
+              />
+            </Box>
+          ) : (
+            <>
+              <Box flexDirection="row" alignItems="center">
+                <Text variant="eyebrow" flex={1}>
+                  GROUP {i + 1}
+                </Text>
+                <IconButton
+                  icon={X}
+                  label="Remove group"
+                  onPress={() =>
+                    change((r) => ({
+                      ...r,
+                      conditions: r.conditions.filter((_, j) => i !== j),
+                    }))
+                  }
+                />
+              </Box>
+              <RuleGroup
+                rules={node}
+                path={[...path, i]}
+                onChange={onChange}
+                onAdd={onAdd}
+              />
+            </>
+          )}
+        </Box>
+      ))}
+      <Button
+        secondary
+        icon={Plus}
+        disabled={rules.conditions.length >= 30}
+        onPress={() => onAdd(path)}
+      >
+        {path.length ? "Add to group" : "Add condition"}
+      </Button>
+      {path.length < 3 && (
+        <Button
+          secondary
+          disabled={rules.conditions.length >= 30}
+          onPress={() =>
+            change((r) => ({
+              ...r,
+              conditions: [...r.conditions, { match: "any", conditions: [] }],
+            }))
+          }
+        >
+          Add group
+        </Button>
+      )}
+    </Box>
   );
 }

@@ -68,6 +68,15 @@ export const savedViewSchema = z
     rules: rulesSchema,
     sort: sortSchema,
     pinned: z.boolean().default(false),
+    scope: z
+      .object({
+        collectionId: z.string().min(1).max(1000).optional(),
+        readingListId: z.string().min(1).max(1000).optional(),
+        series: z.string().max(500).optional(),
+        unfiled: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type SavedView = z.infer<typeof savedViewSchema>;

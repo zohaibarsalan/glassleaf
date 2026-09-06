@@ -22,50 +22,41 @@ export async function indexLocalChapters(
   signal: AbortSignal,
   status: (message: string) => void,
 ) {
-  let offset = 0,
-    indexed = 0,
-    skipped = 0;
+  let indexed = 0;
   while (!signal.aborted) {
-    const books = await repo.list({
-      format: "epub",
-      sort: "title",
-      limit: 20,
-      offset,
-    });
-    if (!books.length) break;
-    offset += books.length;
-    for (const book of books) {
+    const jobs = await repo.pendingChapters();
+    if (!jobs.length) break;
+    for (const { book, index, path: relative } of jobs) {
       if (signal.aborted) return;
-      for (const [index, chapter] of book.asset.chapters.entries()) {
-        if (signal.aborted) return;
-        if (await repo.chapterIndexed(book, chapter.path)) continue;
-        try {
-          const path = `${book.id}/content/${chapter.path}`;
-          if (
-            !nativeFile(path).exists ||
-            nativeFile(path).size > 2 * 1024 * 1024
-          ) {
-            skipped++;
-            continue;
-          }
-          const body = flatten(parser.parse(await readText(path)) as unknown)
-            .replace(/\s+/g, " ")
-            .trim();
-          if (signal.aborted) return;
-          await repo.indexChapter(book, index, body);
-          indexed++;
-          status(`Making chapters searchable · ${indexed} indexed`);
-        } catch {
-          skipped++;
+      const path = `${book.id}/content/${relative}`;
+      try {
+        if (
+          !nativeFile(path).exists ||
+          nativeFile(path).size > 2 * 1024 * 1024
+        ) {
+          await repo.skipChapter(book.id, relative);
+          continue;
         }
-        await new Promise((resolve) => setTimeout(resolve, 30));
+        const body = flatten(parser.parse(await readText(path)) as unknown)
+          .replace(/\s+/g, " ")
+          .trim();
+        if (signal.aborted) return;
+        await repo.indexChapter(book, index, body);
+        indexed++;
+        status(`Making chapters searchable · ${indexed} indexed`);
+      } catch {
+        if (signal.aborted) return;
+        await repo.skipChapter(book.id, relative);
       }
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
   }
-  if (!signal.aborted)
+  if (!signal.aborted) {
+    const skipped = await repo.unavailableChapters();
     status(
       skipped
-        ? `${skipped} chapters could not be indexed. Search includes available chapter text.`
+        ? `${skipped} chapters are unavailable. Retry after downloading their files.`
         : "Local EPUB chapters are searchable.",
     );
+  }
 }

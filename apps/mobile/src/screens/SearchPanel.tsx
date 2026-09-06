@@ -1,4 +1,5 @@
 import {
+  type LibraryQuery,
   type Book,
   type LibraryRepository,
   type SearchHit,
@@ -18,10 +19,18 @@ export function SearchPanel({
   repo,
   onOpen,
   indexStatus,
+  scope,
+  scopeName,
+  onEverywhere,
+  onRetryIndex,
 }: {
   repo: LibraryRepository;
   onOpen: (book: Book) => void;
   indexStatus: string;
+  scope: LibraryQuery;
+  scopeName: string;
+  onEverywhere: () => void;
+  onRetryIndex: () => void;
 }) {
   const c = usePalette();
   const [term, setTerm] = useState(""),
@@ -39,7 +48,7 @@ export function SearchPanel({
     setError("");
     const timer = setTimeout(() => {
       void repo
-        .discover(term, kind)
+        .discover(term, kind, 0, scope)
         .then((hits) => {
           if (run === generation.current) {
             setRows(hits);
@@ -54,13 +63,13 @@ export function SearchPanel({
         });
     }, 180);
     return () => clearTimeout(timer);
-  }, [term, kind, repo]);
+  }, [term, kind, repo, scope]);
   async function next() {
     if (!more || busy || paging.current) return;
     paging.current = true;
     const run = generation.current;
     try {
-      const hits = await repo.discover(term, kind, rows.length);
+      const hits = await repo.discover(term, kind, rows.length, scope);
       if (run === generation.current) {
         setRows((old) => [...old, ...hits]);
         setMore(hits.length === 40);
@@ -83,6 +92,14 @@ export function SearchPanel({
   return (
     <Box flex={1}>
       <Box paddingHorizontal="l" gap="m" paddingBottom="m">
+        <Box flexDirection="row" gap="s" alignItems="center">
+          <Text variant="caption" flex={1}>
+            Searching {scopeName}
+          </Text>
+          {scopeName !== "everywhere" && (
+            <Chip label="Everywhere" onPress={onEverywhere} />
+          )}
+        </Box>
         <Field
           label="Search everything"
           value={term}
@@ -101,6 +118,9 @@ export function SearchPanel({
           ))}
         </Box>
         {!!indexStatus && <Text variant="caption">{indexStatus}</Text>}
+        {indexStatus.includes("unavailable") && (
+          <Chip label="Retry chapter indexing" onPress={onRetryIndex} />
+        )}
         {!!error && <Text color="danger">{error}</Text>}
       </Box>
       {busy ? (

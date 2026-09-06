@@ -1,4 +1,8 @@
-import { bookSchema, type LibraryRepository } from "@glassleaf/library";
+import {
+  bookSchema,
+  organizationRecordSchema,
+  type LibraryRepository,
+} from "@glassleaf/library";
 import {
   GoogleSignin,
   isSuccessResponse,
@@ -212,6 +216,24 @@ async function performSync(
     await repo.mergeRemote(records);
     await repo.setSetting(`drive-batch:${account}:${batch.id}`, "1");
   }
+  const structures = await listFiles("organization-batch");
+  for (const batch of structures) {
+    const key = `drive-organization:${account}:${batch.id}`;
+    if (await repo.setting(key)) continue;
+    status("Syncing collections, reading lists and views…");
+    const records = z
+      .array(organizationRecordSchema)
+      .max(100)
+      .parse(
+        await (
+          await request(
+            `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(batch.id)}?alt=media`,
+          )
+        ).json(),
+      );
+    await repo.mergeOrganization(records);
+    await repo.setSetting(key, "1");
+  }
   const pending = await repo.pending();
   for (const [index, book] of pending.entries()) {
     status(`Uploading book ${index + 1} of ${pending.length}…`);
@@ -243,6 +265,17 @@ async function performSync(
       "application/json",
     );
     await repo.acknowledge(batch);
+  }
+  const organization = await repo.pendingOrganization();
+  for (let offset = 0; offset < organization.length; offset += 100) {
+    const batch = organization.slice(offset, offset + 100);
+    await upload(
+      `Glassleaf-organization-${Date.now()}-${offset}.json`,
+      { type: "organization-batch" },
+      new TextEncoder().encode(JSON.stringify(batch)),
+      "application/json",
+    );
+    await repo.acknowledgeOrganization(batch);
   }
   const snapshot = await repo.snapshot();
   for (const book of snapshot.books) {

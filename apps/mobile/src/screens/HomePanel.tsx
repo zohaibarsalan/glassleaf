@@ -93,7 +93,9 @@ export function HomePanel({
                 key={v.id}
                 icon={BookOpen}
                 title={v.name}
-                onPress={() => onBrowse({ rules: v.rules, sort: v.sort })}
+                onPress={() =>
+                  onBrowse({ ...v.scope, rules: v.rules, sort: v.sort })
+                }
               />
             ))}
         </Box>

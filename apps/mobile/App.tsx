@@ -1,3 +1,7 @@
+import { ReadingListEditor } from "./src/screens/ReadingListEditor";
+import { type OrganizationRecord } from "@glassleaf/library";
+import { StructurePlanReview } from "./src/screens/StructurePlanReview";
+import { structurePlanSchema, type StructurePlan } from "@glassleaf/library";
 import { HomePanel } from "./src/screens/HomePanel";
 import { SearchPanel } from "./src/screens/SearchPanel";
 import { SpacesPanel } from "./src/screens/SpacesPanel";
@@ -32,6 +36,7 @@ import {
   Heart,
   Home,
   MoreHorizontal,
+  ListPlus,
   Layers,
   Leaf,
   Library,
@@ -70,6 +75,7 @@ import {
   Box,
   Button,
   IconButton,
+  Field,
   Sheet,
   Text,
   usePalette,
@@ -216,6 +222,23 @@ function LibraryApp({
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const [tab, setTab] = useState<Tab>("home");
+  const [searchScope, setSearchScope] = useState<{
+    query: LibraryQuery;
+    name: string;
+  }>({ query: {}, name: "everywhere" });
+  const [listEditor, setListEditor] = useState<{
+    record?: OrganizationRecord;
+    selected?: string[];
+  }>();
+  const [facetEditor, setFacetEditor] = useState<{
+    field: "tag" | "collection";
+    value: string;
+  }>();
+  const [facetName, setFacetName] = useState("");
+  const [organization, setOrganization] = useState<OrganizationRecord[]>([]);
+  const [contextFacets, setContextFacets] = useState<
+    { field: string; value: string; count: number }[]
+  >([]);
   const [query, setQuery] = useState<LibraryQuery>({});
   const [search, setSearch] = useState("");
   const [books, setBooks] = useState<Book[]>([]);
@@ -233,6 +256,19 @@ function LibraryApp({
   const [libraryMenu, setLibraryMenu] = useState(false);
   const [views, setViews] = useState<SavedView[]>([]);
   const [indexStatus, setIndexStatus] = useState("");
+  useEffect(() => {
+    void repo
+      .organization()
+      .then(setOrganization)
+      .catch((e) => setNotice(String(e)));
+  }, [repo, revision, views]);
+  useEffect(() => {
+    if (sortSheet)
+      void repo
+        .facets(query)
+        .then(setContextFacets)
+        .catch((e) => setNotice(String(e)));
+  }, [repo, query, sortSheet]);
   useEffect(() => {
     void repo
       .savedViews()
@@ -273,7 +309,7 @@ function LibraryApp({
   }
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
-  const [plan, setPlan] = useState<OrganizationPlan>();
+  const [plan, setPlan] = useState<OrganizationPlan | StructurePlan>();
   const [noteBooks, setNoteBooks] = useState<Book[]>([]);
   useEffect(() => {
     if (!__DEV__) return;
@@ -291,7 +327,12 @@ function LibraryApp({
     const timer = setTimeout(() => {
       void (async () => {
         if (!(await repo.setting("drive-account"))) return;
-        if (syncedOnLaunch.current && !(await repo.pending()).length) return;
+        if (
+          syncedOnLaunch.current &&
+          !(await repo.pending()).length &&
+          !(await repo.pendingOrganization()).length
+        )
+          return;
         syncedOnLaunch.current = true;
         try {
           await syncDrive(repo, setSyncMessage);
@@ -419,7 +460,9 @@ function LibraryApp({
     if (result.canceled) return;
     await run("Reading organization plan…", async () => {
       setPlan(
-        planSchema.parse(JSON.parse(await readExternal(result.assets[0]!.uri))),
+        planSchema
+          .or(structurePlanSchema)
+          .parse(JSON.parse(await readExternal(result.assets[0]!.uri))),
       );
     });
   }
@@ -431,6 +474,10 @@ function LibraryApp({
   const contentWidth = width - (wide ? 244 : 0) - (wide ? 72 : 40);
   const columns = Math.max(2, Math.min(6, Math.floor(contentWidth / 145)));
   const hasFilters = !!(
+    query.series ||
+    query.collectionId ||
+    query.readingListId ||
+    query.unfiled ||
     query.rules?.conditions.length ||
     query.search?.trim() ||
     query.kind ||
@@ -445,12 +492,23 @@ function LibraryApp({
     ? views.find(
         (view) =>
           JSON.stringify(view.rules) === JSON.stringify(query.rules) &&
-          view.sort === query.sort,
+          view.sort === query.sort &&
+          view.scope?.series === query.series &&
+          view.scope?.collectionId === query.collectionId &&
+          view.scope?.readingListId === query.readingListId &&
+          Boolean(view.scope?.unfiled) === Boolean(query.unfiled),
       )
     : undefined;
+  const activeGroup = organization.find(
+    (r) => r.id === (query.readingListId ?? query.collectionId),
+  );
   const title = query.trash
     ? "Trash"
-    : (activeView?.name ??
+    : (query.series ??
+      (activeGroup?.value.kind !== "view"
+        ? activeGroup?.value.name
+        : undefined) ??
+      activeView?.name ??
       query.collection ??
       (query.kind
         ? kindLabels[query.kind]
@@ -464,6 +522,11 @@ function LibraryApp({
       <Reader
         book={reader}
         repo={repo}
+        onSearch={(book) => {
+          setSearchScope({ query: { bookId: book.id }, name: book.title });
+          setReader(undefined);
+          setTab("search");
+        }}
         onClose={() => {
           setReader(undefined);
           reload();
@@ -493,6 +556,8 @@ function LibraryApp({
                   title={t.title}
                   active={tab === t.id}
                   onPress={() => {
+                    if (t.id === "search")
+                      setSearchScope({ query: {}, name: "everywhere" });
                     setTab(t.id);
                     setQuery({});
                     setSearch("");
@@ -613,7 +678,7 @@ function LibraryApp({
                           ? `${books.length}${more ? "+" : ""} matching ${books.length === 1 ? "story" : "stories"}`
                           : `${stats.total} ${stats.total === 1 ? "story" : "stories"} · ${stats.reading} in progress`
                         : tab === "collections"
-                          ? "Collections, tags, and story types."
+                          ? "Your stories, connected your way."
                           : tab === "notes"
                             ? "The thoughts and pages you want to keep."
                             : "Appearance, sync, and library tools."}
@@ -641,6 +706,16 @@ function LibraryApp({
               repo={repo}
               onOpen={setReader}
               indexStatus={indexStatus}
+              onRetryIndex={() =>
+                void run("Retrying chapter indexing…", () =>
+                  repo.retryChapters(),
+                )
+              }
+              scope={searchScope.query}
+              scopeName={searchScope.name}
+              onEverywhere={() =>
+                setSearchScope({ query: {}, name: "everywhere" })
+              }
             />
           )}
           {tab === "library" && (
@@ -697,6 +772,13 @@ function LibraryApp({
                     >
                       Organize selected
                     </Button>
+                    <IconButton
+                      icon={ListPlus}
+                      label="Make reading list from selection"
+                      onPress={() =>
+                        setListEditor({ selected: [...selection.keys()] })
+                      }
+                    />
                   </Box>
                 )}
               </Box>
@@ -790,6 +872,14 @@ function LibraryApp({
               stats={stats}
               views={views}
               onBrowse={browse}
+              repo={repo}
+              revision={revision}
+              onChanged={reload}
+              onEditList={(record) => setListEditor({ record })}
+              onManageFacet={(field, value) => {
+                setFacetEditor({ field, value });
+                setFacetName(value);
+              }}
               onCreate={() => {
                 setQuery({});
                 setSortSheet(true);
@@ -858,7 +948,11 @@ function LibraryApp({
                     key={t.id}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: tab === t.id }}
-                    onPress={() => setTab(t.id)}
+                    onPress={() => {
+                      if (t.id === "search")
+                        setSearchScope({ query: {}, name: "everywhere" });
+                      setTab(t.id);
+                    }}
                     style={{
                       flex: 1,
                       alignItems: "center",
@@ -967,6 +1061,27 @@ function LibraryApp({
           <Button
             secondary
             onPress={() => {
+              setSearchScope({ query, name: title });
+              setTab("search");
+              setLibraryMenu(false);
+            }}
+          >
+            Search this view
+          </Button>
+          {query.readingListId && (
+            <Button
+              secondary
+              onPress={() => {
+                setListEditor({ record: activeGroup });
+                setLibraryMenu(false);
+              }}
+            >
+              Edit reading order
+            </Button>
+          )}
+          <Button
+            secondary
+            onPress={() => {
               setLayout((v) => (v === "grid" ? "list" : "grid"));
               setLibraryMenu(false);
             }}
@@ -1003,11 +1118,75 @@ function LibraryApp({
           </Button>
         </Sheet>
       )}
+      {facetEditor && (
+        <Sheet
+          title={`Manage ${facetEditor.field}`}
+          onClose={() => setFacetEditor(undefined)}
+        >
+          <Text>
+            Rename this group, or merge it into an existing name. All matching
+            books and saved rules are updated together.
+          </Text>
+          <Field
+            label="Group name"
+            value={facetName}
+            onChangeText={setFacetName}
+          />
+          <Button
+            disabled={!facetName.trim()}
+            onPress={() =>
+              void run("Updating group…", async () => {
+                await repo.renameFacet(
+                  facetEditor.field,
+                  facetEditor.value,
+                  facetName,
+                );
+                setFacetEditor(undefined);
+              })
+            }
+          >
+            Rename or merge
+          </Button>
+          <Button
+            secondary
+            onPress={() =>
+              void run("Removing group…", async () => {
+                await repo.renameFacet(
+                  facetEditor.field,
+                  facetEditor.value,
+                  "",
+                );
+                setFacetEditor(undefined);
+              })
+            }
+          >
+            Remove group, keep books
+          </Button>
+        </Sheet>
+      )}
+      {listEditor && (
+        <ReadingListEditor
+          repo={repo}
+          {...listEditor}
+          onClose={() => setListEditor(undefined)}
+          onSaved={() => {
+            setListEditor(undefined);
+            reload();
+          }}
+        />
+      )}
       {sortSheet && (
         <ViewEditor
           initial={{
             id: activeView?.id,
             name: activeView?.name,
+            pinned: activeView?.pinned,
+            scope: {
+              series: query.series,
+              collectionId: query.collectionId,
+              readingListId: query.readingListId,
+              unfiled: query.unfiled,
+            },
             rules: query.rules ?? {
               match: "all",
               conditions: [
@@ -1031,19 +1210,51 @@ function LibraryApp({
             },
             sort: query.sort ?? "added",
           }}
-          stats={stats}
+          stats={{
+            ...stats,
+            tags: contextFacets
+              .filter((f) => f.field === "tag")
+              .map((f) => f.value),
+            collections: contextFacets
+              .filter((f) => f.field === "collection")
+              .map((f) => f.value),
+          }}
           onClose={() => setSortSheet(false)}
           onApply={(rules, sort) => {
-            browse({ rules, sort, trash: query.trash });
+            browse({
+              rules,
+              sort,
+              trash: query.trash,
+              series: query.series,
+              readingListId: query.readingListId,
+              collectionId: query.collectionId,
+              unfiled: query.unfiled,
+            });
             setSortSheet(false);
           }}
           onSave={async (view) => {
-            await repo.saveView(view);
+            await repo.saveView(
+              view,
+              organization.find((r) => r.id === view.id)?.revision ?? null,
+            );
             setViews(await repo.savedViews());
           }}
         />
       )}
-      {plan && (
+      {plan?.version === 2 && (
+        <StructurePlanReview
+          repo={repo}
+          plan={plan}
+          onClose={() => setPlan(undefined)}
+          onApply={() =>
+            void run("Applying organization…", async () => {
+              await repo.applyStructurePlan(plan);
+              setPlan(undefined);
+            })
+          }
+        />
+      )}
+      {plan?.version === 1 && (
         <PlanReview
           plan={plan}
           repo={repo}
