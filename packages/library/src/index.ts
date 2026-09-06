@@ -66,6 +66,14 @@ export const bookSchema = z.object({
         locator: z.string(),
         text: z.string().max(20000),
         createdAt: z.string(),
+        quote: z.string().max(5000).optional(),
+        endAnchor: z
+          .object({
+            text: z.string().max(240),
+            offset: z.number().int().nonnegative(),
+            node: z.number().int().nonnegative(),
+          })
+          .optional(),
       }),
     )
     .default([]),
@@ -459,6 +467,7 @@ export class LibraryRepository {
         | "language"
         | "direction"
         | "layout"
+        | "pdfNightMode"
         | "favorite"
         | "status"
         | "progress"

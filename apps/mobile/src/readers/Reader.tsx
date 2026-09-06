@@ -15,13 +15,17 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
+  FlatList,
+  Linking,
   BackHandler,
   Pressable,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { fileURI, hasFile } from "../data/files";
+import * as Sharing from "expo-sharing";
+import { fileURI, hasFile, writeExport } from "../data/files";
 import {
   Box,
   Button,
@@ -35,6 +39,9 @@ import {
 import { ComicCanvas, ComicStripPage } from "./ComicCanvas";
 import { chapterTitles } from "../data/epubNavigation";
 import { EPUBPage } from "./EPUBPage";
+import { parseLocator, encodeLocator, type TextAnchor } from "./location";
+import { ReadingAppearance } from "./ReadingAppearance";
+import { readingPreferencesSchema } from "./preferences";
 import { PDFPages } from "./PDFPages";
 export function Reader({
   book: initialBook,
@@ -71,6 +78,10 @@ export function Reader({
   const start = parseLocator(book.locator);
   const [page, setPage] = useState(start.page);
   const [fraction, setFraction] = useState(start.fraction);
+  const anchor = useRef<{ page: number; value?: TextAnchor }>({
+    page: start.page,
+    value: start.anchor,
+  });
   const [count, setCount] = useState(
     book.format === "epub"
       ? book.asset.chapters.length
@@ -80,24 +91,37 @@ export function Reader({
   const [settings, setSettings] = useState(false);
   const [contents, setContents] = useState(false);
   const [note, setNote] = useState<string>();
-  const [size, setSize] = useState(20);
+  const [preferences, setPreferences] = useState(() =>
+    readingPreferencesSchema.parse({}),
+  );
+  const [appearance, setAppearance] = useState(false);
+  const size = preferences.size;
   const [command, setCommand] = useState<{
     id: number;
     delta?: number;
     fraction?: number;
+    anchor?: TextAnchor;
   }>();
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState(1);
   const [selection, setSelection] = useState("");
+  const selectionRange = useRef<{ start?: TextAnchor; end?: TextAnchor }>({});
+  const [footnote, setFootnote] = useState<string>();
+  const [annotations, setAnnotations] = useState(false);
   const [jump, setJump] = useState("");
   const scrollList = useRef<FlashListRef<string>>(null);
   const current = useRef({ page, fraction });
   current.current = { page, fraction };
   const saved = useRef("");
-  const initialSizeLoaded = useRef(false);
+
   const save = useCallback(async () => {
     const position = current.current;
-    const locator = `${position.page}:${position.fraction}`;
+    const locator = encodeLocator(
+      position.page,
+      position.fraction,
+      initialBook.asset.chapters[position.page]?.path,
+      anchor.current.page === position.page ? anchor.current.value : undefined,
+    );
     if (locator === saved.current || !hasFile(initialBook.asset.path)) return;
     await repo.update(initialBook.id, {
       locator,
@@ -119,17 +143,22 @@ export function Reader({
       .catch((e) => setError(String(e)));
   }, [save, onClose]);
   useEffect(() => {
-    void repo.setting("reader-size").then((value) => {
-      if (value) setSize(Math.min(Math.max(Number(value) || 20, 14), 34));
-      initialSizeLoaded.current = true;
-    });
+    let cancelled = false;
+    void Promise.all([
+      repo.setting("reading-preferences"),
+      repo.setting("reader-size"),
+    ])
+      .then(([stored, legacy]) => {
+        const parsed = readingPreferencesSchema.safeParse(
+          stored ? JSON.parse(stored) : { size: Number(legacy) || 20 },
+        );
+        if (!cancelled && parsed.success) setPreferences(parsed.data);
+      })
+      .catch((error) => setError(String(error)));
+    return () => {
+      cancelled = true;
+    };
   }, [repo]);
-  useEffect(() => {
-    if (initialSizeLoaded.current)
-      void repo
-        .setSetting("reader-size", String(size))
-        .catch((e) => setError(String(e)));
-  }, [size, repo]);
   useEffect(() => {
     const timer = setTimeout(() => {
       void save().catch((e) => setError(String(e)));
@@ -158,7 +187,8 @@ export function Reader({
     >,
   ) {
     try {
-      setBook(await repo.update(book.id, patch));
+      const updated = await repo.update(book.id, patch);
+      setBook((current) => ({ ...updated, asset: current.asset }));
       if (patch.layout === "spread")
         setPage((p) => (p > 0 ? 1 + Math.floor((p - 1) / 2) * 2 : 0));
     } catch (e) {
@@ -170,7 +200,12 @@ export function Reader({
     setFraction(book.format === "epub" && delta < 0 ? 1 : 0);
     setZoom(1);
   }
-  const locator = `${page}:${fraction}`;
+  const locator = encodeLocator(
+    page,
+    fraction,
+    book.asset.chapters[page]?.path,
+    anchor.current.page === page ? anchor.current.value : undefined,
+  );
   const bookmarked = book.bookmarks.some(
     (mark) => parseLocator(mark.locator).page === page,
   );
@@ -247,9 +282,20 @@ export function Reader({
             book={book}
             chapter={page}
             size={size}
+            preferences={preferences}
             initial={fraction}
+            initialAnchor={
+              anchor.current.page === page ? anchor.current.value : undefined
+            }
+            onAnchor={(value) => {
+              anchor.current = { page, value };
+            }}
             onProgress={setFraction}
-            onSelection={setSelection}
+            onSelection={(text, start, end) => {
+              setSelection(text);
+              selectionRange.current = { start, end };
+            }}
+            onFootnote={setFootnote}
             onTap={() => setControls((v) => !v)}
             command={command}
             onEdge={turn}
@@ -407,6 +453,136 @@ export function Reader({
           </View>
         </Box>
       )}
+      {!!selection && (
+        <Box padding="s" gap="s" flexDirection="row" flexWrap="wrap">
+          <Button
+            disabled={
+              !selectionRange.current.start || !selectionRange.current.end
+            }
+            onPress={() => {
+              const selected = selectionRange.current;
+              void update({
+                notes: [
+                  ...book.notes,
+                  {
+                    id: randomUUID(),
+                    locator: encodeLocator(
+                      page,
+                      fraction,
+                      book.asset.chapters[page]?.path,
+                      selected.start,
+                    ),
+                    text: selection,
+                    quote: selection,
+                    endAnchor: selected.end,
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+              });
+              setSelection("");
+            }}
+          >
+            Highlight
+          </Button>
+          <Button
+            secondary
+            disabled={selection.trim().length > 80}
+            onPress={() => {
+              void Linking.openURL(
+                `https://en.wiktionary.org/wiki/${encodeURIComponent(selection.trim())}`,
+              ).catch((error) => setError(String(error)));
+            }}
+          >
+            Look up online
+          </Button>
+          <Button secondary onPress={() => setSelection("")}>
+            Dismiss
+          </Button>
+        </Box>
+      )}
+      {footnote !== undefined && (
+        <Sheet title="Footnote" onClose={() => setFootnote(undefined)}>
+          <Text>{footnote}</Text>
+        </Sheet>
+      )}
+      {annotations && (
+        <Sheet title="Highlights & notes" onClose={() => setAnnotations(false)}>
+          {book.notes.length ? (
+            <>
+              <Button
+                secondary
+                onPress={() => {
+                  void writeExport(`glassleaf-${book.id}-annotations.json`, {
+                    version: 1,
+                    title: book.title,
+                    author: book.author,
+                    bookId: book.id,
+                    annotations: book.notes,
+                  })
+                    .then((uri) =>
+                      Sharing.shareAsync(uri, {
+                        mimeType: "application/json",
+                        dialogTitle: "Export annotations",
+                      }),
+                    )
+                    .catch((error) => setError(String(error)));
+                }}
+              >
+                Export annotations
+              </Button>
+              {book.notes.map((entry) => (
+                <Pressable
+                  key={entry.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open annotation: ${entry.text}`}
+                  onPress={() => {
+                    const location = parseLocator(entry.locator);
+                    anchor.current = {
+                      page: location.page,
+                      value: location.anchor,
+                    };
+                    setPage(location.page);
+                    setFraction(location.fraction);
+                    setCommand({
+                      id: Date.now(),
+                      fraction: location.fraction,
+                      anchor: location.anchor,
+                    });
+                    setAnnotations(false);
+                  }}
+                >
+                  <Box padding="m" gap="s" backgroundColor="surface">
+                    <Text variant="caption">
+                      {entry.quote ? "HIGHLIGHT" : "NOTE"} ·{" "}
+                      {book.asset.chapters[parseLocator(entry.locator).page]
+                        ?.title ??
+                        `Page ${parseLocator(entry.locator).page + 1}`}
+                    </Text>
+                    <Text numberOfLines={4}>{entry.text}</Text>
+                  </Box>
+                </Pressable>
+              ))}
+            </>
+          ) : (
+            <Text color="secondary">
+              Select a passage to highlight it, or keep a note while you read.
+            </Text>
+          )}
+        </Sheet>
+      )}
+      {appearance && (
+        <Sheet title="Reading appearance" onClose={() => setAppearance(false)}>
+          <ReadingAppearance
+            value={preferences}
+            onChange={(next) => {
+              setPreferences(next);
+              void repo
+                .setSetting("reading-preferences", JSON.stringify(next))
+                .catch((error) => setError(String(error)));
+            }}
+          />
+        </Sheet>
+      )}
       {settings && (
         <Sheet title="Settle into the story" onClose={() => setSettings(false)}>
           <Button
@@ -420,24 +596,15 @@ export function Reader({
             Find in this book
           </Button>
           {book.format === "epub" && (
-            <Box
-              flexDirection="row"
-              alignItems="center"
-              justifyContent="space-between"
+            <Button
+              secondary
+              onPress={() => {
+                setSettings(false);
+                setAppearance(true);
+              }}
             >
-              <Text>Text size</Text>
-              <IconButton
-                icon={Minus}
-                label="Smaller text"
-                onPress={() => setSize((s) => Math.max(14, s - 2))}
-              />
-              <Text>{size}</Text>
-              <IconButton
-                icon={Plus}
-                label="Larger text"
-                onPress={() => setSize((s) => Math.min(34, s + 2))}
-              />
-            </Box>
+              Reading appearance
+            </Button>
           )}
           {book.format === "pdf" && (
             <>
@@ -532,6 +699,62 @@ export function Reader({
           }
           onClose={() => setContents(false)}
         >
+          <Button
+            secondary
+            onPress={() => {
+              setContents(false);
+              setAnnotations(true);
+            }}
+          >
+            Highlights & notes ({book.notes.length})
+          </Button>
+          {book.format === "cbz" && (
+            <Box height={160}>
+              <FlatList
+                horizontal
+                data={book.asset.pages}
+                initialScrollIndex={page}
+                getItemLayout={(_, index) => ({
+                  length: 104,
+                  offset: 104 * index,
+                  index,
+                })}
+                keyExtractor={(path) => path}
+                renderItem={({ item, index }) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open page ${index + 1}`}
+                    onPress={() => {
+                      setPage(index);
+                      setFraction(0);
+                      setContents(false);
+                      scrollList.current?.scrollToIndex({
+                        index,
+                        animated: false,
+                      });
+                    }}
+                    style={{ width: 104, padding: 6 }}
+                  >
+                    <Image
+                      source={fileURI(`${book.id}/content/${item}`)}
+                      style={{
+                        width: 92,
+                        height: 122,
+                        borderRadius: 6,
+                        borderWidth: index === page ? 2 : 0,
+                        borderColor: c.accent,
+                      }}
+                      contentFit="contain"
+                      recyclingKey={item}
+                    />
+                    <Text variant="caption" textAlign="center">
+                      {index + 1}
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </Box>
+          )}
           <Field
             label={book.format === "epub" ? "Go to chapter" : "Go to page"}
             value={jump}
@@ -580,8 +803,13 @@ export function Reader({
                 onPress={() => {
                   const p = parseLocator(mark.locator);
                   setPage(p.page);
+                  anchor.current = { page: p.page, value: p.anchor };
                   setFraction(p.fraction);
-                  setCommand({ id: Date.now(), fraction: p.fraction });
+                  setCommand({
+                    id: Date.now(),
+                    fraction: p.fraction,
+                    anchor: p.anchor,
+                  });
                   setContents(false);
                 }}
               >
@@ -635,13 +863,4 @@ export function Reader({
       )}
     </SafeAreaView>
   );
-}
-function parseLocator(locator: string) {
-  const [page, fraction] = locator.split(":").map(Number);
-  return {
-    page: Number.isFinite(page) ? Math.max(page ?? 0, 0) : 0,
-    fraction: Number.isFinite(fraction)
-      ? Math.min(Math.max(fraction ?? 0, 0), 1)
-      : 0,
-  };
 }
