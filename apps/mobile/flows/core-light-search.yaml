@@ -1,0 +1,33 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- tapOn: "Appearance"
+- tapOn: "Paper theme"
+- tapOn: "Close"
+- tapOn: "Home"
+- takeScreenshot: paper-home
+- tapOn: "Library"
+- takeScreenshot: paper-library
+- tapOn: "Organize"
+- assertVisible: "Manga shelf"
+- takeScreenshot: paper-organize
+- tapOn: "Search"
+- tapOn: "Chapters"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "the"
+- extendedWaitUntil:
+    visible: "passage: Chapter 1"
+    timeout: 30000
+- takeScreenshot: paper-chapter-search
+- tapOn:
+    text: "passage: Chapter 1"
+    index: 0
+- takeScreenshot: paper-chapter-reader

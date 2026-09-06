@@ -10,10 +10,11 @@ import {
   Undo2,
   Upload,
 } from "lucide-react-native";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView } from "react-native";
 import { DriveSettings } from "../sync/DriveSettings";
-import { Box, Button, Chip, Text, usePalette } from "../ui/theme";
+import { Box, Button, Chip, Sheet, Text, usePalette } from "../ui/theme";
 export function CollectionsPanel({
   wide,
   stats,
@@ -178,6 +179,7 @@ export function SettingsPanel({
   onSamples: () => void;
   onTrash: () => void;
 }) {
+  const [section, setSection] = useState<string>();
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
@@ -187,38 +189,75 @@ export function SettingsPanel({
         paddingBottom: 36,
       }}
     >
-      {appearance}
-      <DriveSettings repo={repo} onSynced={onSynced} />
-      <Box gap="m">
-        <Text variant="eyebrow">AGENT ORGANIZATION</Text>
-        <Text variant="heading">A helping hand for a big library.</Text>
-        <Text color="secondary">
-          Use your own AI agent through MCP. Export a metadata snapshot, then
-          import its organization plan. Review every batch before applying it.
-        </Text>
-        <Button secondary icon={Upload} onPress={onExport}>
-          Export library for your agent
-        </Button>
-        <Button secondary icon={Download} onPress={onPlan}>
-          Review an organization plan
-        </Button>
-        <Button secondary icon={Undo2} onPress={onUndo}>
-          Undo last organization batch
-        </Button>
-      </Box>
-      <Box gap="m">
-        <Text variant="eyebrow">YOUR LIBRARY</Text>
-        <Button secondary icon={BookOpen} onPress={onSamples}>
-          Add original sample books
-        </Button>
-        <Button secondary icon={Trash2} onPress={onTrash}>
-          Open Trash
-        </Button>
-        <Text variant="caption">
-          Glassleaf 0.1 · Local first. No account needed to read.\nEPUB, PDF,
-          and CBZ · CBR support is still to come.
-        </Text>
-      </Box>
+      {[
+        ["appearance", "Appearance"],
+        ["sync", "Sync & backups"],
+        ["agent", "Agent organization"],
+        ["library", "Library tools"],
+      ].map(([id, label]) => (
+        <Pressable
+          key={id}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          onPress={() => setSection(id)}
+        >
+          <Box flexDirection="row" alignItems="center" paddingVertical="l">
+            <Text variant="label" flex={1}>
+              {label}
+            </Text>
+            <ChevronRight size={20} />
+          </Box>
+        </Pressable>
+      ))}
+      {section === "appearance" && (
+        <Sheet title="Appearance" onClose={() => setSection(undefined)}>
+          {appearance}
+        </Sheet>
+      )}
+      {section === "sync" && (
+        <Sheet title="Sync & backups" onClose={() => setSection(undefined)}>
+          <DriveSettings repo={repo} onSynced={onSynced} />
+        </Sheet>
+      )}
+      {section === "agent" && (
+        <Sheet title="Agent organization" onClose={() => setSection(undefined)}>
+          <Box gap="m">
+            <Text variant="eyebrow">AGENT ORGANIZATION</Text>
+            <Text variant="heading">A helping hand for a big library.</Text>
+            <Text color="secondary">
+              Use your own AI agent through MCP. Export a metadata snapshot,
+              then import its organization plan. Review every batch before
+              applying it.
+            </Text>
+            <Button secondary icon={Upload} onPress={onExport}>
+              Export library for your agent
+            </Button>
+            <Button secondary icon={Download} onPress={onPlan}>
+              Review an organization plan
+            </Button>
+            <Button secondary icon={Undo2} onPress={onUndo}>
+              Undo last organization batch
+            </Button>
+          </Box>
+        </Sheet>
+      )}
+      {section === "library" && (
+        <Sheet title="Library tools" onClose={() => setSection(undefined)}>
+          <Box gap="m">
+            <Text variant="eyebrow">YOUR LIBRARY</Text>
+            <Button secondary icon={BookOpen} onPress={onSamples}>
+              Add original sample books
+            </Button>
+            <Button secondary icon={Trash2} onPress={onTrash}>
+              Open Trash
+            </Button>
+            <Text variant="caption">
+              Glassleaf 0.1 · Local first. No account needed to read.\nEPUB,
+              PDF, and CBZ · CBR support is still to come.
+            </Text>
+          </Box>
+        </Sheet>
+      )}
     </ScrollView>
   );
 }

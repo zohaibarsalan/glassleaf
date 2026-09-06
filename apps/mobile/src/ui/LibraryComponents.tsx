@@ -76,7 +76,7 @@ export function BookTile({
   book: Book;
   list: boolean;
   onOpen: () => void;
-  onMenu: () => void;
+  onMenu?: () => void;
   selected?: boolean;
 }) {
   const c = usePalette();
@@ -108,12 +108,22 @@ export function BookTile({
           {book.asset.cover ? (
             <Image
               source={fileURI(book.asset.cover)}
-              style={{ flex: 1 }}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+              }}
               contentFit="cover"
               cachePolicy="memory-disk"
               recyclingKey={book.id}
               transition={0}
             />
+          ) : list ? (
+            <Box flex={1} alignItems="center" justifyContent="center">
+              <Library size={24} color={c.accent} />
+            </Box>
           ) : (
             <Box flex={1} padding="m" justifyContent="space-between">
               <Text variant="eyebrow" color="accent">
@@ -191,23 +201,25 @@ export function BookTile({
                 ? ` · ${Math.round(book.progress * 100)}%`
                 : ""}
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Options for ${book.title}`}
-              onPress={(e) => {
-                e.stopPropagation();
-                onMenu();
-              }}
-              hitSlop={10}
-              style={{
-                width: 32,
-                height: 28,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <MoreHorizontal size={18} color={c.secondary} />
-            </Pressable>
+            {onMenu && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Options for ${book.title}`}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onMenu();
+                }}
+                hitSlop={10}
+                style={{
+                  width: 32,
+                  height: 28,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <MoreHorizontal size={18} color={c.secondary} />
+              </Pressable>
+            )}
           </Box>
         </Box>
       </Pressable>

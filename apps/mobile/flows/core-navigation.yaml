@@ -1,0 +1,38 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- takeScreenshot: mocha-home
+- tapOn: "Library"
+- assertVisible: "View options"
+- takeScreenshot: mocha-library
+- tapOn: "View options"
+- tapOn: "Add condition"
+- tapOn: "Story type"
+- tapOn: "Manga"
+- tapOn: "Add condition"
+- tapOn: "File format"
+- tapOn: "CBZ"
+- takeScreenshot: mocha-view-rules
+- tapOn:
+    id: "field-View name"
+- inputText: "Manga shelf"
+- tapOn: "Save view"
+- assertVisible: "All of 2 conditions"
+- takeScreenshot: mocha-saved-library
+- tapOn: "Organize"
+- assertVisible: "Manga shelf"
+- takeScreenshot: mocha-organize
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "light"
+- extendedWaitUntil:
+    visible: "book: The Shape of Light"
+    timeout: 15000
+- takeScreenshot: mocha-search
+- tapOn: "book: The Shape of Light"
+- takeScreenshot: mocha-search-reader

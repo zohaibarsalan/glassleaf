@@ -182,11 +182,11 @@ CREATE VIRTUAL TABLE IF NOT EXISTS discovery USING fts5(bookId UNINDEXED, kind U
 CREATE TABLE IF NOT EXISTS chapter_index (bookId TEXT, path TEXT, hash TEXT, PRIMARY KEY(bookId,path));
 CREATE TABLE IF NOT EXISTS saved_views (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 `;
-const discoveryInsert = (row: string) => `
- INSERT INTO discovery SELECT ${row}.id,'book','',${row}.title,${row}.author || ' ' || COALESCE(json_extract(${row}.data,'$.series'),'') || ' ' || COALESCE(json_extract(${row}.data,'$.tags'),'') || ' ' || COALESCE(json_extract(${row}.data,'$.collections'),'');
- INSERT INTO discovery SELECT ${row}.id,'note',json_extract(value,'$.locator'),${row}.title,json_extract(value,'$.text') FROM json_each(${row}.data,'$.notes');
- INSERT INTO discovery SELECT ${row}.id,'bookmark',json_extract(value,'$.locator'),${row}.title,json_extract(value,'$.label') FROM json_each(${row}.data,'$.bookmarks');
- INSERT INTO discovery SELECT ${row}.id,'chapter',key || ':0',json_extract(value,'$.title'),'' FROM json_each(${row}.data,'$.asset.chapters');
+const discoveryInsert = (row: "new" | "books") => `
+ INSERT INTO discovery SELECT ${row}.id,'book','',${row}.title,${row}.author || ' ' || COALESCE(json_extract(${row}.data,'$.series'),'') || ' ' || COALESCE(json_extract(${row}.data,'$.tags'),'') || ' ' || COALESCE(json_extract(${row}.data,'$.collections'),'') ${row === "books" ? "FROM books" : ""};
+ INSERT INTO discovery SELECT ${row}.id,'note',json_extract(value,'$.locator'),${row}.title,json_extract(value,'$.text') FROM ${row === "books" ? "books, " : ""}json_each(${row}.data,'$.notes');
+ INSERT INTO discovery SELECT ${row}.id,'bookmark',json_extract(value,'$.locator'),${row}.title,json_extract(value,'$.label') FROM ${row === "books" ? "books, " : ""}json_each(${row}.data,'$.bookmarks');
+ INSERT INTO discovery SELECT ${row}.id,'chapter',key || ':0',json_extract(value,'$.title'),'' FROM ${row === "books" ? "books, " : ""}json_each(${row}.data,'$.asset.chapters');
 `;
 export type SearchHit = {
   bookId: string;
@@ -228,17 +228,7 @@ export class LibraryRepository {
           CREATE TRIGGER discovery_update AFTER UPDATE ON books WHEN json_extract(old.data,'$.title') IS NOT json_extract(new.data,'$.title') OR json_extract(old.data,'$.author') IS NOT json_extract(new.data,'$.author') OR json_extract(old.data,'$.tags') IS NOT json_extract(new.data,'$.tags') OR json_extract(old.data,'$.collections') IS NOT json_extract(new.data,'$.collections') OR json_extract(old.data,'$.series') IS NOT json_extract(new.data,'$.series') OR json_extract(old.data,'$.notes') IS NOT json_extract(new.data,'$.notes') OR json_extract(old.data,'$.bookmarks') IS NOT json_extract(new.data,'$.bookmarks') OR json_extract(old.data,'$.asset') IS NOT json_extract(new.data,'$.asset') BEGIN
           DELETE FROM discovery WHERE bookId=old.id AND kind != 'passage'; ${discoveryInsert("new")} END;`);
         // Backfill existing metadata in SQL without materializing the library in JavaScript.
-        await sql.exec(
-          discoveryInsert("books")
-            .replaceAll(
-              "FROM json_each(books.data",
-              "FROM books, json_each(books.data",
-            )
-            .replace(
-              "json_extract(books.data,'$.collections'),'');",
-              "json_extract(books.data,'$.collections'),'') FROM books;",
-            ),
-        );
+        await sql.exec(discoveryInsert("books"));
         await sql.run(
           "INSERT INTO settings(key,value) VALUES('discovery-v1','1')",
         );

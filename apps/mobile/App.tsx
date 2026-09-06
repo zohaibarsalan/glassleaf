@@ -1,3 +1,9 @@
+import { HomePanel } from "./src/screens/HomePanel";
+import { SearchPanel } from "./src/screens/SearchPanel";
+import { SpacesPanel } from "./src/screens/SpacesPanel";
+import { ViewEditor } from "./src/screens/ViewEditor";
+import { indexLocalChapters } from "./src/data/searchIndex";
+import { type SavedView } from "@glassleaf/library";
 import {
   DMSans_400Regular,
   DMSans_500Medium,
@@ -12,7 +18,6 @@ import {
   type LibraryQuery,
   type LibraryRepository,
   type OrganizationPlan,
-  type Sort,
   type Stats,
 } from "@glassleaf/library";
 import { FlashList } from "@shopify/flash-list";
@@ -25,19 +30,17 @@ import {
   BookOpen,
   Folder,
   Heart,
+  Home,
+  MoreHorizontal,
   Layers,
-  LayoutGrid,
   Leaf,
   Library,
-  List,
-  NotebookPen,
   Pencil,
   Plus,
   Search,
   Settings,
   SlidersHorizontal,
   Trash2,
-  X,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -46,8 +49,6 @@ import {
   AppState,
   Platform,
   Pressable,
-  ScrollView,
-  TextInput,
   useWindowDimensions,
 } from "react-native";
 import "react-native-gesture-handler";
@@ -59,11 +60,7 @@ import { loadSamples } from "./src/data/samples";
 import { Reader } from "./src/readers/Reader";
 import { BookEditor } from "./src/screens/BookEditor";
 import { BulkOrganize } from "./src/screens/BulkOrganize";
-import {
-  CollectionsPanel,
-  NotesPanel,
-  SettingsPanel,
-} from "./src/screens/LibraryPanels";
+import { NotesPanel, SettingsPanel } from "./src/screens/LibraryPanels";
 import { PlanReview } from "./src/screens/PlanReview";
 import { ThemePanel } from "./src/screens/ThemePanel";
 import { syncDrive } from "./src/sync/drive";
@@ -72,7 +69,6 @@ import {
   base,
   Box,
   Button,
-  Chip,
   IconButton,
   Sheet,
   Text,
@@ -85,12 +81,12 @@ import {
   type ThemeDefinition,
 } from "./src/ui/themeDefinition";
 
-type Tab = "library" | "collections" | "notes" | "settings";
+type Tab = "home" | "library" | "collections" | "search" | "notes" | "settings";
 const tabs = [
+  { id: "home", title: "Home", icon: Home },
   { id: "library", title: "Library", icon: Library },
   { id: "collections", title: "Organize", icon: Layers },
-  { id: "notes", title: "Notes", icon: NotebookPen },
-  { id: "settings", title: "Settings", icon: Settings },
+  { id: "search", title: "Search", icon: Search },
 ] as const;
 const initialStats: Stats = {
   total: 0,
@@ -219,7 +215,7 @@ function LibraryApp({
   const c = usePalette();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
-  const [tab, setTab] = useState<Tab>("library");
+  const [tab, setTab] = useState<Tab>("home");
   const [query, setQuery] = useState<LibraryQuery>({});
   const [search, setSearch] = useState("");
   const [books, setBooks] = useState<Book[]>([]);
@@ -234,6 +230,36 @@ function LibraryApp({
   const [editor, setEditor] = useState<Book>();
   const [menu, setMenu] = useState<Book>();
   const [sortSheet, setSortSheet] = useState(false);
+  const [libraryMenu, setLibraryMenu] = useState(false);
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [indexStatus, setIndexStatus] = useState("");
+  useEffect(() => {
+    void repo
+      .savedViews()
+      .then(setViews)
+      .catch((e) => setNotice(String(e)));
+  }, [repo, revision]);
+  useEffect(() => {
+    if (reader) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void indexLocalChapters(repo, controller.signal, setIndexStatus).catch(
+        (e) => setIndexStatus(`Chapter indexing paused: ${String(e)}`),
+      );
+    }, 1200);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [repo, revision, reader]);
+  const browse = (q: LibraryQuery) => {
+    setQuery(q);
+    setSearch(q.search ?? "");
+    setTab("library");
+    setSelecting(false);
+    setSelection(new Map());
+  };
+
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<Map<string, Book>>(new Map());
   const [bulk, setBulk] = useState(false);
@@ -405,6 +431,7 @@ function LibraryApp({
   const contentWidth = width - (wide ? 244 : 0) - (wide ? 72 : 40);
   const columns = Math.max(2, Math.min(6, Math.floor(contentWidth / 145)));
   const hasFilters = !!(
+    query.rules?.conditions.length ||
     query.search?.trim() ||
     query.kind ||
     query.format ||
@@ -451,7 +478,7 @@ function LibraryApp({
           >
             <Brand />
             <Box gap="xs">
-              {tabs.slice(0, 3).map((t) => (
+              {tabs.map((t) => (
                 <NavRow
                   key={t.id}
                   icon={t.icon}
@@ -533,14 +560,22 @@ function LibraryApp({
                 marginBottom="s"
               >
                 <Brand />
-                <IconButton
-                  icon={Plus}
-                  label="Import books"
-                  onPress={() => void pickBooks()}
-                />
+                <Box flexDirection="row">
+                  <IconButton
+                    icon={Settings}
+                    label="Settings"
+                    onPress={() => setTab("settings")}
+                  />
+                  <IconButton
+                    icon={Plus}
+                    label="Import books"
+                    onPress={() => void pickBooks()}
+                  />
+                </Box>
               </Box>
             )}
             <Box
+              style={{ display: tab === "home" ? "none" : "flex" }}
               flexDirection="row"
               alignItems="center"
               justifyContent="space-between"
@@ -548,24 +583,32 @@ function LibraryApp({
             >
               <Box flex={1}>
                 <Text variant="heading" fontSize={24} lineHeight={32}>
-                  {tab === "library"
-                    ? title
-                    : tab === "collections"
-                      ? "Organize"
-                      : tab === "notes"
-                        ? "Notes & bookmarks"
-                        : "Settings"}
+                  {tab === "home"
+                    ? "Home"
+                    : tab === "search"
+                      ? "Search"
+                      : tab === "library"
+                        ? title
+                        : tab === "collections"
+                          ? "Organize"
+                          : tab === "notes"
+                            ? "Notes & bookmarks"
+                            : "Settings"}
                 </Text>
                 <Text variant="caption" marginTop="s">
-                  {tab === "library"
-                    ? hasFilters
-                      ? `${books.length}${more ? "+" : ""} matching ${books.length === 1 ? "story" : "stories"}`
-                      : `${stats.total} ${stats.total === 1 ? "story" : "stories"} · ${stats.reading} in progress`
-                    : tab === "collections"
-                      ? "Collections, tags, and story types."
-                      : tab === "notes"
-                        ? "The thoughts and pages you want to keep."
-                        : "Appearance, sync, and library tools."}
+                  {tab === "home"
+                    ? "Your reading space."
+                    : tab === "search"
+                      ? "Across your whole library."
+                      : tab === "library"
+                        ? hasFilters
+                          ? `${books.length}${more ? "+" : ""} matching ${books.length === 1 ? "story" : "stories"}`
+                          : `${stats.total} ${stats.total === 1 ? "story" : "stories"} · ${stats.reading} in progress`
+                        : tab === "collections"
+                          ? "Collections, tags, and story types."
+                          : tab === "notes"
+                            ? "The thoughts and pages you want to keep."
+                            : "Appearance, sync, and library tools."}
                 </Text>
               </Box>
               {wide && tab === "library" && (
@@ -575,81 +618,71 @@ function LibraryApp({
               )}
             </Box>
           </Box>
+          {tab === "home" && (
+            <HomePanel
+              repo={repo}
+              revision={revision}
+              views={views}
+              onOpen={setReader}
+              onBrowse={browse}
+              onImport={() => void pickBooks()}
+            />
+          )}
+          {tab === "search" && (
+            <SearchPanel
+              repo={repo}
+              onOpen={setReader}
+              indexStatus={indexStatus}
+            />
+          )}
           {tab === "library" && (
             <>
-              <Box
-                paddingHorizontal={wide ? "xxl" : "l"}
-                gap="m"
-                paddingBottom="l"
-              >
-                <Box flexDirection="row" alignItems="center" gap="s">
-                  <Box
-                    flex={1}
-                    flexDirection="row"
-                    alignItems="center"
-                    gap="s"
-                    backgroundColor="muted"
-                    borderRadius="m"
-                    paddingHorizontal="m"
-                  >
-                    <Search size={18} color={c.secondary} />
-                    <TextInput
-                      value={search}
-                      onChangeText={setSearch}
-                      placeholder="Find a title, author, or tag…"
-                      placeholderTextColor={c.secondary}
-                      accessibilityLabel="Search library"
-                      style={{
-                        flex: 1,
-                        minHeight: 46,
-                        fontFamily: "DM",
-                        color: c.text,
-                        fontSize: 14,
-                      }}
-                    />
-                    {!!search && (
-                      <IconButton
-                        icon={X}
-                        label="Clear search"
-                        onPress={() => setSearch("")}
-                      />
-                    )}
-                  </Box>
+              <Box paddingHorizontal="l" paddingBottom="m" gap="s">
+                <Box
+                  flexDirection="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
+                  <Text variant="caption" flex={1}>
+                    {query.rules?.conditions.length
+                      ? `${query.rules.match === "all" ? "All" : "Any"} of ${query.rules.conditions.length} conditions`
+                      : hasFilters
+                        ? "Filtered library"
+                        : "All stories"}
+                  </Text>
                   <IconButton
-                    icon={layout === "grid" ? List : LayoutGrid}
-                    label={layout === "grid" ? "List view" : "Grid view"}
-                    onPress={() =>
-                      setLayout((v) => (v === "grid" ? "list" : "grid"))
-                    }
+                    icon={SlidersHorizontal}
+                    label="View options"
+                    onPress={() => setSortSheet(true)}
+                  />
+                  <IconButton
+                    icon={MoreHorizontal}
+                    label="Library actions"
+                    onPress={() => setLibraryMenu(true)}
                   />
                 </Box>
-                <Box flexDirection="row" gap="s" alignItems="center">
-                  <Box flex={1}>
-                    <Button
-                      secondary
-                      icon={SlidersHorizontal}
-                      onPress={() => setSortSheet(true)}
-                    >
-                      Filters & sort
-                    </Button>
-                  </Box>
-                  <Box flex={1}>
+                {hasFilters && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear library filters"
+                    onPress={() => browse({})}
+                    style={{ paddingVertical: 8 }}
+                  >
+                    <Text color="accent">Clear filters</Text>
+                  </Pressable>
+                )}
+                {selecting && (
+                  <Box flexDirection="row" alignItems="center" gap="s">
+                    <Text flex={1}>{selection.size} selected</Text>
                     <Button
                       secondary
                       onPress={() => {
-                        setSelecting((v) => !v);
+                        setSelecting(false);
                         setSelection(new Map());
                       }}
                     >
-                      {selecting ? "Cancel selection" : "Select books"}
+                      Cancel
                     </Button>
-                  </Box>
-                </Box>
-                {selecting && (
-                  <Box flexDirection="row" gap="s" alignItems="center">
-                    <Text variant="label" flex={1}>
-                      {selection.size} selected
-                    </Text>
                     <Button
                       disabled={!selection.size}
                       onPress={() => setBulk(true)}
@@ -658,63 +691,6 @@ function LibraryApp({
                     </Button>
                   </Box>
                 )}
-                {(query.tag ||
-                  query.collection ||
-                  query.status ||
-                  query.format ||
-                  query.favorite) && (
-                  <Box flexDirection="row" flexWrap="wrap" gap="s">
-                    {(["tag", "collection", "status", "format"] as const).map(
-                      (key) =>
-                        query[key] ? (
-                          <Chip
-                            key={key}
-                            label={`${query[key]} ×`}
-                            active
-                            onPress={() =>
-                              setQuery((q) => ({ ...q, [key]: undefined }))
-                            }
-                          />
-                        ) : null,
-                    )}
-                    {query.favorite && (
-                      <Chip
-                        label="Favorites ×"
-                        active
-                        onPress={() =>
-                          setQuery((q) => ({ ...q, favorite: undefined }))
-                        }
-                      />
-                    )}
-                  </Box>
-                )}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 8 }}
-                >
-                  <Chip
-                    label="Everything"
-                    active={!query.kind && !query.collection}
-                    onPress={() =>
-                      setQuery((q) => ({
-                        ...q,
-                        kind: undefined,
-                        collection: undefined,
-                      }))
-                    }
-                  />
-                  {kinds.map((kind) => (
-                    <Chip
-                      key={kind}
-                      label={kindLabels[kind]}
-                      active={query.kind === kind}
-                      onPress={() =>
-                        setQuery((q) => ({ ...q, kind, collection: undefined }))
-                      }
-                    />
-                  ))}
-                </ScrollView>
               </Box>
               {loading ? (
                 <Box flex={1} justifyContent="center">
@@ -802,19 +778,17 @@ function LibraryApp({
             </>
           )}
           {tab === "collections" && (
-            <CollectionsPanel
-              wide={wide}
+            <SpacesPanel
               stats={stats}
-              onCollection={selectCollection}
-              onOrganize={() => {
-                setTab("library");
-                setSelecting(true);
-                setSelection(new Map());
+              views={views}
+              onBrowse={browse}
+              onCreate={() => {
+                setQuery({});
+                setSortSheet(true);
               }}
-              onTag={(tag) => {
-                setQuery({ tag });
-                setTab("library");
-              }}
+              onRemove={(id) =>
+                void run("Removing view…", () => repo.removeView(id))
+              }
             />
           )}
           {tab === "notes" && (
@@ -980,118 +954,84 @@ function LibraryApp({
           }}
         />
       )}
-      {sortSheet && (
-        <Sheet
-          title="Filters & sort"
-          onClose={() => setSortSheet(false)}
-          footer={
-            <Box gap="s">
-              <Button onPress={() => setSortSheet(false)}>Show books</Button>
-              <Button
-                secondary
-                onPress={() => {
-                  setQuery({});
-                  setSearch("");
-                  setSortSheet(false);
-                }}
-              >
-                Reset filters
-              </Button>
-            </Box>
-          }
-        >
-          <Text variant="eyebrow">SORT BY</Text>
-          <Box flexDirection="row" flexWrap="wrap" gap="s">
-            {(["added", "title", "author", "series", "progress"] as Sort[]).map(
-              (sort) => (
-                <Chip
-                  key={sort}
-                  label={
-                    {
-                      added: "Recently added",
-                      title: "Title A–Z",
-                      author: "Author",
-                      series: "Series & volume",
-                      progress: "Reading progress",
-                    }[sort]
-                  }
-                  active={(query.sort ?? "added") === sort}
-                  onPress={() => setQuery((q) => ({ ...q, sort }))}
-                />
-              ),
-            )}
-          </Box>
-          <Text variant="eyebrow">FILE FORMAT</Text>
-          <Box flexDirection="row" gap="s">
-            {(["epub", "pdf", "cbz"] as const).map((format) => (
-              <Chip
-                key={format}
-                label={format.toUpperCase()}
-                active={query.format === format}
-                onPress={() =>
-                  setQuery((q) => ({
-                    ...q,
-                    format: q.format === format ? undefined : format,
-                  }))
-                }
-              />
-            ))}
-          </Box>
-          <Text variant="eyebrow">COLLECTIONS</Text>
-          <Box flexDirection="row" flexWrap="wrap" gap="s">
-            {stats.collections.map((collection) => (
-              <Chip
-                key={collection}
-                label={collection}
-                active={query.collection === collection}
-                onPress={() =>
-                  setQuery((q) => ({
-                    ...q,
-                    collection:
-                      q.collection === collection ? undefined : collection,
-                  }))
-                }
-              />
-            ))}
-          </Box>
-          <Text variant="eyebrow">TAGS</Text>
-          <Box flexDirection="row" flexWrap="wrap" gap="s">
-            {stats.tags.map((tag) => (
-              <Chip
-                key={tag}
-                label={tag}
-                active={query.tag === tag}
-                onPress={() =>
-                  setQuery((q) => ({
-                    ...q,
-                    tag: q.tag === tag ? undefined : tag,
-                  }))
-                }
-              />
-            ))}
-          </Box>
-          <Text variant="eyebrow">READING STATUS</Text>
-          <Box flexDirection="row" flexWrap="wrap" gap="s">
-            {(["unread", "reading", "finished"] as const).map((status) => (
-              <Chip
-                key={status}
-                label={status.charAt(0).toUpperCase() + status.slice(1)}
-                active={query.status === status}
-                onPress={() =>
-                  setQuery((q) => ({
-                    ...q,
-                    status: q.status === status ? undefined : status,
-                  }))
-                }
-              />
-            ))}
-            <Chip
-              label="Favorites"
-              active={query.favorite}
-              onPress={() => setQuery((q) => ({ ...q, favorite: !q.favorite }))}
-            />
-          </Box>
+      {libraryMenu && (
+        <Sheet title="Library actions" onClose={() => setLibraryMenu(false)}>
+          <Button
+            secondary
+            onPress={() => {
+              setLayout((v) => (v === "grid" ? "list" : "grid"));
+              setLibraryMenu(false);
+            }}
+          >
+            {layout === "grid" ? "List view" : "Grid view"}
+          </Button>
+          <Button
+            secondary
+            onPress={() => {
+              setSelecting(true);
+              setSelection(new Map());
+              setLibraryMenu(false);
+            }}
+          >
+            Select books
+          </Button>
+          <Button
+            secondary
+            onPress={() => {
+              setTab("notes");
+              setLibraryMenu(false);
+            }}
+          >
+            Notes & bookmarks
+          </Button>
+          <Button
+            secondary
+            onPress={() => {
+              setLibraryMenu(false);
+              void pickBooks();
+            }}
+          >
+            Import books
+          </Button>
         </Sheet>
+      )}
+      {sortSheet && (
+        <ViewEditor
+          initial={{
+            rules: query.rules ?? {
+              match: "all",
+              conditions: [
+                ...(
+                  ["kind", "format", "status", "tag", "collection"] as const
+                ).flatMap((field) =>
+                  query[field]
+                    ? [{ field, operator: "is" as const, value: query[field]! }]
+                    : [],
+                ),
+                ...(query.favorite
+                  ? [
+                      {
+                        field: "favorite" as const,
+                        operator: "is" as const,
+                        value: "true",
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            sort: query.sort ?? "added",
+          }}
+          stats={stats}
+          onClose={() => setSortSheet(false)}
+          onApply={(rules, sort) => {
+            browse({ rules, sort, trash: query.trash });
+            setSortSheet(false);
+          }}
+          onSave={async (view) => {
+            await repo.saveView(view);
+            setViews(await repo.savedViews());
+          }}
+        />
       )}
       {plan && (
         <PlanReview
