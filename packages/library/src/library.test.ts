@@ -291,3 +291,131 @@ test("Discovery migrates existing notes and chapters, updates atomically, and ex
     db.close();
   }
 });
+
+test("Nested rules share semantics with scoped search and ordered lists", async () => {
+  const { repo, db } = setup();
+  try {
+    await repo.initialize();
+    await repo.add({ ...book("a"), title: "Moon manga" });
+    await repo.add({ ...book("b"), kind: "light-novel", title: "Moon novel" });
+    await repo.add({ ...book("c"), language: "en", title: "Moon English" });
+    const rules = {
+      match: "all" as const,
+      conditions: [
+        { field: "language" as const, operator: "is" as const, value: "ja" },
+        {
+          match: "any" as const,
+          conditions: [
+            { field: "kind" as const, operator: "is" as const, value: "manga" },
+            {
+              field: "kind" as const,
+              operator: "is" as const,
+              value: "light-novel",
+            },
+          ],
+        },
+      ],
+    };
+    assert.deepEqual(
+      (await repo.list({ rules })).map((b) => b.id),
+      ["a", "b"],
+    );
+    assert.deepEqual(
+      (await repo.discover("Moon", "book", 0, { rules }))
+        .map((b) => b.bookId)
+        .sort(),
+      ["a", "b"],
+    );
+    await repo.saveOrganization(
+      "list-a",
+      { kind: "reading-list", name: "Crossover", bookIds: ["b", "a"] },
+      null,
+    );
+    assert.deepEqual(
+      (await repo.list({ readingListId: "list-a", sort: "list-order" })).map(
+        (b) => b.id,
+      ),
+      ["b", "a"],
+    );
+    assert.equal(
+      (await repo.discover("English", "book", 0, { readingListId: "list-a" }))
+        .length,
+      0,
+    );
+    await assert.rejects(
+      repo.saveOrganization(
+        "list-a",
+        { kind: "reading-list", name: "Stale", bookIds: [] },
+        null,
+      ),
+    );
+    assert.equal((await repo.list({ readingListId: "list-a" })).length, 2);
+  } finally {
+    db.close();
+  }
+});
+test("Organization sync preserves tombstones, revisions, pending edits and undo", async () => {
+  const a = setup(),
+    b = setup();
+  try {
+    await a.repo.initialize();
+    await b.repo.initialize();
+    await a.repo.saveView({
+      id: "pinned",
+      name: "Pinned",
+      pinned: true,
+      rules: { match: "all", conditions: [] },
+      sort: "title",
+    });
+    const first = await a.repo.pendingOrganization();
+    await b.repo.mergeOrganization(first);
+    assert.equal((await b.repo.savedViews())[0]?.pinned, true);
+    await a.repo.saveView({
+      ...(await a.repo.savedViews())[0]!,
+      name: "New name",
+    });
+    await a.repo.acknowledgeOrganization(first);
+    assert.equal((await a.repo.pendingOrganization()).length, 1);
+    await a.repo.removeView("pinned");
+    await b.repo.mergeOrganization(await a.repo.pendingOrganization());
+    await b.repo.mergeOrganization(first);
+    assert.equal((await b.repo.savedViews()).length, 0);
+    await a.repo.undoStructure();
+    assert.equal((await a.repo.savedViews())[0]?.name, "New name");
+  } finally {
+    a.db.close();
+    b.db.close();
+  }
+});
+test("Reading recency is not changed by metadata edits and facets follow current scope", async () => {
+  const { repo, db } = setup();
+  try {
+    await repo.initialize();
+    await repo.add({
+      ...book("a"),
+      lastReadAt: "2026-09-05T00:00:00.000Z",
+      collections: ["Old shelf"],
+    });
+    await repo.add({
+      ...book("b"),
+      lastReadAt: "2026-09-06T00:00:00.000Z",
+      tags: ["science"],
+    });
+    await repo.update("a", { title: "Edited today" });
+    assert.deepEqual(
+      (await repo.list({ sort: "last-read" })).map((b) => b.id),
+      ["b", "a"],
+    );
+    assert.deepEqual(
+      (await repo.facets({ bookId: "b" })).map((f) => f.value),
+      ["science"],
+    );
+    const shelf = (await repo.organization()).find(
+      (r) => r.value.kind === "collection",
+    );
+    assert.ok(shelf);
+    assert.equal((await repo.list({ collectionId: shelf.id }))[0]?.id, "a");
+  } finally {
+    db.close();
+  }
+});

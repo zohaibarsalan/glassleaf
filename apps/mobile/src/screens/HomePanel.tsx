@@ -31,7 +31,7 @@ export function HomePanel({
   useEffect(() => {
     let live = true;
     void Promise.all([
-      repo.list({ status: "reading", sort: "updated", limit: 4 }),
+      repo.list({ status: "reading", sort: "last-read", limit: 4 }),
       repo.list({ limit: 6 }),
     ])
       .then(([a, b]) => {
@@ -83,17 +83,19 @@ export function HomePanel({
           </Box>
         )}
       </Box>
-      {!!views.length && (
+      {views.some((v) => v.pinned) && (
         <Box gap="s">
           <Text variant="eyebrow">YOUR VIEWS</Text>
-          {views.slice(0, 5).map((v) => (
-            <NavRow
-              key={v.id}
-              icon={BookOpen}
-              title={v.name}
-              onPress={() => onBrowse({ rules: v.rules, sort: v.sort })}
-            />
-          ))}
+          {views
+            .filter((v) => v.pinned)
+            .map((v) => (
+              <NavRow
+                key={v.id}
+                icon={BookOpen}
+                title={v.name}
+                onPress={() => onBrowse({ rules: v.rules, sort: v.sort })}
+              />
+            ))}
         </Box>
       )}
       <Box gap="m">

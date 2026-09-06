@@ -1,4 +1,13 @@
 import {
+  organizationRecordSchema,
+  structurePlanSchema,
+  collectionId,
+  type OrganizationRecord,
+  type OrganizationValue,
+  type StructurePlan,
+} from "./organization";
+export * from "./organization";
+import {
   compileRules,
   savedViewSchema,
   type Rules,
@@ -67,6 +76,7 @@ export const bookSchema = z.object({
   progress: z.number().min(0).max(1),
   locator: z.string().max(2000),
   addedAt: z.string().datetime(),
+  lastReadAt: z.string().datetime().nullable().optional(),
   updatedAt: z.string().datetime(),
   revision: z.number().int().nonnegative(),
   device: z.string(),
@@ -116,11 +126,24 @@ export const snapshotSchema = z.object({
   version: z.literal(1),
   exportedAt: z.string(),
   books: z.array(bookSchema).max(100000),
+  organization: z.array(organizationRecordSchema).max(10000).default([]),
 });
 export type LibrarySnapshot = z.infer<typeof snapshotSchema>;
 export type Sort =
-  "added" | "title" | "author" | "series" | "progress" | "updated";
+  | "added"
+  | "title"
+  | "author"
+  | "series"
+  | "progress"
+  | "updated"
+  | "last-read"
+  | "list-order";
 export type LibraryQuery = {
+  bookId?: string;
+  collectionId?: string;
+  readingListId?: string;
+  series?: string;
+  unfiled?: boolean;
   rules?: Rules;
   format?: Book["format"];
   search?: string;
@@ -164,14 +187,6 @@ CREATE INDEX IF NOT EXISTS books_kind_added ON books(deleted,kind,added DESC,id)
 CREATE INDEX IF NOT EXISTS books_added ON books(deleted,added DESC,id);
 CREATE INDEX IF NOT EXISTS books_title ON books(deleted,title COLLATE NOCASE,id);
 CREATE INDEX IF NOT EXISTS books_status ON books(deleted,status,added DESC);
-CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(id UNINDEXED, title, author, series, tags, tokenize='unicode61 remove_diacritics 2');
-CREATE TRIGGER IF NOT EXISTS books_insert AFTER INSERT ON books BEGIN
- INSERT INTO search VALUES(new.id,new.title,new.author,json_extract(new.data,'$.series'),json_extract(new.data,'$.tags'));
-END;
-CREATE TRIGGER IF NOT EXISTS books_update AFTER UPDATE ON books BEGIN
- DELETE FROM search WHERE id=old.id;
- INSERT INTO search VALUES(new.id,new.title,new.author,json_extract(new.data,'$.series'),json_extract(new.data,'$.tags'));
-END;
 CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS history (id TEXT PRIMARY KEY, title TEXT NOT NULL, data TEXT NOT NULL, created TEXT NOT NULL);
@@ -196,7 +211,10 @@ export type SearchHit = {
   excerpt: string;
   bookTitle: string;
 };
-export function compareVersions(a: Book, b: Book): number {
+export function compareVersions(
+  a: Pick<Book, "revision" | "updatedAt" | "device">,
+  b: Pick<Book, "revision" | "updatedAt" | "device">,
+): number {
   return (
     a.revision - b.revision ||
     a.updatedAt.localeCompare(b.updatedAt) ||
@@ -233,6 +251,49 @@ export class LibraryRepository {
           "INSERT INTO settings(key,value) VALUES('discovery-v1','1')",
         );
       }
+      await sql.exec(`CREATE TABLE IF NOT EXISTS organization(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS organization_outbox(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS structure_history(id TEXT PRIMARY KEY,data TEXT NOT NULL,created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS reading_list_members(listId TEXT NOT NULL,bookId TEXT NOT NULL,position INTEGER NOT NULL,PRIMARY KEY(listId,bookId));
+        CREATE INDEX IF NOT EXISTS reading_list_position ON reading_list_members(listId,position);
+        CREATE TABLE IF NOT EXISTS book_facets(bookId TEXT NOT NULL,field TEXT NOT NULL,value TEXT COLLATE NOCASE NOT NULL,PRIMARY KEY(bookId,field,value));
+        CREATE INDEX IF NOT EXISTS facet_lookup ON book_facets(field,value,bookId);`);
+      const upgraded = await sql.all(
+        "SELECT 1 FROM settings WHERE key='organization-v1'",
+      );
+      if (!upgraded.length) {
+        const facets = (row: string) =>
+          `INSERT OR IGNORE INTO book_facets SELECT ${row}.id,'tag',value FROM json_each(${row}.data,'$.tags'); INSERT OR IGNORE INTO book_facets SELECT ${row}.id,'collection',value FROM json_each(${row}.data,'$.collections');`;
+        await sql.exec(`CREATE TRIGGER facets_insert AFTER INSERT ON books BEGIN ${facets("new")} END;
+          CREATE TRIGGER facets_update AFTER UPDATE ON books WHEN json_extract(old.data,'$.tags') IS NOT json_extract(new.data,'$.tags') OR json_extract(old.data,'$.collections') IS NOT json_extract(new.data,'$.collections') BEGIN DELETE FROM book_facets WHERE bookId=old.id; ${facets("new")} END;
+          INSERT OR IGNORE INTO book_facets SELECT books.id,'tag',value FROM books,json_each(data,'$.tags');
+          INSERT OR IGNORE INTO book_facets SELECT books.id,'collection',value FROM books,json_each(data,'$.collections');
+          DROP TRIGGER IF EXISTS books_insert; DROP TRIGGER IF EXISTS books_update; DROP TABLE IF EXISTS search;`);
+        const collections = await sql.all<{ value: string }>(
+          "SELECT DISTINCT value FROM book_facets WHERE field='collection'",
+        );
+        for (const { value: name } of collections)
+          await this.ensureCollection(sql, name);
+        const views = await sql.all<{ data: string }>(
+          "SELECT data FROM saved_views",
+        );
+        for (const row of views) {
+          const view = savedViewSchema.parse(JSON.parse(row.data));
+          await this.putOrganization(
+            sql,
+            {
+              id: view.id,
+              value: { kind: "view", view },
+              revision: 1,
+              device: this.device,
+              updatedAt: new Date().toISOString(),
+              deletedAt: null,
+            },
+            true,
+          );
+        }
+        await sql.run("INSERT INTO settings VALUES('organization-v1','1')");
+      }
     });
   }
   private async put(sql: SQL, book: Book, pending: boolean) {
@@ -242,6 +303,7 @@ export class LibraryRepository {
       book.id,
       data,
     );
+    for (const name of book.collections) await this.ensureCollection(sql, name);
     if (pending)
       await sql.run(
         "INSERT INTO outbox(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
@@ -269,9 +331,11 @@ export class LibraryRepository {
       await this.put(sql, book, true);
     });
   }
-  async list(query: LibraryQuery = {}): Promise<Book[]> {
+  private filter(query: LibraryQuery = {}) {
     const params: (string | number | null)[] = [];
-    const where = [query.trash ? "deleted IS NOT NULL" : "deleted IS NULL"];
+    const where = [
+      query.trash ? "books.deleted IS NOT NULL" : "books.deleted IS NULL",
+    ];
     if (query.rules) {
       const filter = compileRules(query.rules);
       where.push(filter.sql);
@@ -282,32 +346,64 @@ export class LibraryRepository {
       params.push(query.format);
     }
     if (query.kind) {
-      where.push("kind=?");
+      where.push("books.kind=?");
       params.push(query.kind);
     }
     if (query.status) {
-      where.push("status=?");
+      where.push("books.status=?");
       params.push(query.status);
     }
     if (query.favorite) where.push("json_extract(data,'$.favorite')=1");
     if (query.collection) {
       where.push(
-        "EXISTS(SELECT 1 FROM json_each(data,'$.collections') WHERE value=?)",
+        "EXISTS(SELECT 1 FROM book_facets WHERE bookId=books.id AND field='collection' AND value=? COLLATE NOCASE)",
       );
       params.push(query.collection);
     }
     if (query.tag) {
       where.push(
-        "EXISTS(SELECT 1 FROM json_each(data,'$.tags') WHERE value=?)",
+        "EXISTS(SELECT 1 FROM book_facets WHERE bookId=books.id AND field='tag' AND value=? COLLATE NOCASE)",
       );
       params.push(query.tag);
     }
     if (query.search?.trim()) {
-      where.push("id IN(SELECT id FROM search WHERE search MATCH ?)");
+      where.push(
+        "books.id IN(SELECT bookId FROM discovery WHERE discovery MATCH ? AND kind='book')",
+      );
       params.push(searchExpression(query.search));
     }
+    if (query.bookId) {
+      where.push("books.id=?");
+      params.push(query.bookId);
+    }
+    if (query.series) {
+      where.push("json_extract(books.data,'$.series')=? COLLATE NOCASE");
+      params.push(query.series);
+    }
+    if (query.collectionId) {
+      where.push(
+        "EXISTS(SELECT 1 FROM book_facets f JOIN organization o ON o.id=? WHERE f.bookId=books.id AND f.field='collection' AND f.value=json_extract(o.data,'$.value.name') COLLATE NOCASE AND json_extract(o.data,'$.deletedAt') IS NULL)",
+      );
+      params.push(query.collectionId);
+    }
+    if (query.readingListId) {
+      where.push(
+        "books.id IN(SELECT bookId FROM reading_list_members WHERE listId=?)",
+      );
+      params.push(query.readingListId);
+    }
+    if (query.unfiled)
+      where.push(
+        "NOT EXISTS(SELECT 1 FROM book_facets WHERE bookId=books.id AND field='collection')",
+      );
+    return { where: where.join(" AND "), params };
+  }
+  async list(query: LibraryQuery = {}): Promise<Book[]> {
+    const { where, params } = this.filter(query);
     const sort: Record<Sort, string> = {
       added: "added DESC,id",
+      "last-read": "COALESCE(json_extract(data,'$.lastReadAt'),added) DESC,id",
+      "list-order": "id",
       updated: "json_extract(data,'$.updatedAt') DESC,id",
       title: "title COLLATE NOCASE,id",
       author: "author COLLATE NOCASE,title COLLATE NOCASE,id",
@@ -315,12 +411,17 @@ export class LibraryRepository {
         "json_extract(data,'$.series') COLLATE NOCASE,json_extract(data,'$.volume'),title,id",
       progress: "json_extract(data,'$.progress') DESC,id",
     };
+    if (query.sort === "list-order" && query.readingListId) {
+      sort["list-order"] =
+        "(SELECT position FROM reading_list_members WHERE listId=? AND bookId=books.id),id";
+      params.push(query.readingListId);
+    }
     params.push(
       Math.min(Math.max(query.limit ?? 60, 1), 10000),
       Math.max(query.offset ?? 0, 0),
     );
     const rows = await this.sql.all<{ data: string }>(
-      `SELECT data FROM books WHERE ${where.join(" AND ")} ORDER BY ${sort[query.sort ?? "added"]} LIMIT ? OFFSET ?`,
+      `SELECT data FROM books WHERE ${where} ORDER BY ${sort[query.sort ?? "added"]} LIMIT ? OFFSET ?`,
       ...params,
     );
     return rows.map((row) => bookSchema.parse(JSON.parse(row.data)));
@@ -330,6 +431,7 @@ export class LibraryRepository {
     patch: Partial<
       Pick<
         Book,
+        | "lastReadAt"
         | "notes"
         | "bookmarks"
         | "title"
@@ -398,7 +500,7 @@ export class LibraryRepository {
   async undoLatest() {
     await this.sql.transaction(async (sql) => {
       const rows = await sql.all<{ id: string; data: string }>(
-        "SELECT id,data FROM history ORDER BY created DESC LIMIT 1",
+        "SELECT id,data FROM history ORDER BY created DESC,rowid DESC LIMIT 1",
       );
       const row = rows[0];
       if (!row) throw new Error("No organization changes to undo.");
@@ -462,35 +564,288 @@ export class LibraryRepository {
         );
     });
   }
-  async savedViews(): Promise<SavedView[]> {
-    const rows = await this.sql.all<{ data: string }>(
-      "SELECT data FROM saved_views ORDER BY json_extract(data,'$.name') COLLATE NOCASE",
+  private async ensureCollection(sql: SQL, name: string) {
+    const id = collectionId(name);
+    const existing = await sql.all(
+      "SELECT 1 FROM organization WHERE json_extract(data,'$.value.kind')='collection' AND json_extract(data,'$.value.name')=? COLLATE NOCASE AND json_extract(data,'$.deletedAt') IS NULL",
+      name,
     );
-    return rows.map((row) => savedViewSchema.parse(JSON.parse(row.data)));
+    if (!existing.length)
+      await sql.run(
+        "INSERT OR IGNORE INTO organization VALUES(?,?)",
+        id,
+        JSON.stringify({
+          id,
+          value: { kind: "collection", name },
+          revision: 0,
+          device: "legacy",
+          updatedAt: "1970-01-01T00:00:00.000Z",
+          deletedAt: null,
+        }),
+      );
   }
-  async saveView(view: SavedView) {
-    const valid = savedViewSchema.parse(view);
-    await this.sql.run(
-      "INSERT INTO saved_views VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
-      valid.id,
-      JSON.stringify(valid),
+  private async putOrganization(
+    sql: SQL,
+    input: OrganizationRecord,
+    pending: boolean,
+  ) {
+    const record = organizationRecordSchema.parse(input),
+      data = JSON.stringify(record);
+    await sql.run(
+      "INSERT INTO organization VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+      record.id,
+      data,
+    );
+    await sql.run("DELETE FROM reading_list_members WHERE listId=?", record.id);
+    if (record.value.kind === "reading-list" && !record.deletedAt) {
+      for (const [position, bookId] of record.value.bookIds.entries())
+        await sql.run(
+          "INSERT INTO reading_list_members VALUES(?,?,?)",
+          record.id,
+          bookId,
+          position,
+        );
+    }
+    if (pending)
+      await sql.run(
+        "INSERT INTO organization_outbox VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+        record.id,
+        data,
+      );
+  }
+  async organization(includeDeleted = false): Promise<OrganizationRecord[]> {
+    return (
+      await this.sql.all<{ data: string }>(
+        `SELECT data FROM organization ${includeDeleted ? "" : "WHERE json_extract(data,'$.deletedAt') IS NULL"} ORDER BY COALESCE(json_extract(data,'$.value.name'),json_extract(data,'$.value.view.name')) COLLATE NOCASE`,
+      )
+    ).map((row) => organizationRecordSchema.parse(JSON.parse(row.data)));
+  }
+  async saveOrganization(
+    id: string,
+    value: OrganizationValue,
+    expectedRevision: number | null,
+  ) {
+    await this.applyStructurePlan({
+      version: 2,
+      id: `edit-${id}-${expectedRevision??"new"}-${Date.now()}`,
+      title: "Edit organization",
+      changes: [{ id, value, expectedRevision, deleted: false }],
+    });
+  }
+  async applyStructurePlan(input: StructurePlan) {
+    const plan = structurePlanSchema.parse(input);
+    if (new Set(plan.changes.map((c) => c.id)).size !== plan.changes.length)
+      throw new Error("Duplicate organization record in plan.");
+    await this.sql.transaction(async (sql) => {
+      const history: {
+        before: OrganizationRecord | null;
+        after: OrganizationRecord;
+      }[] = [];
+      for (const change of plan.changes) {
+        const rows = await sql.all<{ data: string }>(
+          "SELECT data FROM organization WHERE id=?",
+          change.id,
+        );
+        const before = rows[0]
+          ? organizationRecordSchema.parse(JSON.parse(rows[0].data))
+          : null;
+        if ((before?.revision ?? null) !== change.expectedRevision)
+          throw new Error(
+            "This organization changed. Refresh and try again; nothing was applied.",
+          );
+        if (before && before.value.kind !== change.value.kind)
+          throw new Error("An organization record cannot change its type.");
+        if (change.value.kind === "reading-list") {
+          for (const id of change.value.bookIds) {
+            if (!(await this.get(id, sql)))
+              throw new Error(`Unknown book in reading list: ${id}`);
+          }
+        }
+        if (
+          change.value.kind === "collection" &&
+          before?.value.kind === "collection" &&
+          (change.deleted || before.value.name !== change.value.name)
+        )
+          throw new Error(
+            "Rename or remove collections through the collection membership tool.",
+          );
+        const after: OrganizationRecord = {
+          id: change.id,
+          value: change.value,
+          revision: (before?.revision ?? 0) + 1,
+          device: this.device,
+          updatedAt: new Date().toISOString(),
+          deletedAt: change.deleted ? new Date().toISOString() : null,
+        };
+        await this.putOrganization(sql, after, true);
+        history.push({ before, after });
+      }
+      await sql.run(
+        "INSERT INTO structure_history VALUES(?,?,?)",
+        plan.id,
+        JSON.stringify(history),
+        new Date().toISOString(),
+      );
+    });
+  }
+  async undoStructure() {
+    await this.sql.transaction(async (sql) => {
+      const row = (
+        await sql.all<{ id: string; data: string }>(
+          "SELECT id,data FROM structure_history ORDER BY created DESC,rowid DESC LIMIT 1",
+        )
+      )[0];
+      if (!row) throw new Error("No view or reading-list changes to undo.");
+      const entries = z
+        .array(
+          z.object({
+            before: organizationRecordSchema.nullable(),
+            after: organizationRecordSchema,
+          }),
+        )
+        .parse(JSON.parse(row.data));
+      for (const entry of entries) {
+        const current = (
+          await sql.all<{ data: string }>(
+            "SELECT data FROM organization WHERE id=?",
+            entry.after.id,
+          )
+        )[0];
+        if (
+          !current ||
+          JSON.stringify(
+            organizationRecordSchema.parse(JSON.parse(current.data)),
+          ) !== JSON.stringify(entry.after)
+        )
+          throw new Error(
+            "This structure changed after the edit. Undo stopped to preserve newer changes.",
+          );
+        await this.putOrganization(
+          sql,
+          {
+            ...(entry.before ?? entry.after),
+            revision: entry.after.revision + 1,
+            device: this.device,
+            updatedAt: new Date().toISOString(),
+            deletedAt:
+              entry.before?.deletedAt ??
+              (entry.before ? null : new Date().toISOString()),
+          },
+          true,
+        );
+      }
+      await sql.run("DELETE FROM structure_history WHERE id=?", row.id);
+    });
+  }
+  async pendingOrganization() {
+    return (
+      await this.sql.all<{ data: string }>(
+        "SELECT data FROM organization_outbox",
+      )
+    ).map((row) => organizationRecordSchema.parse(JSON.parse(row.data)));
+  }
+  async acknowledgeOrganization(records: OrganizationRecord[]) {
+    await this.sql.transaction(async (sql) => {
+      for (const record of records)
+        await sql.run(
+          "DELETE FROM organization_outbox WHERE id=? AND data=?",
+          record.id,
+          JSON.stringify(record),
+        );
+    });
+  }
+  async mergeOrganization(records: OrganizationRecord[]) {
+    await this.sql.transaction(async (sql) => {
+      for (const input of records) {
+        const remote = organizationRecordSchema.parse(input);
+        const row = (
+          await sql.all<{ data: string }>(
+            "SELECT data FROM organization WHERE id=?",
+            remote.id,
+          )
+        )[0];
+        const local = row
+          ? organizationRecordSchema.parse(JSON.parse(row.data))
+          : null;
+        if (
+          local &&
+          local.device !== remote.device &&
+          local.revision === remote.revision &&
+          JSON.stringify(local) !== JSON.stringify(remote)
+        )
+          await sql.run(
+            "INSERT OR IGNORE INTO conflicts VALUES(?,?)",
+            `organization:${remote.id}:${remote.revision}:${remote.device}`,
+            JSON.stringify({ local, remote }),
+          );
+        if (!local || compareVersions(remote, local) > 0)
+          await this.putOrganization(sql, remote, false);
+      }
+    });
+  }
+  async savedViews(): Promise<SavedView[]> {
+    return (await this.organization()).flatMap((record) =>
+      record.value.kind === "view" ? [record.value.view] : [],
+    );
+  }
+  async saveView(view: Omit<SavedView, "pinned"> & { pinned?: boolean }) {
+    const before = (await this.organization(true)).find(
+      (r) => r.id === view.id,
+    );
+    await this.saveOrganization(
+      view.id,
+      { kind: "view", view: savedViewSchema.parse(view) },
+      before?.revision ?? null,
     );
   }
   async removeView(id: string) {
-    await this.sql.run("DELETE FROM saved_views WHERE id=?", id);
+    const record = (await this.organization()).find((r) => r.id === id);
+    if (record)
+      await this.applyStructurePlan({
+        version: 2,
+        id: `remove-${id}-${Date.now()}`,
+        title: "Remove view",
+        changes: [
+          {
+            id,
+            value: record.value,
+            expectedRevision: record.revision,
+            deleted: true,
+          },
+        ],
+      });
+  }
+  async series() {
+    return this.sql.all<{ name: string; count: number; finished: number }>(
+      "SELECT json_extract(data,'$.series') AS name,count(*) AS count,sum(status='finished') AS finished FROM books WHERE deleted IS NULL AND json_extract(data,'$.series')!='' GROUP BY name COLLATE NOCASE ORDER BY name COLLATE NOCASE",
+    );
+  }
+  async facets(query: LibraryQuery = {}) {
+    const { where, params } = this.filter(query);
+    return this.sql.all<{ field: string; value: string; count: number }>(
+      `SELECT f.field,f.value,count(*) AS count FROM book_facets f JOIN books ON books.id=f.bookId WHERE ${where} GROUP BY f.field,f.value ORDER BY f.value COLLATE NOCASE`,
+      ...params,
+    );
   }
   async discover(
     term: string,
     kind?: SearchHit["kind"],
     offset = 0,
+    scope: LibraryQuery = {},
   ): Promise<SearchHit[]> {
     if (!term.trim()) return [];
+    const { where, params } = this.filter({
+      ...scope,
+      search: undefined,
+      trash: false,
+    });
     return this.sql.all<SearchHit>(
       `SELECT discovery.bookId,discovery.kind,discovery.locator,discovery.title,CASE WHEN discovery.kind='book' THEN books.author ELSE snippet(discovery,4,'','',' … ',24) END AS excerpt,books.title AS bookTitle
       FROM discovery JOIN books ON books.id=discovery.bookId
-      WHERE discovery MATCH ? AND books.deleted IS NULL ${kind === "passage" ? "AND discovery.kind IN ('passage','chapter')" : kind ? "AND discovery.kind=?" : ""}
+      WHERE discovery MATCH ? AND ${where} ${kind === "passage" ? "AND discovery.kind IN ('passage','chapter')" : kind ? "AND discovery.kind=?" : ""}
       ORDER BY CASE discovery.kind WHEN 'book' THEN 0 WHEN 'note' THEN 1 WHEN 'bookmark' THEN 2 ELSE 3 END, rank, discovery.rowid LIMIT 40 OFFSET ?`,
       searchExpression(term.slice(0, 500)),
+      ...params,
       ...(kind && kind !== "passage" ? [kind] : []),
       Math.max(0, offset),
     );
@@ -559,6 +914,7 @@ export class LibraryRepository {
       version: 1,
       exportedAt: new Date().toISOString(),
       books: rows.map((row) => bookSchema.parse(JSON.parse(row.data))),
+      organization: await this.organization(true),
     };
   }
   async stats(): Promise<Stats> {

@@ -80,6 +80,7 @@ export function Reader({
     if (locator === saved.current || !hasFile(initialBook.asset.path)) return;
     await repo.update(initialBook.id, {
       locator,
+      lastReadAt: new Date().toISOString(),
       progress: Math.min(
         (position.page + position.fraction) / Math.max(count, 1),
         1,
