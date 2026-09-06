@@ -41,3 +41,7 @@ Native UI automation became available through Maestro. This supersedes the earli
 | Comic navigation | Changing to spreads could start on the wrong pair | Cover-aware pair alignment | Native page/spread captures |
 
 The dated gallery in `docs/ui-gallery/` includes before/after, Paper, Midnight, Tokyo Night, organization and reader views. Screenshots use original generated fixtures; they do not represent broad third-party archive compatibility. Pinch gestures, physical-device frame times, file-picker/share-sheet theme round trips, and Android interaction testing remain unverified.
+
+## Organization rebuild — September 6
+
+See [the implementation and evidence report](ORGANIZATION_REBUILD.md) for nested views, ordered lists, scoped discovery, durable chapter jobs, organization sync/MCP, native checks, build artifact and remaining limitations. The new gallery stage preserves prior captures.

@@ -23,7 +23,13 @@ EPUB indexing uses durable pending/done/unavailable jobs, processes eight jobs p
 
 ## Verification
 
-Pending final native and release checks; results will be recorded before completion.
+- Strict TypeScript and formatting pass. Eleven focused catalog tests cover migration, nested/scoped queries, reading-list order, stale edits, merge/tombstones/acknowledgement, collection merge/undo, reading recency, and interrupted/replaced chapter jobs. MCP client/server checks cover scoped snapshot search and both plan formats; theme import/contrast checks pass.
+- The 10,000-record mixed-format host fixture exercises paging, FTS, nested scope and contextual facets/counts in 39.3 ms on the final run. This is a combined host SQLite timing, not a phone latency percentile or frame-rate benchmark.
+- iPhone 17 Pro Max / iOS 26.5 Simulator: native journeys passed reading-list creation/reordering/scoped search, collection rename/undo, series metadata/browsing, and CBZ page jump/next/RTL swipe/spreads/zoom/scroll. Nested-view creation/pinning/restart and scoped EPUB passage opening were verified in segments; selector corrections are retained in the flow. EPUB prose was asserted before reader capture. The final book-search journey passed selecting a specific book, entering Find in this book, verifying its scope, and searching its chapter text.
+- Android arm64 release build passed and APK signature verification passed. Artifact: `outputs/react-native/Glassleaf-android-arm64-organization.apk`. SHA-256: `8dfe38d473e191b58a4643b9eb769970e5a197b0857ed5baf6c7094d19514533`.
+- Native screenshots are preserved in `docs/ui-gallery/2026-09-06-organization-rebuild`. The phone-friendly gallery retains earlier revisions.
+
+Issues found and corrected during verification: reading-list keyboard dismissal, Home hiding pinned views below too many continued books, scoped-search copy, stale editor revision capture, and a nested book-options button hidden from native accessibility. Some Maestro runs lost their XCTest connection; those failed runs are not counted as passing.
 
 ## Remaining limits
 

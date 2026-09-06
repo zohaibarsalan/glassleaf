@@ -1,0 +1,28 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- tapOn: "Organize"
+- tapOn: "Collections"
+- tapOn: "Options for Weekend shelf"
+- tapOn: "Rename or merge collection"
+- tapOn:
+    id: "field-Group name"
+- eraseText
+- inputText: "Weekend collection"
+- tapOn: "Rename or merge"
+- extendedWaitUntil:
+    visible: "Weekend collection"
+    timeout: 10000
+- takeScreenshot: paper-renamed-collection
+- tapOn: "Settings"
+- tapOn: "Agent organization"
+- tapOn: "Undo view, list or group edit"
+- tapOn: "Close"
+- tapOn: "Organize"
+- tapOn: "Collections"
+- assertVisible: "Weekend shelf"
+- takeScreenshot: paper-restored-collection

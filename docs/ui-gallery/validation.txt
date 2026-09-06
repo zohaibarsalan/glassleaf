@@ -32,3 +32,27 @@ Community theme follow-up (2026-09-06): Native Maestro flow community-themes.yam
 Core navigation rebuild (2026-09-06): Home, compact Library toolbar, sectioned Settings, Organize and global Search. Native core-navigation flow passed creating a Manga + CBZ saved view and opening a book search result. Light follow-up passed saved-view persistence after restart, chapter-text search and opening an EPUB chapter with an assertion on rendered prose. Final dark flow passed Home/Library/Settings/global book search. Eleven captures added; prior stages preserved. Fixed issues found during checks: Home cover sizing, keyboard overlap with Save view, legacy EPUB imports lacking a ready marker, raw whitespace in a native search row. Search indexing no longer resets active typing.
 
 Host verification: TypeScript, formatting, six library tests (including existing-library discovery migration and all/any/exclusion rules), MCP and theme checks. Android arm64 release compilation passed. Android UI interactions, tablet/smallest-phone layouts, large font sizes, RTL layout mirroring, Japanese linguistic search and device frame-time profiling were not verified. No claim of 10k-book device frame-rate performance is made. PDF/comic text OCR and exact passage highlighting are not implemented. Saved view definitions remain device-local.
+
+
+Organization rebuild (2026-09-06, supersedes the earlier device-local-view limitation):
+17 new captures, preserving all previous stages. Native journeys passed ordered
+reading-list creation/reordering/scoped search, collection rename and undo,
+series metadata editing and volume browsing, and book-scoped chapter search.
+Nested-view creation, Home pinning, restart persistence and scoped EPUB passage
+opening were verified in segments after correcting native automation selectors.
+CBZ page jump, next page, RTL swipe, spreads, zoom and scrolling passed again.
+Paper and Catppuccin Mocha captures were inspected. Book-options accessibility
+was corrected by moving the action outside the main reading button.
+
+TypeScript, formatting, 11 focused catalog tests, actual MCP client/server checks,
+and theme validation pass. The final 10k mixed-format host query workload took
+39.3 ms for paging, FTS, nested scope and facet/count retrieval combined; this
+is not a phone latency or frame-rate measurement. Android arm64 release build
+and APK signature verification pass. No Android device/emulator is connected.
+
+Saved views, reading lists and collection records now use revisioned sync batches
+and are included in agent snapshots/plans. Live Drive OAuth and multi-device
+behavior remain unverified pending client IDs. Whole-record concurrent edit
+resolution retains the losing version; it does not interleave reading-list edits.
+PDF/OCR extraction, Japanese linguistic segmentation and exact match highlighting
+remain unimplemented. Full details: docs/ORGANIZATION_REBUILD.md in the repository.
