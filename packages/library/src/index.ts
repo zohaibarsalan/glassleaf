@@ -1,3 +1,10 @@
+import {
+  compileRules,
+  savedViewSchema,
+  type Rules,
+  type SavedView,
+} from "./views";
+export * from "./views";
 import { z } from "zod";
 
 export const kinds = [
@@ -111,8 +118,10 @@ export const snapshotSchema = z.object({
   books: z.array(bookSchema).max(100000),
 });
 export type LibrarySnapshot = z.infer<typeof snapshotSchema>;
-export type Sort = "added" | "title" | "author" | "series" | "progress";
+export type Sort =
+  "added" | "title" | "author" | "series" | "progress" | "updated";
 export type LibraryQuery = {
+  rules?: Rules;
   format?: Book["format"];
   search?: string;
   kind?: StoryKind;
@@ -168,6 +177,25 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS history (id TEXT PRIMARY KEY, title TEXT NOT NULL, data TEXT NOT NULL, created TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS conflicts (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 `;
+const discoverySchema = `
+CREATE VIRTUAL TABLE IF NOT EXISTS discovery USING fts5(bookId UNINDEXED, kind UNINDEXED, locator UNINDEXED, title, body, tokenize='unicode61 remove_diacritics 2');
+CREATE TABLE IF NOT EXISTS chapter_index (bookId TEXT, path TEXT, hash TEXT, PRIMARY KEY(bookId,path));
+CREATE TABLE IF NOT EXISTS saved_views (id TEXT PRIMARY KEY, data TEXT NOT NULL);
+`;
+const discoveryInsert = (row: string) => `
+ INSERT INTO discovery SELECT ${row}.id,'book','',${row}.title,${row}.author || ' ' || COALESCE(json_extract(${row}.data,'$.series'),'') || ' ' || COALESCE(json_extract(${row}.data,'$.tags'),'') || ' ' || COALESCE(json_extract(${row}.data,'$.collections'),'');
+ INSERT INTO discovery SELECT ${row}.id,'note',json_extract(value,'$.locator'),${row}.title,json_extract(value,'$.text') FROM json_each(${row}.data,'$.notes');
+ INSERT INTO discovery SELECT ${row}.id,'bookmark',json_extract(value,'$.locator'),${row}.title,json_extract(value,'$.label') FROM json_each(${row}.data,'$.bookmarks');
+ INSERT INTO discovery SELECT ${row}.id,'chapter',key || ':0',json_extract(value,'$.title'),'' FROM json_each(${row}.data,'$.asset.chapters');
+`;
+export type SearchHit = {
+  bookId: string;
+  kind: "book" | "note" | "bookmark" | "chapter" | "passage";
+  locator: string;
+  title: string;
+  excerpt: string;
+  bookTitle: string;
+};
 export function compareVersions(a: Book, b: Book): number {
   return (
     a.revision - b.revision ||
@@ -190,6 +218,32 @@ export class LibraryRepository {
   ) {}
   async initialize() {
     await this.sql.exec(schema);
+    await this.sql.transaction(async (sql) => {
+      await sql.exec(discoverySchema);
+      const migrated = await sql.all<{ value: string }>(
+        "SELECT value FROM settings WHERE key='discovery-v1'",
+      );
+      if (!migrated.length) {
+        await sql.exec(`CREATE TRIGGER discovery_insert AFTER INSERT ON books BEGIN ${discoveryInsert("new")} END;
+          CREATE TRIGGER discovery_update AFTER UPDATE ON books WHEN json_extract(old.data,'$.title') IS NOT json_extract(new.data,'$.title') OR json_extract(old.data,'$.author') IS NOT json_extract(new.data,'$.author') OR json_extract(old.data,'$.tags') IS NOT json_extract(new.data,'$.tags') OR json_extract(old.data,'$.collections') IS NOT json_extract(new.data,'$.collections') OR json_extract(old.data,'$.series') IS NOT json_extract(new.data,'$.series') OR json_extract(old.data,'$.notes') IS NOT json_extract(new.data,'$.notes') OR json_extract(old.data,'$.bookmarks') IS NOT json_extract(new.data,'$.bookmarks') OR json_extract(old.data,'$.asset') IS NOT json_extract(new.data,'$.asset') BEGIN
+          DELETE FROM discovery WHERE bookId=old.id AND kind != 'passage'; ${discoveryInsert("new")} END;`);
+        // Backfill existing metadata in SQL without materializing the library in JavaScript.
+        await sql.exec(
+          discoveryInsert("books")
+            .replaceAll(
+              "FROM json_each(books.data",
+              "FROM books, json_each(books.data",
+            )
+            .replace(
+              "json_extract(books.data,'$.collections'),'');",
+              "json_extract(books.data,'$.collections'),'') FROM books;",
+            ),
+        );
+        await sql.run(
+          "INSERT INTO settings(key,value) VALUES('discovery-v1','1')",
+        );
+      }
+    });
   }
   private async put(sql: SQL, book: Book, pending: boolean) {
     const data = JSON.stringify(bookSchema.parse(book));
@@ -228,6 +282,11 @@ export class LibraryRepository {
   async list(query: LibraryQuery = {}): Promise<Book[]> {
     const params: (string | number | null)[] = [];
     const where = [query.trash ? "deleted IS NOT NULL" : "deleted IS NULL"];
+    if (query.rules) {
+      const filter = compileRules(query.rules);
+      where.push(filter.sql);
+      params.push(...filter.params);
+    }
     if (query.format) {
       where.push("json_extract(data,'$.format')=?");
       params.push(query.format);
@@ -259,6 +318,7 @@ export class LibraryRepository {
     }
     const sort: Record<Sort, string> = {
       added: "added DESC,id",
+      updated: "json_extract(data,'$.updatedAt') DESC,id",
       title: "title COLLATE NOCASE,id",
       author: "author COLLATE NOCASE,title COLLATE NOCASE,id",
       series:
@@ -410,6 +470,76 @@ export class LibraryRepository {
           record.id,
           JSON.stringify(record),
         );
+    });
+  }
+  async savedViews(): Promise<SavedView[]> {
+    const rows = await this.sql.all<{ data: string }>(
+      "SELECT data FROM saved_views ORDER BY json_extract(data,'$.name') COLLATE NOCASE",
+    );
+    return rows.map((row) => savedViewSchema.parse(JSON.parse(row.data)));
+  }
+  async saveView(view: SavedView) {
+    const valid = savedViewSchema.parse(view);
+    await this.sql.run(
+      "INSERT INTO saved_views VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+      valid.id,
+      JSON.stringify(valid),
+    );
+  }
+  async removeView(id: string) {
+    await this.sql.run("DELETE FROM saved_views WHERE id=?", id);
+  }
+  async discover(
+    term: string,
+    kind?: SearchHit["kind"],
+    offset = 0,
+  ): Promise<SearchHit[]> {
+    if (!term.trim()) return [];
+    return this.sql.all<SearchHit>(
+      `SELECT discovery.bookId,discovery.kind,discovery.locator,discovery.title,snippet(discovery,4,'','',' … ',24) AS excerpt,books.title AS bookTitle
+      FROM discovery JOIN books ON books.id=discovery.bookId
+      WHERE discovery MATCH ? AND books.deleted IS NULL ${kind === "passage" ? "AND discovery.kind IN ('passage','chapter')" : kind ? "AND discovery.kind=?" : ""}
+      ORDER BY rank, discovery.rowid LIMIT 40 OFFSET ?`,
+      searchExpression(term.slice(0, 500)),
+      ...(kind && kind !== "passage" ? [kind] : []),
+      Math.max(0, offset),
+    );
+  }
+  async chapterIndexed(book: Book, path: string) {
+    return (
+      (
+        await this.sql.all(
+          "SELECT 1 FROM chapter_index WHERE bookId=? AND path=? AND hash=?",
+          book.id,
+          path,
+          book.asset.hash,
+        )
+      ).length > 0
+    );
+  }
+  async indexChapter(book: Book, index: number, body: string) {
+    const chapter = book.asset.chapters[index];
+    if (!chapter) return;
+    await this.sql.transaction(async (sql) => {
+      await sql.run(
+        "DELETE FROM discovery WHERE bookId=? AND kind='passage' AND locator=?",
+        book.id,
+        `${index}:0`,
+      );
+      await sql.run(
+        "INSERT INTO discovery VALUES(?,?,?,?,?)",
+        book.id,
+        "passage",
+        `${index}:0`,
+        chapter.title,
+        body,
+      );
+      await sql.run(
+        "INSERT INTO chapter_index VALUES(?,?,?) ON CONFLICT(bookId,path) DO UPDATE SET hash=excluded.hash",
+        book.id,
+        chapter.path,
+        book.asset.hash,
+      );
     });
   }
   async readingNotes(): Promise<Book[]> {

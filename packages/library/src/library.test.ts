@@ -183,3 +183,111 @@ test("10,000-book indexed paging and FTS search return bounded, stable results",
     db.close();
   }
 });
+
+test("Saved views overlap without duplicate books and persist all/any exclusions", async () => {
+  const { db, repo } = setup();
+  try {
+    await repo.initialize();
+    await repo.add(book("a"));
+    await repo.add({
+      ...book("b"),
+      kind: "novel",
+      collections: ["Shared world"],
+      tags: ["mystery"],
+    });
+    const rules = {
+      match: "any" as const,
+      conditions: [
+        { field: "kind" as const, operator: "is" as const, value: "manga" },
+        {
+          field: "collection" as const,
+          operator: "is" as const,
+          value: "Shared world",
+        },
+      ],
+    };
+    assert.equal((await repo.list({ rules })).length, 2);
+    assert.equal(
+      (await repo.list({ rules: { ...rules, match: "all" } })).length,
+      0,
+    );
+    assert.deepEqual(
+      (
+        await repo.list({
+          rules: {
+            match: "all",
+            conditions: [
+              { field: "tag", operator: "is-not", value: "FANTASY" },
+            ],
+          },
+        })
+      ).map((b) => b.id),
+      ["b"],
+    );
+    await repo.saveView({
+      id: "view",
+      name: "Across formats",
+      rules,
+      sort: "series",
+    });
+    assert.deepEqual((await repo.savedViews())[0]?.rules, rules);
+    await repo.removeView("view");
+    assert.equal((await repo.savedViews()).length, 0);
+    assert.equal((await repo.list()).length, 2);
+  } finally {
+    db.close();
+  }
+});
+test("Discovery migrates existing notes and chapters, updates atomically, and excludes Trash", async () => {
+  const { db, repo } = setup();
+  try {
+    await repo.initialize();
+    const original = {
+      ...book("a"),
+      notes: [
+        {
+          id: "n",
+          text: "Remember the lighthouse",
+          locator: "2:0.4",
+          createdAt: "now",
+        },
+      ],
+      asset: {
+        ...book("a").asset,
+        chapters: [{ path: "chapter.xhtml", title: "Arrival at the island" }],
+      },
+    };
+    await repo.add(original);
+    // Recreate the pre-discovery state to exercise an existing-library upgrade.
+    db.exec(
+      "DROP TRIGGER discovery_insert; DROP TRIGGER discovery_update; DROP TABLE discovery; DELETE FROM settings WHERE key='discovery-v1'",
+    );
+    await repo.initialize();
+    await repo.initialize();
+    assert.equal(
+      (await repo.discover("lighthouse", "note"))[0]?.locator,
+      "2:0.4",
+    );
+    assert.equal(
+      (await repo.discover("Arrival", "passage"))[0]?.kind,
+      "chapter",
+    );
+    await repo.indexChapter(
+      original,
+      0,
+      "Silver moonlight washed the quiet harbor.",
+    );
+    assert.equal(
+      (await repo.discover("moonlight", "passage"))[0]?.locator,
+      "0:0",
+    );
+    assert.ok(await repo.chapterIndexed(original, "chapter.xhtml"));
+    await repo.update("a", { notes: [] });
+    assert.equal((await repo.discover("lighthouse")).length, 0);
+    assert.equal((await repo.discover("moonlight")).length, 1);
+    await repo.update("a", { deletedAt: new Date().toISOString() });
+    assert.equal((await repo.discover("moonlight")).length, 0);
+  } finally {
+    db.close();
+  }
+});
