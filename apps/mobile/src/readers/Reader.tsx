@@ -549,6 +549,8 @@ export function Reader({
               const n = Number(jump) - 1;
               setPage(n);
               setFraction(0);
+              setCommand({ id: Date.now(), fraction: 0 });
+              setJump("");
               scrollList.current?.scrollToIndex({ index: n, animated: false });
               setContents(false);
             }}
@@ -564,6 +566,7 @@ export function Reader({
                 onPress={() => {
                   setPage(index);
                   setFraction(0);
+                  setCommand({ id: Date.now(), fraction: 0 });
                   setContents(false);
                 }}
               />

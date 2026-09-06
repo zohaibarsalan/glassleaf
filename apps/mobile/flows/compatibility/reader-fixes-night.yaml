@@ -1,0 +1,15 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Back to library"
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "attention"
+- tapOn: "book: attention"
+- tapOn:
+    text: "Reading settings"
+    retryTapIfNoChange: true
+- tapOn: "Night reading"
+- tapOn: "Close"
+- waitForAnimationToEnd
+- takeScreenshot: mocha-pdf-night

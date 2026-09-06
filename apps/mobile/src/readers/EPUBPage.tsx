@@ -159,7 +159,7 @@ export function EPUBPage({
         </style></head><body>${clean}<style>
           html,body{background:${c.bg};color:${c.text};}
           body{box-sizing:border-box;margin:0 auto;padding:24px 26px 50px;max-width:740px;font-size:${size}px;}
-          a:link,a:visited{color:${c.accent};}strong{color:inherit;text-emphasis-color:currentColor;}
+          a:link,a:visited{color:${c.accent};}strong{color:inherit!important;text-emphasis-color:currentColor!important;}
           ${pageCSS}
         </style><script nonce="glassleaf">
           const send=(type,value)=>window.ReactNativeWebView.postMessage(JSON.stringify({type,value}));
