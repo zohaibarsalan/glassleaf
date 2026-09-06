@@ -1,7 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LibraryRepository, type SQL, type Book } from "./index.ts";
+import {
+  LibraryRepository,
+  matchesRules,
+  type Rules,
+  type SQL,
+  type Book,
+} from "./index.ts";
 function setup() {
   const db = new DatabaseSync(":memory:");
   const sql: SQL = {
@@ -155,6 +161,10 @@ test("10,000-book indexed paging and FTS search return bounded, stable results",
     db.exec("BEGIN");
     for (let i = 0; i < 10000; i++) {
       const record = book(String(i).padStart(5, "0"));
+      record.kind = i % 2 ? "manga" : "novel";
+      record.format = i % 3 === 0 ? "pdf" : i % 3 === 1 ? "epub" : "cbz";
+      record.tags = [i % 2 ? "fantasy" : "science", `topic-${i % 20}`];
+      record.collections = [`Shelf ${i % 10}`];
       if (i === 9999) record.format = "pdf";
       insert.run(record.id, JSON.stringify(record));
     }
@@ -168,7 +178,9 @@ test("10,000-book indexed paging and FTS search return bounded, stable results",
     assert.equal(new Set([...first, ...second].map((b) => b.id)).size, 120);
     assert.equal(result[0]?.id, "09999");
     assert.equal(
-      (await repo.list({ kind: "manga", format: "pdf" }))[0]?.id,
+      (
+        await repo.list({ search: "Book 09999", kind: "manga", format: "pdf" })
+      )[0]?.id,
       "09999",
     );
     assert.equal(
@@ -176,8 +188,34 @@ test("10,000-book indexed paging and FTS search return bounded, stable results",
       0,
     );
     assert.equal((await repo.stats()).total, 10000);
+    const rules: Rules = {
+      match: "all",
+      conditions: [
+        { field: "collection", operator: "is", value: "Shelf 9" },
+        {
+          match: "any",
+          conditions: [
+            { field: "tag", operator: "is", value: "fantasy" },
+            { field: "format", operator: "is", value: "epub" },
+          ],
+        },
+      ],
+    };
+    const scoped = await repo.list({ rules, limit: 60 });
+    assert.equal(scoped.length, 60);
+    assert.ok(scoped.every((b) => matchesRules(b, rules)));
+    assert.equal(
+      (await repo.discover("Book 09999", "book", 0, { rules }))[0]?.bookId,
+      "09999",
+    );
+    const facets = await repo.facets({ rules });
+    assert.equal(
+      facets.find((f) => f.field === "collection" && f.value === "Shelf 9")
+        ?.count,
+      1000,
+    );
     console.log(
-      `10k library: two pages + FTS + counts in ${(performance.now() - start).toFixed(1)} ms (host SQLite; not a device UI benchmark)`,
+      `10k library: paging + FTS + nested scope + facets/counts in ${(performance.now() - start).toFixed(1)} ms (host SQLite; not a device UI benchmark)`,
     );
   } finally {
     db.close();

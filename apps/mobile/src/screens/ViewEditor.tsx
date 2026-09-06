@@ -57,12 +57,14 @@ export function ViewEditor({
     name?: string;
     pinned?: boolean;
     scope?: SavedView["scope"];
+    revision?: number;
   };
   stats: Stats;
   onClose: () => void;
   onApply: (rules: Rules, sort: Sort) => void;
-  onSave: (view: SavedView) => Promise<void>;
+  onSave: (view: SavedView, expectedRevision: number | null) => Promise<void>;
 }) {
+  const [expectedRevision] = useState(initial.revision ?? null);
   const [rules, setRules] = useState(initial.rules),
     [sort, setSort] = useState(initial.sort),
     [name, setName] = useState(initial.name ?? ""),
@@ -122,14 +124,17 @@ export function ViewEditor({
             disabled={!name.trim() || saving}
             onPress={() => {
               setSaving(true);
-              void onSave({
-                id: initial.id ?? randomUUID(),
-                name,
-                rules,
-                sort,
-                pinned,
-                scope: initial.scope,
-              })
+              void onSave(
+                {
+                  id: initial.id ?? randomUUID(),
+                  name,
+                  rules,
+                  sort,
+                  pinned,
+                  scope: initial.scope,
+                },
+                expectedRevision,
+              )
                 .then(() => onApply(rules, sort))
                 .catch((e) => setError(String(e)))
                 .finally(() => setSaving(false));

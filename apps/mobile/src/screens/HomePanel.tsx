@@ -31,7 +31,7 @@ export function HomePanel({
   useEffect(() => {
     let live = true;
     void Promise.all([
-      repo.list({ status: "reading", sort: "last-read", limit: 4 }),
+      repo.list({ status: "reading", sort: "last-read", limit: 2 }),
       repo.list({ limit: 6 }),
     ])
       .then(([a, b]) => {
@@ -49,6 +49,7 @@ export function HomePanel({
   }, [repo, revision]);
   return (
     <ScrollView
+      style={{ flex: 1 }}
       contentContainerStyle={{ padding: 20, gap: 28, paddingBottom: 40 }}
     >
       <Box gap="s">
@@ -61,7 +62,21 @@ export function HomePanel({
       </Box>
       {!!error && <Text color="danger">{error}</Text>}
       <Box gap="m">
-        <Text variant="eyebrow">CONTINUE READING</Text>
+        <Box
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Text variant="eyebrow">CONTINUE READING</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Browse currently reading"
+            style={{ padding: 12 }}
+            onPress={() => onBrowse({ status: "reading", sort: "last-read" })}
+          >
+            <ArrowRight size={20} color={c.accent} />
+          </Pressable>
+        </Box>
         {reading.map((book) => (
           <BookTile
             key={book.id}

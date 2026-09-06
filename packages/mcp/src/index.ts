@@ -86,7 +86,8 @@ server.registerTool(
         (!members || members.has(b.id)) &&
         (!collectionName ||
           b.collections.some((c) => c.toLowerCase() === collectionName)) &&
-        (!view?.scope?.series || b.series === view.scope.series) &&
+        (!view?.scope?.series ||
+          b.series.toLowerCase() === view.scope.series.toLowerCase()) &&
         (!view?.scope?.unfiled || !b.collections.length) &&
         [b.title, b.author, b.series, ...b.tags, ...b.collections]
           .join(" ")

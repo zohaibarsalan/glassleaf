@@ -119,7 +119,7 @@ export function BookEditor({
         label="Collections"
         value={collections}
         onChangeText={setCollections}
-        placeholder="Reading list, Shared universe"
+        placeholder="Shared universe, Research"
       />
       <Field
         label="Tags"

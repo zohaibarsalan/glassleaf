@@ -194,35 +194,40 @@ export function BookTile({
           <Text variant="caption" numberOfLines={1} marginTop="xs">
             {book.author}
           </Text>
-          <Box flexDirection="row" alignItems="center" marginTop="xs">
+          <Box
+            flexDirection="row"
+            alignItems="center"
+            marginTop="xs"
+            minHeight={onMenu ? 28 : undefined}
+            paddingRight={onMenu ? "xl" : undefined}
+          >
             <Text variant="eyebrow" flex={1} fontSize={9} letterSpacing={0.8}>
               {book.format.toUpperCase()}{" "}
               {book.progress > 0
                 ? ` · ${Math.round(book.progress * 100)}%`
                 : ""}
             </Text>
-            {onMenu && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Options for ${book.title}`}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onMenu();
-                }}
-                hitSlop={10}
-                style={{
-                  width: 32,
-                  height: 28,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <MoreHorizontal size={18} color={c.secondary} />
-              </Pressable>
-            )}
           </Box>
         </Box>
       </Pressable>
+      {onMenu && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Options for ${book.title}`}
+          onPress={onMenu}
+          style={{
+            position: "absolute",
+            right: 4,
+            bottom: 16,
+            width: 44,
+            height: 44,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <MoreHorizontal size={18} color={c.secondary} />
+        </Pressable>
+      )}
     </Box>
   );
 }

@@ -101,7 +101,14 @@ export function SearchPanel({
           )}
         </Box>
         <Field
-          label="Search everything"
+          label={
+            scope.bookId
+              ? "Search this book"
+              : scopeName === "everywhere"
+                ? "Search everything"
+                : "Search this view"
+          }
+          testID="field-Search everything"
           value={term}
           onChangeText={setTerm}
           placeholder="A title, a thought, a line you remember…"

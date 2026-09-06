@@ -46,6 +46,33 @@ const original = JSON.stringify({
   version: 1,
   exportedAt: new Date().toISOString(),
   books: [book],
+  organization: [
+    {
+      id: "fixture-list",
+      value: { kind: "reading-list", name: "Empty", bookIds: [] },
+      revision: 1,
+      device: "fixture",
+      updatedAt: book.updatedAt,
+      deletedAt: null,
+    },
+    {
+      id: "fixture-view",
+      value: {
+        kind: "view",
+        view: {
+          id: "fixture-view",
+          name: "Scoped",
+          rules: { match: "all", conditions: [] },
+          sort: "title",
+          scope: { readingListId: "fixture-list" },
+        },
+      },
+      revision: 1,
+      device: "fixture",
+      updatedAt: book.updatedAt,
+      deletedAt: null,
+    },
+  ],
 });
 await writeFile(path, original);
 const client = new Client({ name: "glassleaf-check", version: "1" });
@@ -148,9 +175,22 @@ try {
     JSON.parse((scoped.content as { text: string }[])[0]!.text).total,
     0,
   );
+  const emptyView = await client.callTool({
+    name: "search_library",
+    arguments: { viewId: "fixture-view" },
+  });
+  assert.equal(
+    JSON.parse((emptyView.content as { text: string }[])[0]!.text).total,
+    0,
+  );
+  const unknownView = await client.callTool({
+    name: "search_library",
+    arguments: { viewId: "missing" },
+  });
+  assert.equal(unknownView.isError, true);
   assert.equal(await readFile(path, "utf8"), original);
   console.log(
-    "MCP protocol check passed: search, revision-checked plan, original snapshot unchanged.",
+    "MCP protocol check passed: scoped search, metadata/structure plans, stale revisions, original snapshot unchanged.",
   );
 } finally {
   await client.close();

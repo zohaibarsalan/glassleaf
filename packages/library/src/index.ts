@@ -696,6 +696,17 @@ export class LibraryRepository {
           throw new Error(
             "Rename or remove collections through the collection membership tool.",
           );
+        if (change.value.kind === "collection" && !change.deleted) {
+          const duplicate = await sql.all(
+            "SELECT 1 FROM organization WHERE id!=? AND json_extract(data,'$.deletedAt') IS NULL AND json_extract(data,'$.value.kind')='collection' AND json_extract(data,'$.value.name')=? COLLATE NOCASE",
+            change.id,
+            change.value.name,
+          );
+          if (duplicate.length)
+            throw new Error(
+              "A collection with that name already exists. Use its existing ID.",
+            );
+        }
         const after: OrganizationRecord = {
           id: change.id,
           value: change.value,

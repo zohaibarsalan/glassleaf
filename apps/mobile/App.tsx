@@ -672,7 +672,7 @@ function LibraryApp({
                   {tab === "home"
                     ? "Your reading space."
                     : tab === "search"
-                      ? "Across your whole library."
+                      ? "Books, chapters, and your notes."
                       : tab === "library"
                         ? hasFilters
                           ? `${books.length}${more ? "+" : ""} matching ${books.length === 1 ? "story" : "stories"}`
@@ -1179,6 +1179,8 @@ function LibraryApp({
         <ViewEditor
           initial={{
             id: activeView?.id,
+            revision: organization.find((r) => r.id === activeView?.id)
+              ?.revision,
             name: activeView?.name,
             pinned: activeView?.pinned,
             scope: {
@@ -1232,11 +1234,8 @@ function LibraryApp({
             });
             setSortSheet(false);
           }}
-          onSave={async (view) => {
-            await repo.saveView(
-              view,
-              organization.find((r) => r.id === view.id)?.revision ?? null,
-            );
+          onSave={async (view, expectedRevision) => {
+            await repo.saveView(view, expectedRevision);
             setViews(await repo.savedViews());
           }}
         />
