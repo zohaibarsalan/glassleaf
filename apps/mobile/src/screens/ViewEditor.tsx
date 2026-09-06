@@ -48,7 +48,7 @@ export function ViewEditor({
   onApply,
   onSave,
 }: {
-  initial: { rules: Rules; sort: Sort };
+  initial: { rules: Rules; sort: Sort; id?: string; name?: string };
   stats: Stats;
   onClose: () => void;
   onApply: (rules: Rules, sort: Sort) => void;
@@ -56,7 +56,7 @@ export function ViewEditor({
 }) {
   const [rules, setRules] = useState(initial.rules),
     [sort, setSort] = useState(initial.sort),
-    [name, setName] = useState(""),
+    [name, setName] = useState(initial.name ?? ""),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   const [picker, setPicker] = useState<"field" | "sort" | Rule["field"]>();
@@ -109,7 +109,7 @@ export function ViewEditor({
             disabled={!name.trim() || saving}
             onPress={() => {
               setSaving(true);
-              void onSave({ id: randomUUID(), name, rules, sort })
+              void onSave({ id: initial.id ?? randomUUID(), name, rules, sort })
                 .then(() => onApply(rules, sort))
                 .catch((e) => setError(String(e)))
                 .finally(() => setSaving(false));

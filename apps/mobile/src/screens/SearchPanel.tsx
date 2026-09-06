@@ -54,7 +54,7 @@ export function SearchPanel({
         });
     }, 180);
     return () => clearTimeout(timer);
-  }, [term, kind, repo, indexStatus]);
+  }, [term, kind, repo]);
   async function next() {
     if (!more || busy || paging.current) return;
     paging.current = true;
@@ -133,7 +133,7 @@ export function SearchPanel({
               <Text variant="label">{item.title}</Text>
               {item.kind !== "book" && (
                 <Text variant="caption">{item.bookTitle}</Text>
-              )}{" "}
+              )}
               {!!item.excerpt && (
                 <Text color="secondary" numberOfLines={3}>
                   {item.excerpt}

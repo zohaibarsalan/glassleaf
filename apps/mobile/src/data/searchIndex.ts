@@ -1,6 +1,6 @@
 import type { LibraryRepository } from "@glassleaf/library";
 import { XMLParser } from "fast-xml-parser";
-import { bookFileReady, nativeFile, readText } from "./files";
+import { nativeFile, readText } from "./files";
 const parser = new XMLParser({
   ignoreAttributes: true,
   processEntities: false,
@@ -36,16 +36,15 @@ export async function indexLocalChapters(
     offset += books.length;
     for (const book of books) {
       if (signal.aborted) return;
-      if (!bookFileReady(book)) {
-        skipped += book.asset.chapters.length;
-        continue;
-      }
       for (const [index, chapter] of book.asset.chapters.entries()) {
         if (signal.aborted) return;
         if (await repo.chapterIndexed(book, chapter.path)) continue;
         try {
           const path = `${book.id}/content/${chapter.path}`;
-          if (nativeFile(path).size > 2 * 1024 * 1024) {
+          if (
+            !nativeFile(path).exists ||
+            nativeFile(path).size > 2 * 1024 * 1024
+          ) {
             skipped++;
             continue;
           }
@@ -66,7 +65,7 @@ export async function indexLocalChapters(
   if (!signal.aborted)
     status(
       skipped
-        ? `${skipped} chapters unavailable or too large to index. Local EPUB text is searchable.`
+        ? `${skipped} chapters could not be indexed. Search includes available chapter text.`
         : "Local EPUB chapters are searchable.",
     );
 }

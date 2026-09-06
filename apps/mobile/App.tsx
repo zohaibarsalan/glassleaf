@@ -441,9 +441,17 @@ function LibraryApp({
     query.favorite ||
     query.trash
   );
+  const activeView = query.rules
+    ? views.find(
+        (view) =>
+          JSON.stringify(view.rules) === JSON.stringify(query.rules) &&
+          view.sort === query.sort,
+      )
+    : undefined;
   const title = query.trash
     ? "Trash"
-    : (query.collection ??
+    : (activeView?.name ??
+      query.collection ??
       (query.kind
         ? kindLabels[query.kind]
         : query.favorite
@@ -998,6 +1006,8 @@ function LibraryApp({
       {sortSheet && (
         <ViewEditor
           initial={{
+            id: activeView?.id,
+            name: activeView?.name,
             rules: query.rules ?? {
               match: "all",
               conditions: [

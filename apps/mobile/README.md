@@ -88,3 +88,13 @@ The dated screenshot journal is in `docs/ui-gallery`. Run `python3 scripts/build
 ### Community themes
 
 Appearance includes all four Catppuccin flavors, Nord, Dracula and Gruvbox alongside the original themes. Import downloaded Base16/Base24 YAML or JSON (including legacy flat Base16) from Settings → Appearance → Import. Review/edit the mapped colors and choose Save and apply. Existing Glassleaf JSON imports and exports remain supported. See [format support and palette attribution](themes/community/README.md). Editor extensions and arbitrary application theme files are not interchangeable with these scheme formats.
+
+### Reading home, search, and saved views
+
+The app opens on Home (continue reading, recent additions, saved views). Library keeps books in focus: View options edits filters/sort; Library actions contains layout and bulk selection. Settings is available from the gear and opens individual sections.
+
+Organize separates story types, manual collections, tags and live saved views. Rules match all or any conditions, with is/is-not across kind, format, tag, collection, author, series, language, status and favorite. Open a saved view and change View options to edit its name/rules/sort. Removing a view never removes books. Views are currently device-local; Drive and MCP still exchange book metadata, not saved-view definitions.
+
+Search indexes book metadata, notes, bookmarks, chapter titles and local EPUB text. Results open their saved location or chapter start. Book matches precede notes/bookmarks/chapters in All; each section is also searchable separately. The index is built incrementally after launch and import, paused while reading, with no file scans on keystrokes. Changing the query or reopening Search picks up newly indexed chapters. Chapter files over 2 MB are skipped. PDF page text, comic OCR, Japanese segmentation and exact passage highlighting are not implemented.
+
+Research and rationale: [core experience decisions](../../docs/research/2026-09-06-library-experience.md). Current native checks: flows/core-navigation.yaml, core-light-search.yaml and core-dark-gallery.yaml. Earlier flows document the previous navigation and require updating before reuse.

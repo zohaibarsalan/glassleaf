@@ -486,10 +486,10 @@ export class LibraryRepository {
   ): Promise<SearchHit[]> {
     if (!term.trim()) return [];
     return this.sql.all<SearchHit>(
-      `SELECT discovery.bookId,discovery.kind,discovery.locator,discovery.title,snippet(discovery,4,'','',' … ',24) AS excerpt,books.title AS bookTitle
+      `SELECT discovery.bookId,discovery.kind,discovery.locator,discovery.title,CASE WHEN discovery.kind='book' THEN books.author ELSE snippet(discovery,4,'','',' … ',24) END AS excerpt,books.title AS bookTitle
       FROM discovery JOIN books ON books.id=discovery.bookId
       WHERE discovery MATCH ? AND books.deleted IS NULL ${kind === "passage" ? "AND discovery.kind IN ('passage','chapter')" : kind ? "AND discovery.kind=?" : ""}
-      ORDER BY rank, discovery.rowid LIMIT 40 OFFSET ?`,
+      ORDER BY CASE discovery.kind WHEN 'book' THEN 0 WHEN 'note' THEN 1 WHEN 'bookmark' THEN 2 ELSE 3 END, rank, discovery.rowid LIMIT 40 OFFSET ?`,
       searchExpression(term.slice(0, 500)),
       ...(kind && kind !== "passage" ? [kind] : []),
       Math.max(0, offset),

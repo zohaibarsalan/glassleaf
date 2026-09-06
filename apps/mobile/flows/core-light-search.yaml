@@ -30,4 +30,7 @@ appId: app.glassleaf.mobile
 - tapOn:
     text: "passage: Chapter 1"
     index: 0
+- extendedWaitUntil:
+    visible: ".*The morning.*"
+    timeout: 20000
 - takeScreenshot: paper-chapter-reader
