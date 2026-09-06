@@ -50,6 +50,7 @@ function book(id: string): Book {
     language: "ja",
     direction: "rtl",
     layout: "pages",
+    pdfNightMode: false,
     favorite: false,
     status: "unread",
     progress: 0,

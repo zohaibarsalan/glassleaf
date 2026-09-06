@@ -33,6 +33,7 @@ import {
   usePalette,
 } from "../ui/theme";
 import { ComicCanvas, ComicStripPage } from "./ComicCanvas";
+import { chapterTitles } from "../data/epubNavigation";
 import { EPUBPage } from "./EPUBPage";
 import { PDFPages } from "./PDFPages";
 export function Reader({
@@ -47,6 +48,24 @@ export function Reader({
   onSearch: (book: Book) => void;
 }) {
   const [book, setBook] = useState(initialBook);
+  useEffect(() => {
+    if (initialBook.format !== "epub") return;
+    let cancelled = false;
+    void chapterTitles(initialBook)
+      .then((chapters) => {
+        if (!cancelled)
+          setBook((current) => ({
+            ...current,
+            asset: { ...current.asset, chapters },
+          }));
+      })
+      .catch(() => {
+        /* A missing navigation document does not prevent reading. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialBook]);
   const c = usePalette();
   const { width } = useWindowDimensions();
   const start = parseLocator(book.locator);
@@ -131,7 +150,12 @@ export function Reader({
     };
   }, [save, close]);
   async function update(
-    patch: Partial<Pick<Book, "direction" | "layout" | "notes" | "bookmarks">>,
+    patch: Partial<
+      Pick<
+        Book,
+        "direction" | "layout" | "notes" | "bookmarks" | "pdfNightMode"
+      >
+    >,
   ) {
     try {
       setBook(await repo.update(book.id, patch));
@@ -414,6 +438,27 @@ export function Reader({
                 onPress={() => setSize((s) => Math.min(34, s + 2))}
               />
             </Box>
+          )}
+          {book.format === "pdf" && (
+            <>
+              <Text variant="label">Page appearance</Text>
+              <Box flexDirection="row" gap="s">
+                <Chip
+                  label="Original colors"
+                  active={!book.pdfNightMode}
+                  onPress={() => void update({ pdfNightMode: false })}
+                />
+                <Chip
+                  label="Night reading"
+                  active={book.pdfNightMode}
+                  onPress={() => void update({ pdfNightMode: true })}
+                />
+              </Box>
+              <Text variant="caption">
+                Dark paper and light text. Illustrations also change color; use
+                original colors for artwork.
+              </Text>
+            </>
           )}
           <Text variant="label">Reading direction</Text>
           <Box flexDirection="row" gap="s">

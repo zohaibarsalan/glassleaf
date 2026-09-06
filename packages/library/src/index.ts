@@ -58,6 +58,7 @@ export const bookSchema = z.object({
   language: z.string().max(50),
   direction: z.enum(["ltr", "rtl"]),
   layout: z.enum(["pages", "scroll", "spread"]),
+  pdfNightMode: z.boolean().default(false),
   notes: z
     .array(
       z.object({
