@@ -26,3 +26,5 @@ Two-page screenshots preserve the original fixture art without recoloring it.
 The gallery is a screenshot journal, not the React Native app running in a browser.
 Its layout and theme filters were checked at a 430px phone viewport, with no
 horizontal overflow. The gallery shell follows the phone's light/dark setting.
+
+Community theme follow-up (2026-09-06): Native Maestro flow community-themes.yaml passed switching to Catppuccin Latte and Mocha, with four new Settings/library captures. Light and dark status bars verified in pixels. Pure TypeScript checks cover all seven bundled community YAML/JSON schemes, legacy Base16, Base24 required colors, native export/persistence round trips, invalid YAML and size limits. Native Files-picker import/share-sheet export are still not end-to-end verified.
