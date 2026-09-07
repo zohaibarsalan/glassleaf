@@ -6,8 +6,8 @@ Keep `packages/library` and the current local-first model as the shared core. Us
 
 For the MVP, use Google directly:
 
-1. Google identity (`openid profile email`) identifies the user and provides the account binding shown in the existing Drive settings.
-2. A separate, explicit Google Drive authorization requests `drive.file` for Glassleaf-created/opened files. The Google web guidance intentionally separates sign-in (who the user is) from authorization (what data the app may access). Keep those consent moments and token lifetimes separate.
+1. Google is the product account authority. Native Google Sign-In returns the account identity; the browser’s explicit GIS Drive flow uses Drive `about.user.permissionId` for the local account binding without persisting an ID or access token. Keep identity and authorization as separate concerns even where the first web connect combines them in one user gesture.
+2. Google Drive authorization requests only `drive.file` for Glassleaf-created/opened files. The Google web guidance intentionally separates sign-in (who the user is) from authorization (what data the app may access). Keep those consent moments and token lifetimes separate if a standalone browser identity screen is added later.
 3. Drive remains the user’s storage. Glassleaf stores metadata, reading progress, organization records, immutable batches, and original book assets in the user’s Drive folder; there is no Glassleaf file-storage bill in this design.
 4. Automatic sync means a bounded foreground sync on launch, app resume, browser visibility/online events, and after a local mutation. A timer may retry while the app is active and a valid token is already available. It must never open a consent dialog in the background. Native OS background work and PWA background sync are later enhancements.
 
@@ -17,8 +17,8 @@ This meets the free/local-first requirement without adding a hosted identity dat
 
 - `apps/mobile` is Expo SDK 57 / React Native 0.86 with `expo-sqlite`; the SQLite database is the local source of truth.
 - `packages/library` exposes a small `SQL` interface and the repository already owns revisions, tombstones, outbox, conflicts, organization records, and FTS5 search.
-- `apps/mobile/src/sync/drive.ts` already has Google Sign-In, `drive.file`, per-account binding, immutable book/organization batches, checksums, and resumable-upload negotiation. `drive.web.ts` deliberately fails today.
-- The current readers are native-only at the asset boundary: EPUB uses `react-native-webview` plus `file://` HTML, PDF uses `react-native-pdf`, and import/search use native file APIs and native ZIP extraction. The current web build is therefore not a functional reader/PWA yet.
+- `apps/mobile/src/sync/drive.ts` and `drive.web.ts` now share the Drive engine. Native Google Sign-In and browser GIS both request `drive.file`; browser access tokens are memory-only and require an explicit reconnect after expiry. Tauri builds currently remove the web client ID and disable Drive until a native OAuth bridge exists.
+- Native readers still use `react-native-webview`/`react-native-pdf` and native file APIs; the web path now has browser EPUB/PDF/CBZ readers backed by IndexedDB/OPFS assets. Browser annotations and physical iPhone storage/OAuth behavior remain validation gaps.
 - `apps/apple` has a separate Swift/CloudKit implementation. Treat it as an existing product/compatibility surface while the new cross-platform path is validated; do not share CloudKit and Drive cursors or run two writers against one library.
 
 ## Platform shape
@@ -42,9 +42,9 @@ Continue with Expo development builds and native modules for import, file storag
 
 Export the Expo web bundle, add a manifest (`display: standalone`, stable `id`, 192/512 icons), and add a carefully scoped Workbox service worker. Expo recommends native apps for the strongest offline behavior and warns that an aggressive service worker can make updates difficult. Cache the shell and reader code; let the asset store own book bytes and version them explicitly.
 
-Use browser storage for both metadata and assets. `expo-sqlite` web support is currently documented as alpha and requires WASM plus `Cross-Origin-Embedder-Policy`/`Cross-Origin-Opener-Policy` headers. It is a viable first adapter if deployment can guarantee those headers; otherwise implement the same SQL contract over IndexedDB and keep FTS/search as a browser-specific adapter. Do not use `localStorage` for books, tokens, or the SQLite database.
+Use browser storage for both metadata and assets. The current web adapter runs SQLite WASM in a worker with the OPFS SAH-pool VFS (`opfs-sahpool`, with `opfs-disable=1`) and intentionally does not require COOP/COEP headers. This is an implementation choice around the Expo SQLite web limitations; revisit it if the adapter returns to the default Expo web path. Do not use `localStorage` for books, tokens, or the SQLite database.
 
-The PWA needs browser-native readers:
+The PWA uses browser-native readers:
 
 - EPUB: unzip in JavaScript, sanitize chapter HTML, resolve images/styles to Blob URLs, and render in a same-origin iframe/DOM reader with the existing locator, anchor, selection, note, direction, and pagination protocol.
 - PDF: use a browser PDF renderer (PDF.js or equivalent) with page/outline/night-mode adapters matching `PDFPages`.
@@ -54,13 +54,13 @@ On iPhone, installation is a user action in Safari’s Share menu → Add to Hom
 
 Google Identity Services for web should use its authentication flow for identity and its authorization flow for Drive. Keep the web access token in memory; on expiry/401, mark Drive disconnected and ask the user to reconnect. A service worker or visibility timer must not trigger consent.
 
-There is a deployment-header conflict to resolve before claiming web SQLite and browser OAuth work together: Expo’s SQLite/WASM path requires cross-origin isolation (`COOP: same-origin` plus `COEP: require-corp`), while Google documents that popup GIS may need `COOP: same-origin` with `same-origin-allow-popups` when FedCM is unavailable. Do not add `same-origin-allow-popups` blindly or claim this is validated on iPhone; test the selected hosted headers with real OAuth, or choose an IndexedDB metadata adapter that does not require cross-origin isolation. Chrome’s newer `COOP: restrict-properties` is a possible Chromium-only experiment, not an iPhone compatibility decision.
+The current SAH-pool deployment has no COOP/COEP-versus-GIS header conflict because it does not opt into cross-origin isolation. Browser OAuth, OPFS persistence, and iPhone PWA lifecycle still need real hosted and physical-device validation. If the project switches back to an Expo web SQLite mode that requires isolation, Google’s popup COOP requirement must be retested rather than solved by adding `same-origin-allow-popups` blindly. Chrome’s newer `COOP: restrict-properties` remains a Chromium-only experiment, not an iPhone compatibility decision.
 
 ### Desktop
 
-Package the browser export in Tauri. Tauri supplies platform installers and signing paths for macOS, Windows, and Linux, while the UI remains the same React Native Web UI. Give Tauri a narrow bridge for native file import, large asset storage, secure credential storage, and optional system file associations. If the bridge is unavailable, the desktop build can use the browser adapter. Desktop Google OAuth should use the installed-app PKCE flow with a loopback/custom redirect and an OS secure store; do not put a client secret in the package.
+Package the browser export in Tauri. Tauri supplies platform installers and signing paths for macOS, Windows, and Linux, while the UI remains the same React Native Web UI. Give Tauri a narrow bridge for native file import, large asset storage, secure credential storage, and optional system file associations. The current desktop build deliberately removes the web client ID, so it has no Drive UI or OAuth claim. The future bridge should use a Google **Desktop application** client, a random-port loopback redirect such as `http://127.0.0.1:<port>`, PKCE S256, state validation, and the authorization-code exchange. Store the refresh token in Tauri Stronghold or an OS keychain; never put it in the web database or localStorage. Do not use a web client ID or register `tauri://` as a JavaScript origin.
 
-This is a packaging decision, not a promise of identical native capabilities: the Tauri WebView and browser still require the browser reader adapters. Code signing/notarization and WebView2/WebKit prerequisites are release work.
+This is a packaging decision, not a promise of identical native capabilities: the Tauri WebView and browser still require the browser reader adapters. Code signing/notarization, WebView2/WebKit prerequisites, a Rust/Stronghold bridge, loopback listener, token refresh, and Google Desktop client registration are release work.
 
 ## Clerk versus WorkOS
 
@@ -85,7 +85,7 @@ If an independent Glassleaf account becomes necessary, choose Clerk first for th
 
 1. First extract shared Drive transport and define the database/asset/auth adapters. Preserve `drive.file`, account binding, checksums, immutable batches, conditional acknowledgement, conflict retention, and safe-path checks.
 2. Fix provider state before web work: scope folder IDs by account and reset on disconnect/account change; do not upload a tombstone that requires a missing original; avoid downloading every missing book during each sync; add bounded pagination/cursors and exponential backoff.
-3. Add browser metadata/assets and the three browser reader adapters. A PWA milestone is not complete while EPUB still relies on `react-native-webview`, PDF on `react-native-pdf`, or `drive.web.ts` throws by design.
+3. Validate browser metadata/assets and the three browser reader adapters on deployed PWA and iPhone flows. A PWA milestone is not complete while the browser path lacks its own EPUB/PDF/CBZ readers or `drive.web.ts` throws by design.
 4. Add foreground automatic sync and explicit reconnect states. Sync failures must leave local reading and pending outbox records intact.
 5. Verify with real Google OAuth credentials on iOS, Android, web/PWA, and Tauri; then run a two-device same-account test for import, progress, notes, offline edits, reconnect, conflict, trash/restore, and a large asset. No live auth/sync claim is valid before this gate.
 
@@ -98,7 +98,7 @@ If an independent Glassleaf account becomes necessary, choose Clerk first for th
 - Web client and authorized JavaScript origins/redirect behavior.
 - Desktop client/redirect choice for Tauri (loopback versus custom scheme).
 - Whether Glassleaf needs only `drive.file` (current visible Glassleaf folder/batches) or an app-private `drive.appdata` record in addition. Do not broaden to `drive`/`drive.readonly` without a product requirement and verification plan.
-- Hosting that can supply HTTPS, PWA manifest/service worker, and the cross-origin isolation headers if the web SQLite/WASM adapter is selected.
+- Hosting that can supply HTTPS, PWA manifest/service worker, and the exact authorized JavaScript origins for browser GIS. Cross-origin isolation headers are only needed if the web SQLite adapter changes back to a mode that requires them.
 - No Clerk or WorkOS instance/keys are configured. Keep them out of the initial implementation until the independent-account requirement is explicit.
 
 ## Official sources
