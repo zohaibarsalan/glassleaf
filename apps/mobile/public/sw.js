@@ -1,27 +1,58 @@
-/* This source worker is replaced with a content-addressed precache during build:web. */
-const CACHE = "glassleaf-shell-v1";
+/* build:web replaces the development cache ID and precache list. */
+const CACHE = "glassleaf-shell-dev";
 const PRECACHE = ["/", "/index.html", "/manifest.json", "/favicon.ico"];
+const PRECACHE_PATHS = new Set(
+  PRECACHE.map((entry) => new URL(entry, self.location).pathname),
+);
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(PRECACHE))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter(
+              (key) => key.startsWith("glassleaf-shell-") && key !== CACHE,
+            )
+            .map((key) => caches.delete(key)),
+        ),
+      )
+      .then(() => self.clients.claim()),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
-  const request = event.request;
-  if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
-  event.respondWith(caches.match(request, { ignoreSearch: true }).then((cached) => {
-    const network = fetch(request).then((response) => {
-      if (response.ok) void caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
-      return response;
-    });
-    if (cached) {
-      void network.catch(() => undefined);
-      return cached;
-    }
-    return network.catch(() => caches.match("/index.html"));
-  }));
+  const { request } = event;
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).catch(() =>
+        caches
+          .open(CACHE)
+          .then((cache) => cache.match("/index.html"))
+          .then((response) => response ?? Response.error()),
+      ),
+    );
+    return;
+  }
+
+  if (!PRECACHE_PATHS.has(url.pathname)) return;
+  event.respondWith(
+    caches
+      .open(CACHE)
+      .then((cache) => cache.match(url.pathname, { ignoreSearch: true }))
+      .then((response) => response ?? fetch(request)),
+  );
 });
