@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "mobile": "pnpm --filter @glassleaf/mobile start",
+    "web:build": "pnpm --filter @glassleaf/mobile build:web",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @glassleaf/library test && pnpm --filter @glassleaf/mcp test && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-mobile-themes.ts && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-reader-locations.ts",
     "mcp": "pnpm --filter @glassleaf/mcp start",
