@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "forest",
+  "name": "Forest",
+  "mode": "dark",
+  "colors": {
+    "bg": "#152C25",
+    "surface": "#203B30",
+    "muted": "#2D493D",
+    "line": "#395549",
+    "text": "#F1F0DE",
+    "secondary": "#B4C4AE",
+    "accent": "#D6DDA7",
+    "accentSoft": "#354F3F",
+    "onAccent": "#1C3526",
+    "danger": "#E8A298",
+    "gold": "#BC8941"
+  }
+}

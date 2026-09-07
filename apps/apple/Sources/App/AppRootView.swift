@@ -49,32 +49,15 @@ struct AppRootView: View {
             reduceMotion ? nil : .smooth(duration: 0.24),
             value: store.readerBook?.id
         )
+        // SwiftUI only supports one active file-import presentation in this
+        // view hierarchy. A shared picker keeps EPUB import and library restore
+        // from replacing one another's presentation host on macOS.
         .fileImporter(
-            isPresented: $store.showsImporter,
-            allowedContentTypes: [.epub],
+            isPresented: fileImporterPresented,
+            allowedContentTypes: [.epub, .glassleafLibrary],
             allowsMultipleSelection: true
         ) { result in
-            switch result {
-            case .success(let urls):
-                Task { await store.importBooks(from: urls) }
-            case .failure:
-                store.importAlert = .init(
-                    title: "Import Failed",
-                    message: "Glassleaf couldn’t access the selected files."
-                )
-            }
-        }
-        .fileImporter(
-            isPresented: $store.showsRestoreImporter,
-            allowedContentTypes: [.glassleafLibrary],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first { store.proposeRestore(from: url) }
-            case .failure(let error):
-                store.importAlert = .init(title: "Restore Failed", message: error.localizedDescription)
-            }
+            handleFileImport(result)
         }
         .onOpenURL { url in
             switch url.pathExtension.lowercased() {
@@ -158,6 +141,40 @@ struct AppRootView: View {
         if store.isRestoring { return "Validating and Restoring…" }
         if store.isImporting { return "Importing…" }
         return "Preparing Export…"
+    }
+
+    private var fileImporterPresented: Binding<Bool> {
+        Binding(
+            get: { store.showsImporter || store.showsRestoreImporter },
+            set: { isPresented in
+                guard !isPresented else { return }
+                store.showsImporter = false
+                store.showsRestoreImporter = false
+            }
+        )
+    }
+
+    private func handleFileImport(_ result: Result<[URL], any Error>) {
+        switch result {
+        case .success(let urls):
+            let libraryArchives = urls.filter { $0.pathExtension.lowercased() == "glassleaflibrary" }
+            let epubs = urls.filter { $0.pathExtension.lowercased() == "epub" }
+
+            if let archive = libraryArchives.first {
+                guard urls.count == 1 else {
+                    store.importAlert = .init(
+                        title: "Choose One Library Backup",
+                        message: "Restore a Glassleaf Library backup by itself. EPUBs can be imported together."
+                    )
+                    return
+                }
+                store.proposeRestore(from: archive)
+            } else if !epubs.isEmpty {
+                Task { await store.importBooks(from: epubs) }
+            }
+        case .failure(let error):
+            store.importAlert = .init(title: "Import Failed", message: error.localizedDescription)
+        }
     }
 
     private var libraryRoot: some View {

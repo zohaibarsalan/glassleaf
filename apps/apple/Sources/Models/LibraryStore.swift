@@ -432,11 +432,14 @@ final class LibraryStore {
     }
 
     func requestImport() {
+        guard !isImporting, !isExporting, !isRestoring else { return }
+        showsRestoreImporter = false
         showsImporter = true
     }
 
     func requestRestore() {
         guard !isImporting, !isExporting, !isRestoring else { return }
+        showsImporter = false
         showsRestoreImporter = true
     }
 

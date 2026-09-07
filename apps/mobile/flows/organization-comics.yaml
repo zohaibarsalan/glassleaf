@@ -1,0 +1,51 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "moon"
+- extendedWaitUntil:
+    visible: "book: moon-garden"
+    timeout: 10000
+- tapOn: "book: moon-garden"
+- tapOn: "Reading settings"
+- tapOn: "Single page"
+- tapOn: "Right to left"
+- tapOn: "Close"
+- tapOn: "Contents and bookmarks"
+- tapOn:
+    id: "field-Go to page"
+- eraseText
+- inputText: "1"
+- tapOn: "Go"
+- assertVisible: "Page 1 of 12"
+- tapOn: "Next page"
+- assertVisible: "Page 2 of 12"
+- swipe:
+    start: 25%, 50%
+    end: 75%, 50%
+    duration: 400
+- assertVisible: "Page 3 of 12"
+- takeScreenshot: paper-comic-page
+- tapOn: "Reading settings"
+- tapOn: "Spreads"
+- tapOn: "Close"
+- takeScreenshot: paper-comic-spread
+- tapOn: "Next page"
+- tapOn: "Reading settings"
+- tapOn: "Zoom in"
+- assertVisible: "1.5×"
+- tapOn: "Close"
+- takeScreenshot: paper-comic-zoom
+- tapOn: "Reading settings"
+- tapOn: "Scroll"
+- tapOn: "Close"
+- swipe:
+    direction: UP
+- takeScreenshot: paper-comic-scroll
+- tapOn: "Back to library"

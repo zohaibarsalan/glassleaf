@@ -1,0 +1,29 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element: "Catppuccin Mocha theme"
+    direction: DOWN
+- tapOn: "Catppuccin Mocha theme"
+- tapOn: "Close"
+- takeScreenshot: mocha-settings
+- tapOn: "Home"
+- takeScreenshot: mocha-home
+- tapOn: "Library"
+- takeScreenshot: mocha-library
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "light"
+- extendedWaitUntil:
+    visible: "book: The Shape of Light"
+    timeout: 15000
+- takeScreenshot: mocha-search

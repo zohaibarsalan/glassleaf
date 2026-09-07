@@ -18,7 +18,16 @@ The working product name is **Glassleaf**. The repository name is `glassleaf`.
 - The local WebKit reader renders imported EPUB XHTML/resources offline with pagination/scrolling, TOC/search, position restore, bookmarks, annotations, and persisted appearance controls.
 - Hierarchical folders, tags, collections, series, smart collections, Inbox, batch organization, recoverable Trash, metadata/custom-cover editing, and portable export are implemented.
 - Formal domain tests, generated-EPUB/SQLite integration checks, macOS and generic iOS Simulator builds, and a 50,000-book indexed-search benchmark pass locally.
-- Provider-neutral synchronization has started: versioned opaque records, revisions, append-only reading events, an offline outbox, tombstones, recoverable conflicts, deterministic provider tests, a durable SQLite journal, and gated provider migration are implemented. CloudKit, Google Drive, web, and remote deployment have not started.
+- Provider-neutral synchronization includes versioned opaque records, revisions, append-only reading events, an offline outbox, tombstones, recoverable conflicts, deterministic provider tests, a durable SQLite journal, and gated provider migration. The opt-in CloudKit adapter is implemented but still needs signed multi-device validation. Google Drive, web, and remote deployment have not started.
+
+### Current direction (2026-09-06)
+
+- Active development is on `feat/react-native-app`, with the Expo/React Native app in `apps/mobile`, shared SQLite model in `packages/library`, and stdio MCP server in `packages/mcp`.
+- iOS and Android are first-class. Use the mobile README as the current implementation/validation reference; the Swift snapshot above describes the preserved legacy app.
+- Reader priorities: EPUB, PDF, comics, manga RTL versus Western ordering, fast interaction, and a refined themeable UI. Organize story types independently from format, with overlapping collections/tags/series.
+- Google Drive integration is prepared; live OAuth and signed two-device checks await client IDs. No Google project has been created. No Apple paid-account dependency for local Android development.
+- External agents use MCP snapshot search and revision-checked organization plans, with in-app review and undo. No in-app AI.
+- Native builds and simulator rendering do not establish physical-device performance or full legacy feature parity. See `apps/mobile/README.md` for explicit gaps.
 
 ## Product vision
 
@@ -393,7 +402,7 @@ The benchmark is **Apple Books, but calmer and substantially better organized**.
 
 ### Phase 6 — Google Drive provider
 
-- Google Drive OAuth, dedicated file set, sync, and provider migration after iCloud proves the provider contract.
+- Google Drive OAuth, dedicated file set, sync, and provider migration. This work is now prioritized ahead of iCloud validation; the phase numbering below records the original roadmap.
 
 ### Phase 7 — Glassleaf Sync and web reader
 

@@ -1,0 +1,45 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- takeScreenshot: mocha-home
+- tapOn: "Organize"
+- takeScreenshot: mocha-series
+- tapOn: "Reading lists"
+- tapOn: "New reading list"
+- tapOn:
+    id: "field-Reading list name"
+- inputText: "Weekend reading order"
+- tapOn: "The Shape of Light"
+- tapOn:
+    id: "field-Add books"
+- inputText: "Infinity"
+- scrollUntilVisible:
+    element: "A Small Infinity"
+    direction: DOWN
+- tapOn: "A Small Infinity"
+- scrollUntilVisible:
+    element: "Move book 2 up"
+    direction: UP
+- tapOn: "Move book 2 up"
+- takeScreenshot: mocha-reading-list-editor
+- tapOn: "Save reading list"
+- extendedWaitUntil:
+    visible: "Weekend reading order"
+    timeout: 10000
+- takeScreenshot: mocha-reading-lists
+- tapOn: "Weekend reading order"
+- tapOn: "Library actions"
+- tapOn: "Search this view"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "light"
+- extendedWaitUntil:
+    visible: "book: The Shape of Light"
+    timeout: 15000
+- takeScreenshot: mocha-scoped-search
+- tapOn: "Everywhere"
+- assertVisible: "Searching everywhere"

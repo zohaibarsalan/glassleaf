@@ -1,0 +1,36 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "alice"
+- pressKey: Enter
+- scrollUntilVisible:
+    element: "book: Alice's Adventures in Wonderland"
+    direction: DOWN
+    centerElement: true
+- tapOn: "book: Alice's Adventures in Wonderland"
+- tapOn:
+    text: "Contents and bookmarks"
+    retryTapIfNoChange: true
+- takeScreenshot: mocha-alice-contents-fixed
+- tapOn:
+    id: "field-Go to chapter"
+- eraseText
+- inputText: "1"
+- tapOn: "Go"
+- extendedWaitUntil:
+    visible: "Cover"
+    timeout: 20000
+- takeScreenshot: mocha-alice-cover-fixed
+- tapOn: "Contents and bookmarks"
+- tapOn:
+    id: "field-Go to chapter"
+- eraseText
+- inputText: "3"
+- tapOn: "Go"
+- extendedWaitUntil:
+    visible: ".*Alice was beginning.*"
+    timeout: 20000
+- takeScreenshot: mocha-alice-prose-fixed
+- tapOn: "Back to library"

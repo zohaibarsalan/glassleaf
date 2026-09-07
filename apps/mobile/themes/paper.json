@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "paper",
+  "name": "Paper",
+  "mode": "light",
+  "colors": {
+    "bg": "#F8F7F3",
+    "surface": "#FFFFFF",
+    "muted": "#EDEDE6",
+    "line": "#E1E3DA",
+    "text": "#202D27",
+    "secondary": "#5E6961",
+    "accent": "#285B43",
+    "accentSoft": "#E3EBDF",
+    "onAccent": "#FFFFFF",
+    "danger": "#A8473E",
+    "gold": "#BC8941"
+  }
+}

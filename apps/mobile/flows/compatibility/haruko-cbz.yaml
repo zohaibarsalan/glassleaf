@@ -1,0 +1,29 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Got it"
+- tapOn: "Read Haruko CBZ, Unknown author"
+- extendedWaitUntil:
+    visible: "Page 1 of 12"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: mocha-haruko-cbz-page1
+- tapOn: "Next page"
+- assertVisible: "Page 2 of 12"
+- swipe:
+    start: 25%, 50%
+    end: 75%, 50%
+    duration: 400
+- assertVisible: "Page 3 of 12"
+- takeScreenshot: mocha-haruko-cbz-page3
+- tapOn: "Back to library"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- tapOn:
+    text: "Read Haruko CBZ, Unknown author"
+    retryTapIfNoChange: true
+- assertVisible: "Page 3 of 12"
+- takeScreenshot: mocha-haruko-cbz-resumed
+- tapOn: "Back to library"

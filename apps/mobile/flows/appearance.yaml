@@ -1,0 +1,39 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Filters & sort"
+    timeout: 20000
+- waitForAnimationToEnd
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- tapOn: "Paper theme"
+- tapOn: "Library"
+- assertVisible: "Filters & sort"
+- takeScreenshot: paper-library
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- assertVisible: "Tokyo Night theme"
+- tapOn: "Tokyo Night theme"
+- takeScreenshot: tokyo-night-settings
+- tapOn: "Library"
+- assertVisible: "Filters & sort"
+- takeScreenshot: tokyo-night-library
+- tapOn: "Filters & sort"
+- takeScreenshot: tokyo-night-filters
+
+- tapOn: "Close"
+- tapOn: "Settings"
+- tapOn: "Midnight theme"
+- tapOn: "Library"
+- takeScreenshot: midnight-library
+- tapOn: "Settings"
+- tapOn: "Tokyo Night theme"
+- tapOn: "Library"
+- tapOn: "Read The Shape of Light, Clara Finch"
+- assertVisible: "Reading settings"
+- takeScreenshot: tokyo-night-epub
+- tapOn: "Back to library"

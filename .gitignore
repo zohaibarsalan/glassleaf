@@ -20,3 +20,18 @@ Package.resolved
 .env
 .env.*
 !.env.example
+
+# React Native and tooling
+node_modules/
+.expo/
+dist/
+apps/mobile/ios/
+apps/mobile/android/
+*.tsbuildinfo
+.playwright/
+
+# Local mobile screenshots and evaluation packages
+/outputs/react-native/
+
+# Downloaded reader compatibility corpus
+/outputs/compatibility/

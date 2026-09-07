@@ -1,0 +1,52 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- tapOn: "Library"
+- tapOn: "Options for The Shape of Light"
+- tapOn: "Edit details & organization"
+- scrollUntilVisible:
+    element:
+      id: "field-Series"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "field-Series"
+- eraseText
+- inputText: "Glassleaf Originals"
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "field-Volume"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "field-Volume"
+- eraseText
+- inputText: "1"
+- takeScreenshot: paper-series-editor
+- tapOn: "Save changes"
+- tapOn: "Organize"
+- tapOn: "Series"
+- assertVisible: "Glassleaf Originals"
+- takeScreenshot: paper-series
+- tapOn: "Glassleaf Originals"
+- assertVisible: "Filtered library"
+- takeScreenshot: paper-series-volumes
+- tapOn: "Settings"
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element: "Catppuccin Mocha theme"
+    direction: DOWN
+- tapOn: "Catppuccin Mocha theme"
+- tapOn: "Close"
+- tapOn: "Home"
+- takeScreenshot: mocha-home
+- tapOn: "Organize"
+- tapOn: "Reading lists"
+- assertVisible: "Weekend reading order"
+- takeScreenshot: mocha-reading-lists

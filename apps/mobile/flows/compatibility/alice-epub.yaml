@@ -1,0 +1,33 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Search"
+- tapOn:
+    id: "field-Search everything"
+- eraseText
+- inputText: "alice"
+- pressKey: Enter
+- scrollUntilVisible:
+    element: "book: Alice's Adventures in Wonderland"
+    direction: DOWN
+    centerElement: true
+- extendedWaitUntil:
+    visible: "book: Alice's Adventures in Wonderland"
+    timeout: 15000
+- tapOn: "book: Alice's Adventures in Wonderland"
+- extendedWaitUntil:
+    visible: "Chapter 1 of 15"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: mocha-alice-epub-cover
+- tapOn:
+    text: "Contents and bookmarks"
+    retryTapIfNoChange: true
+- tapOn: "Chapter 3"
+- extendedWaitUntil:
+    visible: ".*Alice was beginning.*"
+    timeout: 20000
+- takeScreenshot: mocha-alice-epub-text
+- swipe:
+    direction: UP
+- takeScreenshot: mocha-alice-epub-scrolled
+- tapOn: "Back to library"

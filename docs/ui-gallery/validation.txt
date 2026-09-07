@@ -1,0 +1,58 @@
+Glassleaf iPhone gallery — September 6, 2026
+
+Screenshots are native captures from iPhone 17 Pro Max / iOS 26.5 Simulator.
+Books shown are original generated fixtures. The gallery preserves the previous
+iteration under 2026-09-06-before and the new iteration under 2026-09-06-refined.
+
+Confirmed with Maestro native UI actions:
+- Paper, Midnight and Tokyo Night theme switching, Settings and library rendering.
+- Tokyo Night EPUB chapter rendering.
+- Filtered result count changes to one matching story.
+- Filter sheet opens and exposes sort, format, collections, tags and status.
+- Two selected books receive a tag and collection. Combining the collection
+  with CBZ format includes the comic and excludes the EPUB.
+- Custom theme creation, persistence after restart, and removal were exercised.
+- CBZ page jump, next page, RTL swipe, cover-aware spreads, zoom control, scroll.
+
+Confirmed in code checks:
+- Four palette import/export round trips; unreadable and malformed colors rejected.
+- All tested text/background pairs in built-in palettes reach 4.5:1 contrast.
+- Strict TypeScript, existing focused catalog/MCP checks, Android release build.
+
+Not yet claimed: physical phone frame times, Android gesture/accessibility coverage,
+pinch gesture automation, CBR/RAR support, or complex third-party comic archives.
+Two-page screenshots preserve the original fixture art without recoloring it.
+
+The gallery is a screenshot journal, not the React Native app running in a browser.
+Its layout and theme filters were checked at a 430px phone viewport, with no
+horizontal overflow. The gallery shell follows the phone's light/dark setting.
+
+Community theme follow-up (2026-09-06): Native Maestro flow community-themes.yaml passed switching to Catppuccin Latte and Mocha, with four new Settings/library captures. Light and dark status bars verified in pixels. Pure TypeScript checks cover all seven bundled community YAML/JSON schemes, legacy Base16, Base24 required colors, native export/persistence round trips, invalid YAML and size limits. Native Files-picker import/share-sheet export are still not end-to-end verified.
+
+Core navigation rebuild (2026-09-06): Home, compact Library toolbar, sectioned Settings, Organize and global Search. Native core-navigation flow passed creating a Manga + CBZ saved view and opening a book search result. Light follow-up passed saved-view persistence after restart, chapter-text search and opening an EPUB chapter with an assertion on rendered prose. Final dark flow passed Home/Library/Settings/global book search. Eleven captures added; prior stages preserved. Fixed issues found during checks: Home cover sizing, keyboard overlap with Save view, legacy EPUB imports lacking a ready marker, raw whitespace in a native search row. Search indexing no longer resets active typing.
+
+Host verification: TypeScript, formatting, six library tests (including existing-library discovery migration and all/any/exclusion rules), MCP and theme checks. Android arm64 release compilation passed. Android UI interactions, tablet/smallest-phone layouts, large font sizes, RTL layout mirroring, Japanese linguistic search and device frame-time profiling were not verified. No claim of 10k-book device frame-rate performance is made. PDF/comic text OCR and exact passage highlighting are not implemented. Saved view definitions remain device-local.
+
+
+Organization rebuild (2026-09-06, supersedes the earlier device-local-view limitation):
+17 new captures, preserving all previous stages. Native journeys passed ordered
+reading-list creation/reordering/scoped search, collection rename and undo,
+series metadata editing and volume browsing, and book-scoped chapter search.
+Nested-view creation, Home pinning, restart persistence and scoped EPUB passage
+opening were verified in segments after correcting native automation selectors.
+CBZ page jump, next page, RTL swipe, spreads, zoom and scrolling passed again.
+Paper and Catppuccin Mocha captures were inspected. Book-options accessibility
+was corrected by moving the action outside the main reading button.
+
+TypeScript, formatting, 11 focused catalog tests, actual MCP client/server checks,
+and theme validation pass. The final 10k mixed-format host query workload took
+39.3 ms for paging, FTS, nested scope and facet/count retrieval combined; this
+is not a phone latency or frame-rate measurement. Android arm64 release build
+and APK signature verification pass. No Android device/emulator is connected.
+
+Saved views, reading lists and collection records now use revisioned sync batches
+and are included in agent snapshots/plans. Live Drive OAuth and multi-device
+behavior remain unverified pending client IDs. Whole-record concurrent edit
+resolution retains the losing version; it does not interleave reading-list edits.
+PDF/OCR extraction, Japanese linguistic segmentation and exact match highlighting
+remain unimplemented. Full details: docs/ORGANIZATION_REBUILD.md in the repository.

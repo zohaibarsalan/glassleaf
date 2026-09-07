@@ -1,0 +1,39 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Library"
+- tapOn: "Read 草枕, 夏目 漱石"
+- tapOn:
+    text: "Contents and bookmarks"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "field-Go to chapter"
+- eraseText
+- inputText: "3"
+- tapOn: "Go"
+- extendedWaitUntil:
+    visible: ".*山路.*"
+    timeout: 20000
+- takeScreenshot: mocha-vertical-fixed
+- tapOn: "Next page"
+- waitForAnimationToEnd
+- takeScreenshot: mocha-vertical-next
+- tapOn: "Back to library"
+- scrollUntilVisible:
+    element:
+      text: "Read ハルコさんの彼氏, Unknown author"
+      index: 1
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    text: "Read ハルコさんの彼氏, Unknown author"
+    index: 1
+- tapOn: "Contents and bookmarks"
+- tapOn:
+    id: "field-Go to chapter"
+- eraseText
+- inputText: "3"
+- tapOn: "Go"
+- assertVisible: "Chapter 3 of 13"
+- waitForAnimationToEnd
+- takeScreenshot: mocha-html-manga-fixed
+- tapOn: "Back to library"

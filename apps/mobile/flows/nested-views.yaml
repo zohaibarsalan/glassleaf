@@ -1,0 +1,82 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "A good place to pause."
+    timeout: 30000
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- tapOn: "Appearance"
+- tapOn: "Paper theme"
+- tapOn: "Close"
+- tapOn: "Library"
+- tapOn: "View options"
+- tapOn: "Add condition"
+- tapOn: "File format"
+- tapOn: "EPUB"
+- tapOn: "Add group"
+- tapOn: "Add to group"
+- tapOn: "Author"
+- tapOn:
+    id: "field-Condition value"
+- inputText: "Clara Finch"
+- tapOn: "Use this value"
+- scrollUntilVisible:
+    element: "Add to group"
+    direction: DOWN
+- tapOn: "Add to group"
+- tapOn: "Story type"
+- tapOn: "Novels"
+- takeScreenshot: paper-nested-rules
+- scrollUntilVisible:
+    element:
+      id: "field-View name"
+    direction: DOWN
+- tapOn: "Pin to Home"
+- tapOn:
+    id: "field-View name"
+- inputText: "Quiet evenings"
+- tapOn: "Save view"
+- tapOn: "Home"
+- assertVisible: "Quiet evenings"
+- scrollUntilVisible:
+    element: "Quiet evenings"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: paper-pinned-home
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Quiet evenings"
+    timeout: 30000
+- scrollUntilVisible:
+    element: "Quiet evenings"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Quiet evenings"
+- takeScreenshot: paper-nested-library
+- tapOn: "Library actions"
+- tapOn: "Search this view"
+- tapOn: "Chapters"
+- tapOn:
+    id: "field-Search everything"
+- inputText: "morning"
+- extendedWaitUntil:
+    visible: "passage: Chapter 1"
+    timeout: 30000
+- takeScreenshot: paper-scoped-chapters
+- tapOn:
+    text: "passage: Chapter 1"
+    index: 0
+- extendedWaitUntil:
+    visible: ".*The morning.*"
+    timeout: 20000
+- takeScreenshot: paper-reader
+- tapOn:
+    text: "Reading settings"
+    retryTapIfNoChange: true
+- tapOn: "Find in this book"
+- assertVisible: "Searching The Long Way Home"
+- takeScreenshot: paper-book-search

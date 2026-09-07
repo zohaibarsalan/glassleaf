@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "tokyo-night",
+  "name": "Tokyo Night",
+  "mode": "dark",
+  "colors": {
+    "bg": "#1A1B26",
+    "surface": "#24283B",
+    "muted": "#292E42",
+    "line": "#3B4261",
+    "text": "#C0CAF5",
+    "secondary": "#A9B1D6",
+    "accent": "#7AA2F7",
+    "accentSoft": "#283457",
+    "onAccent": "#151823",
+    "danger": "#F7768E",
+    "gold": "#E0AF68"
+  }
+}

@@ -1,0 +1,55 @@
+appId: app.glassleaf.mobile
+---
+- tapOn: "Library"
+- tapOn: "View options"
+- tapOn: "Add condition"
+- scrollUntilVisible:
+    element: "Language"
+    direction: DOWN
+- tapOn: "Language"
+- tapOn:
+    id: "field-Condition value"
+- inputText: "ja-jp"
+- tapOn: "Use this value"
+- tapOn: "Show books"
+- tapOn:
+    text: "Read ハルコさんの彼氏, Unknown author"
+    index: 0
+- extendedWaitUntil:
+    visible: "Chapter 1 of 13"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: mocha-haruko-jpeg-spine
+- tapOn: "Back to library"
+- scrollUntilVisible:
+    element:
+      text: "Read ハルコさんの彼氏, Unknown author"
+      index: 1
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    text: "Read ハルコさんの彼氏, Unknown author"
+    index: 1
+- extendedWaitUntil:
+    visible: "Chapter 1 of 13"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: mocha-haruko-html-page1
+- tapOn: "Contents and bookmarks"
+- tapOn: "Chapter 3"
+- waitForAnimationToEnd
+- takeScreenshot: mocha-haruko-html-page3
+- tapOn: "Back to library"
+- scrollUntilVisible:
+    element: "Read 草枕, 夏目 漱石"
+    direction: UP
+    centerElement: true
+- tapOn: "Read 草枕, 夏目 漱石"
+- extendedWaitUntil:
+    visible: "Chapter 1 of 16"
+    timeout: 20000
+- tapOn: "Contents and bookmarks"
+- tapOn: "Chapter 3"
+- waitForAnimationToEnd
+- takeScreenshot: mocha-kusamakura-text
+- tapOn: "Back to library"

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "midnight",
+  "name": "Midnight",
+  "mode": "dark",
+  "colors": {
+    "bg": "#171C1B",
+    "surface": "#222927",
+    "muted": "#2D3631",
+    "line": "#374039",
+    "text": "#EFEFE6",
+    "secondary": "#A8B4A9",
+    "accent": "#B8D3A8",
+    "accentSoft": "#2E4135",
+    "onAccent": "#17251C",
+    "danger": "#E8A298",
+    "gold": "#BC8941"
+  }
+}

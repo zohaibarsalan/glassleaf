@@ -1,0 +1,42 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Filters & sort"
+    timeout: 20000
+- waitForAnimationToEnd
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- tapOn: "Paper theme"
+- tapOn: "Library"
+- tapOn: "Select books"
+- tapOn: "Select The Shape of Light, Clara Finch"
+- tapOn: "Select (moon-garden|Moon Garden), .*"
+- assertVisible: "2 selected"
+- tapOn: "Organize selected"
+- tapOn:
+    id: "field-Add tags"
+- inputText: "Gallery check"
+- tapOn:
+    id: "field-Add to collections"
+- inputText: "Weekend shelf"
+- takeScreenshot: paper-bulk-edit
+- tapOn: "Apply to 2 books"
+- assertVisible: "Select books"
+- tapOn: "Organize"
+- assertVisible: "Weekend shelf"
+- takeScreenshot: paper-organization
+- tapOn: "Weekend shelf"
+- assertVisible: "Read The Shape of Light, Clara Finch"
+- assertVisible: "Read (moon-garden|Moon Garden), .*"
+- tapOn: "Filters & sort"
+- tapOn: "CBZ"
+- scrollUntilVisible:
+    element: "Show books"
+    direction: DOWN
+- tapOn: "Show books"
+- assertVisible: "Read (moon-garden|Moon Garden), .*"
+- assertNotVisible: "Read The Shape of Light, Clara Finch"
+- takeScreenshot: paper-filtered-library

@@ -1,0 +1,66 @@
+[
+  {
+    "slug": "the-quiet-atlas",
+    "title": "The Quiet Atlas",
+    "author": "Mira Ellis",
+    "kind": "novel",
+    "format": "epub",
+    "color": "#344E46"
+  },
+  {
+    "slug": "blue-hour",
+    "title": "Blue Hour",
+    "author": "A. Rivers",
+    "kind": "manga",
+    "format": "cbz",
+    "color": "#254B65"
+  },
+  {
+    "slug": "field-notes",
+    "title": "Field Notes",
+    "author": "Glassleaf Editions",
+    "kind": "document",
+    "format": "pdf",
+    "color": "#D7CBB3"
+  },
+  {
+    "slug": "a-small-infinity",
+    "title": "A Small Infinity",
+    "author": "Nora Vale",
+    "kind": "light-novel",
+    "format": "epub",
+    "color": "#CAB6C2"
+  },
+  {
+    "slug": "wild-islands",
+    "title": "Wild Islands",
+    "author": "Owen Reed",
+    "kind": "comic",
+    "format": "cbz",
+    "color": "#B96445"
+  },
+  {
+    "slug": "the-long-way",
+    "title": "The Long Way Home",
+    "author": "Eli Rowan",
+    "kind": "novel",
+    "format": "epub",
+    "color": "#DBB65B"
+  },
+  {
+    "slug": "moon-garden",
+    "title": "Moon Garden",
+    "author": "Ren Sora",
+    "kind": "manga",
+    "format": "cbz",
+    "color": "#344638"
+  },
+  {
+    "slug": "the-shape-of-light",
+    "title": "The Shape of Light",
+    "author": "Clara Finch",
+    "kind": "novel",
+    "format": "epub",
+    "color": "#B9C9C6"
+  }
+]

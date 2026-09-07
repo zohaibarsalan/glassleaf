@@ -39,7 +39,7 @@ struct LibraryView: View {
         .searchable(text: $store.searchText, prompt: "Title, author, series, folder, collection, or tag")
         .toolbar { libraryToolbar(hasVisibleBooks: !visibleBooks.isEmpty) }
         .safeAreaInset(edge: .bottom) {
-            if store.isSelecting { batchBar }
+            if store.isSelecting && !visibleBooks.isEmpty { batchBar }
         }
         .alert("Add Tag", isPresented: $showsBatchTagEditor) {
             TextField("Tag name", text: $batchTagName)

@@ -1,0 +1,44 @@
+appId: app.glassleaf.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Filters & sort"
+    timeout: 20000
+- waitForAnimationToEnd
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- tapOn: "Tokyo Night theme"
+- tapOn: "Create theme"
+- tapOn:
+    id: "field-Theme name"
+- eraseText
+- inputText: "Tokyo Study"
+- takeScreenshot: tokyo-night-theme-studio
+- tapOn:
+    text: "Save and apply"
+    retryTapIfNoChange: true
+- assertVisible: "Tokyo Study theme"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Filters & sort"
+    timeout: 20000
+- waitForAnimationToEnd
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+- assertVisible: "Tokyo Study theme"
+- scrollUntilVisible:
+    element: "Export Tokyo Study"
+    direction: DOWN
+- assertVisible: "Export Tokyo Study"
+- scrollUntilVisible:
+    element: "Remove theme"
+    direction: DOWN
+- tapOn: "Remove theme"
+- scrollUntilVisible:
+    element: "Tokyo Night theme"
+    direction: UP
+- tapOn: "Tokyo Night theme"
