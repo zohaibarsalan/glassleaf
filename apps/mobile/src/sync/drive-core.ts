@@ -263,16 +263,18 @@ export class DriveSyncEngine {
     }
 
     const pending = await repo.pending();
+    const pendingAssets = pending.length ? await this.listFiles("asset") : [];
+    const pendingHashes = new Set(
+      pendingAssets
+        .map((file) => file.appProperties?.hash)
+        .filter((hash): hash is string => !!hash),
+    );
     for (const [index, book] of pending.entries()) {
       if (book.deletedAt) continue;
       status(`Uploading book ${index + 1} of ${pending.length}…`);
       if (!isValidHash(book.asset.hash))
         throw new Error("Book has an invalid content checksum.");
-      const assets = await this.listFiles(
-        "asset",
-        ` and appProperties has { key='hash' and value='${book.asset.hash}' }`,
-      );
-      if (!assets.length) {
+      if (!pendingHashes.has(book.asset.hash)) {
         if (!(await this.assets.hasFile(book.asset.path)))
           throw new Error(
             `The original file for “${book.title}” is missing. Download or reimport it before syncing.`,
@@ -285,6 +287,7 @@ export class DriveSyncEngine {
           await this.assets.uploadBody(book.asset.path),
           "application/octet-stream",
         );
+        pendingHashes.add(book.asset.hash);
       }
     }
 
