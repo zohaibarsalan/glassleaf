@@ -39,15 +39,21 @@ export function NavRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={{
+      accessibilityState={{ selected: !!active }}
+      style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
         minHeight: 44,
         paddingHorizontal: 12,
         borderRadius: 12,
-        backgroundColor: active ? c.accentSoft : "transparent",
-      }}
+        backgroundColor: active
+          ? c.accentSoft
+          : pressed
+            ? c.muted
+            : "transparent",
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+      })}
     >
       <Icon
         size={19}
@@ -88,21 +94,28 @@ export function BookTile({
         accessibilityRole="button"
         accessibilityLabel={`${selected !== undefined ? "Select" : "Read"} ${book.title}, ${book.author}`}
         accessibilityState={{ selected }}
-        style={{
+        style={({ pressed }) => ({
           flexDirection: list ? "row" : "column",
           gap: list ? 16 : 0,
-          padding: 2,
-        }}
+          minHeight: list ? 108 : undefined,
+          padding: list ? 10 : 8,
+          borderRadius: 16,
+          backgroundColor: selected ? c.accentSoft : c.surface,
+          borderWidth: 1,
+          borderColor: selected ? c.accent : c.line,
+          opacity: pressed ? 0.92 : 1,
+          transform: [{ scale: pressed ? 0.96 : 1 }],
+        })}
       >
         <View
           style={{
             width: list ? 64 : "100%",
             aspectRatio: 0.67,
-            borderRadius: 7,
+            borderRadius: 10,
             overflow: "hidden",
             backgroundColor: c.accentSoft,
             borderWidth: 1,
-            borderColor: "#00000012",
+            borderColor: c.line,
           }}
         >
           {book.asset.cover ? (
@@ -187,7 +200,12 @@ export function BookTile({
             />
           )}
         </View>
-        <Box flex={list ? 1 : undefined} paddingTop={list ? "s" : "m"}>
+        <Box
+          flex={list ? 1 : undefined}
+          justifyContent={list ? "center" : undefined}
+          paddingTop={list ? "none" : "m"}
+          paddingRight={list && onMenu ? "xl" : "none"}
+        >
           <Text variant="label" fontFamily="DMBold" numberOfLines={2}>
             {book.title}
           </Text>
@@ -217,8 +235,8 @@ export function BookTile({
           onPress={onMenu}
           style={{
             position: "absolute",
-            right: 4,
-            bottom: 16,
+            right: 8,
+            bottom: list ? 32 : 16,
             width: 44,
             height: 44,
             alignItems: "center",

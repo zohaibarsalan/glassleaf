@@ -74,9 +74,11 @@ import {
   base,
   Box,
   Button,
+  Chip,
   IconButton,
   Field,
   Sheet,
+  Surface,
   Text,
   usePalette,
   type ThemeName,
@@ -471,8 +473,8 @@ function LibraryApp({
     setSearch("");
     setTab("library");
   };
-  const contentWidth = width - (wide ? 244 : 0) - (wide ? 72 : 40);
-  const columns = Math.max(2, Math.min(6, Math.floor(contentWidth / 145)));
+  const contentWidth = width - (wide ? 264 : 0) - (wide ? 80 : 40);
+  const columns = Math.max(2, Math.min(6, Math.floor(contentWidth / 168)));
   const hasFilters = !!(
     query.series ||
     query.collectionId ||
@@ -543,7 +545,8 @@ function LibraryApp({
       <Box flex={1} flexDirection="row">
         {wide && (
           <Box
-            width={244}
+            width={264}
+            backgroundColor="surface"
             borderRightWidth={1}
             borderRightColor="line"
             padding="l"
@@ -567,7 +570,7 @@ function LibraryApp({
                 />
               ))}
             </Box>
-            <Box gap="s">
+            <Box gap="xs">
               <Text variant="eyebrow" marginBottom="s">
                 YOUR SHELVES
               </Text>
@@ -585,7 +588,7 @@ function LibraryApp({
                 />
               ))}
             </Box>
-            <Box gap="s">
+            <Box gap="xs">
               <Text variant="eyebrow">COLLECTIONS</Text>
               {stats.collections.slice(0, 6).map((name) => (
                 <NavRow
@@ -606,19 +609,14 @@ function LibraryApp({
               active={tab === "settings"}
               onPress={() => setTab("settings")}
             />
-            <Box
-              flexDirection="row"
-              gap="s"
-              alignItems="center"
-              padding="m"
-              backgroundColor="accentSoft"
-              borderRadius="m"
-            >
-              <Leaf size={16} color={c.accent} />
-              <Text variant="caption" color="accent">
-                A little space for your stories.
-              </Text>
-            </Box>
+            <Surface subtle style={{ padding: 12 }}>
+              <Box flexDirection="row" gap="s" alignItems="center">
+                <Leaf size={16} color={c.accent} />
+                <Text variant="caption" color="accent" flex={1}>
+                  A little space for your stories.
+                </Text>
+              </Box>
+            </Surface>
           </Box>
         )}
         <Box flex={1}>
@@ -656,7 +654,7 @@ function LibraryApp({
               justifyContent="space-between"
               gap="m"
             >
-              <Box flex={1}>
+              <Box flex={1} maxWidth={820}>
                 <Text variant="heading" fontSize={24} lineHeight={32}>
                   {tab === "home"
                     ? "Home"
@@ -722,66 +720,73 @@ function LibraryApp({
           )}
           {tab === "library" && (
             <>
-              <Box paddingHorizontal="l" paddingBottom="m" gap="s">
-                <Box
-                  flexDirection="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                >
-                  <Text variant="caption" flex={1}>
-                    {query.rules?.conditions.length
-                      ? `${query.rules.match === "all" ? "All" : "Any"} of ${query.rules.conditions.length} conditions`
-                      : hasFilters
-                        ? "Filtered library"
-                        : "All stories"}
-                  </Text>
-                  <IconButton
-                    icon={SlidersHorizontal}
-                    label="View options"
-                    onPress={() => setSortSheet(true)}
-                  />
-                  <IconButton
-                    icon={MoreHorizontal}
-                    label="Library actions"
-                    onPress={() => setLibraryMenu(true)}
-                  />
-                </Box>
-                {hasFilters && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Clear library filters"
-                    onPress={() => browse({})}
-                    style={{ paddingVertical: 8 }}
+              <Box paddingHorizontal={wide ? "xxl" : "l"} paddingBottom="m">
+                <Surface subtle style={{ padding: 10, gap: 8 }}>
+                  <Box
+                    flexDirection="row"
+                    alignItems="center"
+                    justifyContent="space-between"
                   >
-                    <Text color="accent">Clear filters</Text>
-                  </Pressable>
-                )}
-                {selecting && (
-                  <Box flexDirection="row" alignItems="center" gap="s">
-                    <Text flex={1}>{selection.size} selected</Text>
-                    <Button
-                      secondary
-                      onPress={() => {
-                        setSelecting(false);
-                        setSelection(new Map());
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={!selection.size}
-                      onPress={() => setBulk(true)}
-                    >
-                      Organize selected
-                    </Button>
+                    <Text variant="caption" flex={1} numberOfLines={1}>
+                      {query.rules?.conditions.length
+                        ? `${query.rules.match === "all" ? "All" : "Any"} of ${query.rules.conditions.length} conditions`
+                        : hasFilters
+                          ? "Filtered library"
+                          : "All stories"}
+                    </Text>
                     <IconButton
-                      icon={ListPlus}
-                      label="Make reading list from selection"
-                      onPress={() =>
-                        setListEditor({ selected: [...selection.keys()] })
-                      }
+                      icon={SlidersHorizontal}
+                      label="View options"
+                      onPress={() => setSortSheet(true)}
+                    />
+                    <IconButton
+                      icon={MoreHorizontal}
+                      label="Library actions"
+                      onPress={() => setLibraryMenu(true)}
                     />
                   </Box>
+                  {hasFilters && (
+                    <Box flexDirection="row" flexWrap="wrap" gap="s">
+                      <Chip label="Clear filters" onPress={() => browse({})} />
+                      {query.sort && (
+                        <Chip
+                          label={`Sorted by ${query.sort.replaceAll("-", " ")}`}
+                          onPress={() => setSortSheet(true)}
+                        />
+                      )}
+                    </Box>
+                  )}
+                </Surface>
+                {selecting && (
+                  <Surface style={{ marginTop: 8, padding: 10 }}>
+                    <Box gap="s">
+                      <Text variant="label">{selection.size} selected</Text>
+                      <Box flexDirection="row" flexWrap="wrap" gap="s">
+                        <Button
+                          secondary
+                          onPress={() => {
+                            setSelecting(false);
+                            setSelection(new Map());
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={!selection.size}
+                          onPress={() => setBulk(true)}
+                        >
+                          Organize selected
+                        </Button>
+                        <IconButton
+                          icon={ListPlus}
+                          label="Make reading list from selection"
+                          onPress={() =>
+                            setListEditor({ selected: [...selection.keys()] })
+                          }
+                        />
+                      </Box>
+                    </Box>
+                  </Surface>
                 )}
               </Box>
               {loading ? (
@@ -799,7 +804,7 @@ function LibraryApp({
                   onEndReachedThreshold={0.5}
                   contentContainerStyle={{
                     paddingHorizontal: wide ? 34 : 14,
-                    paddingBottom: 24,
+                    paddingBottom: 32,
                   }}
                   renderItem={({ item }) => (
                     <BookTile
@@ -955,12 +960,16 @@ function LibraryApp({
                         setSearchScope({ query: {}, name: "everywhere" });
                       setTab(t.id);
                     }}
-                    style={{
+                    style={({ pressed }) => ({
                       flex: 1,
                       alignItems: "center",
                       gap: 4,
                       paddingVertical: 8,
-                    }}
+                      borderRadius: 14,
+                      backgroundColor:
+                        tab === t.id ? c.accentSoft : "transparent",
+                      transform: [{ scale: pressed ? 0.96 : 1 }],
+                    })}
                   >
                     <t.icon
                       size={22}

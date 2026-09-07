@@ -4,11 +4,18 @@ import {
   type LibraryQuery,
   type SavedView,
 } from "@glassleaf/library";
-import { ArrowRight, BookOpen } from "lucide-react-native";
+import { ArrowRight, BookOpen, Play } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView } from "react-native";
+import { Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { BookTile, NavRow } from "../ui/LibraryComponents";
-import { Box, Button, Text, usePalette } from "../ui/theme";
+import {
+  Box,
+  Button,
+  SectionHeading,
+  Surface,
+  Text,
+  usePalette,
+} from "../ui/theme";
 export function HomePanel({
   repo,
   revision,
@@ -25,6 +32,8 @@ export function HomePanel({
   onImport: () => void;
 }) {
   const c = usePalette();
+  const { width } = useWindowDimensions();
+  const wide = width >= 700;
   const [reading, setReading] = useState<Book[]>([]),
     [recent, setRecent] = useState<Book[]>([]),
     [error, setError] = useState("");
@@ -50,10 +59,24 @@ export function HomePanel({
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={{ padding: 20, gap: 28, paddingBottom: 40 }}
+      contentContainerStyle={{
+        width: "100%",
+        maxWidth: 1180,
+        alignSelf: "center",
+        paddingHorizontal: wide ? 40 : 20,
+        paddingTop: wide ? 8 : 0,
+        gap: 28,
+        paddingBottom: 48,
+      }}
     >
       <Box gap="s">
-        <Text fontFamily="Lora" fontSize={32} lineHeight={40}>
+        <Text
+          accessibilityRole="header"
+          fontFamily="Lora"
+          fontSize={wide ? 38 : 32}
+          lineHeight={wide ? 47 : 40}
+          letterSpacing={-0.7}
+        >
           A good place to pause.
         </Text>
         <Text color="secondary">
@@ -61,32 +84,56 @@ export function HomePanel({
         </Text>
       </Box>
       {!!error && <Text color="danger">{error}</Text>}
-      <Box gap="m">
-        <Box
-          flexDirection="row"
-          alignItems="center"
-          justifyContent="space-between"
-        >
-          <Text variant="eyebrow">CONTINUE READING</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Browse currently reading"
-            style={{ padding: 12 }}
-            onPress={() => onBrowse({ status: "reading", sort: "last-read" })}
-          >
-            <ArrowRight size={20} color={c.accent} />
-          </Pressable>
-        </Box>
-        {reading.map((book) => (
-          <BookTile
-            key={book.id}
-            book={book}
-            list
-            onOpen={() => onOpen(book)}
-          />
-        ))}
-        {!reading.length && (
-          <Box backgroundColor="surface" padding="l" borderRadius="l" gap="m">
+      <Surface subtle style={{ padding: wide ? 24 : 20, gap: 18 }}>
+        <SectionHeading
+          title="CONTINUE READING"
+          action={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Browse currently reading"
+              style={({ pressed }) => ({
+                width: 44,
+                height: 44,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 12,
+                backgroundColor: pressed ? c.surface : "transparent",
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
+              onPress={() => onBrowse({ status: "reading", sort: "last-read" })}
+            >
+              <ArrowRight size={20} color={c.accent} />
+            </Pressable>
+          }
+        />
+        {reading.length ? (
+          <>
+            <BookTile
+              book={reading[0]!}
+              list
+              onOpen={() => onOpen(reading[0]!)}
+            />
+            <Box flexDirection={wide ? "row" : "column"} gap="s">
+              <Box flex={1}>
+                <Button
+                  icon={Play}
+                  accessibilityLabel={`Continue reading ${reading[0]!.title}`}
+                  onPress={() => onOpen(reading[0]!)}
+                >
+                  Continue reading
+                </Button>
+              </Box>
+              {reading[1] && (
+                <Box flex={1}>
+                  <Button secondary onPress={() => onOpen(reading[1]!)}>
+                    Switch book
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          </>
+        ) : (
+          <Box gap="m">
             <BookOpen color={c.accent} size={28} />
             <Text variant="heading">Your next chapter is waiting.</Text>
             <Text color="secondary">
@@ -97,10 +144,10 @@ export function HomePanel({
             </Button>
           </Box>
         )}
-      </Box>
+      </Surface>
       {views.some((v) => v.pinned) && (
-        <Box gap="s">
-          <Text variant="eyebrow">YOUR VIEWS</Text>
+        <Box gap="m">
+          <SectionHeading title="YOUR VIEWS" />
           {views
             .filter((v) => v.pinned)
             .map((v) => (
@@ -116,24 +163,34 @@ export function HomePanel({
         </Box>
       )}
       <Box gap="m">
-        <Box
-          flexDirection="row"
-          alignItems="center"
-          justifyContent="space-between"
+        <SectionHeading
+          title="RECENTLY ADDED"
+          action={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Browse all books"
+              onPress={() => onBrowse({})}
+              style={({ pressed }) => ({
+                width: 44,
+                height: 44,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 12,
+                backgroundColor: pressed ? c.muted : "transparent",
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
+            >
+              <ArrowRight size={20} color={c.accent} />
+            </Pressable>
+          }
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 12, paddingRight: 12 }}
         >
-          <Text variant="eyebrow">RECENTLY ADDED</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Browse all books"
-            onPress={() => onBrowse({})}
-            style={{ padding: 12 }}
-          >
-            <ArrowRight size={20} color={c.accent} />
-          </Pressable>
-        </Box>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {recent.map((book) => (
-            <Box key={book.id} width={150}>
+            <Box key={book.id} width={wide ? 172 : 150}>
               <BookTile book={book} list={false} onOpen={() => onOpen(book)} />
             </Box>
           ))}

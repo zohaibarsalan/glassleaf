@@ -6,6 +6,9 @@ import {
   Download,
   Layers,
   NotebookPen,
+  Palette,
+  RefreshCw,
+  Settings2,
   Trash2,
   Undo2,
   Upload,
@@ -14,7 +17,15 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView } from "react-native";
 import { DriveSettings } from "../sync/DriveSettings";
-import { Box, Button, Chip, Sheet, Text, usePalette } from "../ui/theme";
+import {
+  Box,
+  Button,
+  Chip,
+  Sheet,
+  Surface,
+  Text,
+  usePalette,
+} from "../ui/theme";
 export function CollectionsPanel({
   wide,
   stats,
@@ -121,19 +132,19 @@ export function NotesPanel({
         </Box>
       )}
       {books.map((book) => (
-        <Box
-          key={book.id}
-          backgroundColor="surface"
-          borderRadius="m"
-          padding="l"
-          gap="m"
-        >
-          <Pressable onPress={() => onOpen(book)}>
+        <Surface key={book.id} style={{ padding: 20, gap: 12 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${book.title}`}
+            onPress={() => onOpen(book)}
+          >
             <Text variant="heading">{book.title}</Text>
           </Pressable>
           {book.notes.map((note) => (
             <Pressable
               key={note.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Open note in ${book.title}`}
               onPress={() => onOpen({ ...book, locator: note.locator })}
             >
               <Text>{note.text}</Text>
@@ -145,6 +156,8 @@ export function NotesPanel({
           {book.bookmarks.map((mark) => (
             <Pressable
               key={mark.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Open bookmark ${mark.label} in ${book.title}`}
               onPress={() => onOpen({ ...book, locator: mark.locator })}
             >
               <Box flexDirection="row" gap="s">
@@ -153,7 +166,7 @@ export function NotesPanel({
               </Box>
             </Pressable>
           ))}
-        </Box>
+        </Surface>
       ))}
     </ScrollView>
   );
@@ -181,6 +194,34 @@ export function SettingsPanel({
 }) {
   const [section, setSection] = useState<string>();
   const [error, setError] = useState("");
+  const c = usePalette();
+  const sections = [
+    {
+      id: "appearance",
+      label: "Appearance",
+      description: "Choose the colors that carry into your library and reader.",
+      icon: Palette,
+    },
+    {
+      id: "sync",
+      label: "Sync & backups",
+      description: "Keep originals, notes, and progress in your own Drive.",
+      icon: RefreshCw,
+    },
+    {
+      id: "agent",
+      label: "Agent organization",
+      description:
+        "Review every suggested change before it reaches your library.",
+      icon: Settings2,
+    },
+    {
+      id: "library",
+      label: "Library tools",
+      description: "Samples, trash, and local-library maintenance.",
+      icon: BookOpen,
+    },
+  ] as const;
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
@@ -190,24 +231,40 @@ export function SettingsPanel({
         paddingBottom: 36,
       }}
     >
-      {[
-        ["appearance", "Appearance"],
-        ["sync", "Sync & backups"],
-        ["agent", "Agent organization"],
-        ["library", "Library tools"],
-      ].map(([id, label]) => (
+      <Text variant="caption">
+        Keep the daily reading experience quiet. Library maintenance is here
+        when you need it.
+      </Text>
+      {sections.map(({ id, label, description, icon: Icon }) => (
         <Pressable
           key={id}
           accessibilityRole="button"
           accessibilityLabel={label}
           onPress={() => setSection(id)}
+          style={({ pressed }) => ({
+            borderRadius: 16,
+            transform: [{ scale: pressed ? 0.96 : 1 }],
+          })}
         >
-          <Box flexDirection="row" alignItems="center" paddingVertical="l">
-            <Text variant="label" flex={1}>
-              {label}
-            </Text>
-            <ChevronRight size={20} />
-          </Box>
+          <Surface style={{ padding: 16 }}>
+            <Box flexDirection="row" alignItems="center" gap="m">
+              <Box
+                width={40}
+                height={40}
+                borderRadius="m"
+                backgroundColor="accentSoft"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Icon size={20} color={c.accent} strokeWidth={1.7} />
+              </Box>
+              <Box flex={1} gap="xs">
+                <Text variant="label">{label}</Text>
+                <Text variant="caption">{description}</Text>
+              </Box>
+              <ChevronRight size={20} color={c.secondary} />
+            </Box>
+          </Surface>
         </Pressable>
       ))}
       {section === "appearance" && (

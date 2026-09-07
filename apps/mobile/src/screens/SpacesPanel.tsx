@@ -16,9 +16,19 @@ import {
   Tag,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { FlatList, ScrollView } from "react-native";
+import { FlatList, ScrollView, useWindowDimensions } from "react-native";
 import { NavRow } from "../ui/LibraryComponents";
-import { Box, Button, Chip, Field, IconButton, Sheet, Text } from "../ui/theme";
+import {
+  Box,
+  Button,
+  Chip,
+  Field,
+  IconButton,
+  SectionHeading,
+  Sheet,
+  Surface,
+  Text,
+} from "../ui/theme";
 export function SpacesPanel({
   stats,
   views,
@@ -42,6 +52,8 @@ export function SpacesPanel({
   onManageFacet: (field: "tag" | "collection", value: string) => void;
   onChanged: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const wide = width >= 700;
   const [section, setSection] = useState<
       "series" | "collections" | "lists" | "views" | "tags" | "types"
     >("series"),
@@ -52,6 +64,14 @@ export function SpacesPanel({
     >([]),
     [menu, setMenu] = useState<OrganizationRecord>(),
     [error, setError] = useState("");
+  const searchLabel = {
+    series: "series",
+    collections: "collection",
+    lists: "reading list",
+    views: "smart view",
+    tags: "tag",
+    types: "story type",
+  }[section];
   useEffect(() => {
     let live = true;
     void Promise.all([repo.organization(), repo.series()])
@@ -141,35 +161,48 @@ export function SpacesPanel({
     }
   }
   return (
-    <Box flex={1} paddingHorizontal="l" gap="m">
-      <ScrollView
-        horizontal
-        style={{ flexGrow: 0 }}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
-      >
-        {(
-          [
-            ["series", "Series"],
-            ["collections", "Collections"],
-            ["lists", "Reading lists"],
-            ["views", "Smart views"],
-            ["tags", "Tags"],
-            ["types", "Story types"],
-          ] as const
-        ).map(([id, label]) => (
-          <Chip
-            key={id}
-            label={label}
-            active={section === id}
-            onPress={() => {
-              setSection(id);
-              setTerm("");
-            }}
-          />
-        ))}
-      </ScrollView>
-      <Field label="Find a group" value={term} onChangeText={setTerm} />
+    <Box
+      flex={1}
+      paddingHorizontal={wide ? "xxl" : "l"}
+      gap="m"
+      style={{ maxWidth: 920, width: "100%", alignSelf: "center" }}
+    >
+      <Surface subtle style={{ padding: 10, gap: 10 }}>
+        <SectionHeading title="BROWSE YOUR LIBRARY" />
+        <ScrollView
+          horizontal
+          style={{ flexGrow: 0 }}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+        >
+          {(
+            [
+              ["series", "Series"],
+              ["collections", "Collections"],
+              ["lists", "Reading lists"],
+              ["views", "Smart views"],
+              ["tags", "Tags"],
+              ["types", "Story types"],
+            ] as const
+          ).map(([id, label]) => (
+            <Chip
+              key={id}
+              label={label}
+              active={section === id}
+              onPress={() => {
+                setSection(id);
+                setTerm("");
+              }}
+            />
+          ))}
+        </ScrollView>
+      </Surface>
+      <Field
+        label={`Find ${searchLabel}`}
+        value={term}
+        onChangeText={setTerm}
+        placeholder={`Search ${section}`}
+      />
       {!!error && <Text color="danger">{error}</Text>}
       <FlatList
         keyboardShouldPersistTaps="handled"
@@ -177,38 +210,41 @@ export function SpacesPanel({
           r.name.toLowerCase().includes(term.toLowerCase()),
         )}
         keyExtractor={(r) => r.id}
+        contentContainerStyle={{ gap: 8, paddingBottom: 12 }}
         renderItem={({ item }) => (
-          <Box flexDirection="row" alignItems="center" paddingVertical="s">
-            <Box flex={1}>
-              <NavRow
-                icon={
-                  section === "tags"
-                    ? Tag
-                    : section === "series"
-                      ? BookOpen
-                      : Folder
-                }
-                title={item.name}
-                onPress={() => onBrowse(item.query)}
-              />
-              {item.detail && (
-                <Text variant="caption" paddingLeft="m">
-                  {item.detail}
-                </Text>
+          <Surface style={{ overflow: "hidden" }}>
+            <Box flexDirection="row" alignItems="center" padding="xs">
+              <Box flex={1}>
+                <NavRow
+                  icon={
+                    section === "tags"
+                      ? Tag
+                      : section === "series"
+                        ? BookOpen
+                        : Folder
+                  }
+                  title={item.name}
+                  onPress={() => onBrowse(item.query)}
+                />
+                {item.detail && (
+                  <Text variant="caption" paddingLeft="m" paddingBottom="s">
+                    {item.detail}
+                  </Text>
+                )}
+              </Box>
+              {(item.record || section === "tags") && (
+                <IconButton
+                  icon={MoreHorizontal}
+                  label={`Options for ${item.name}`}
+                  onPress={() =>
+                    section === "tags"
+                      ? onManageFacet("tag", item.name)
+                      : setMenu(item.record)
+                  }
+                />
               )}
             </Box>
-            {(item.record || section === "tags") && (
-              <IconButton
-                icon={MoreHorizontal}
-                label={`Options for ${item.name}`}
-                onPress={() =>
-                  section === "tags"
-                    ? onManageFacet("tag", item.name)
-                    : setMenu(item.record)
-                }
-              />
-            )}
-          </Box>
+          </Surface>
         )}
         ListEmptyComponent={
           <Text color="secondary" paddingVertical="xl">
@@ -221,15 +257,17 @@ export function SpacesPanel({
         }
       />
       <Box paddingBottom="l" gap="s">
-        <Button
-          secondary
-          icon={Plus}
-          onPress={() => (section === "lists" ? onEditList() : onCreate())}
-        >
-          {section === "lists" ? "New reading list" : "Create smart view"}
-        </Button>
+        {(section === "lists" || section === "views") && (
+          <Button
+            secondary
+            icon={Plus}
+            onPress={() => (section === "lists" ? onEditList() : onCreate())}
+          >
+            {section === "lists" ? "New reading list" : "Create smart view"}
+          </Button>
+        )}
         <Button secondary onPress={() => onBrowse({ unfiled: true })}>
-          Unfiled books
+          Explore unfiled books
         </Button>
       </Box>
       {menu && (
