@@ -284,7 +284,14 @@ function PDFReader({
     let active = true;
     let renderTask:
       { cancel: () => void; promise: Promise<unknown> } | undefined;
+    let rendering = false;
+    let renderAgain = false;
     const render = async () => {
+      if (rendering) {
+        renderAgain = true;
+        return;
+      }
+      rendering = true;
       try {
         const pdfPage = await document.getPage(
           Math.min(page + 1, document.numPages),
@@ -310,6 +317,13 @@ function PDFReader({
           (error as { name?: string }).name !== "RenderingCancelledException"
         )
           onError(error instanceof Error ? error.message : String(error));
+      } finally {
+        rendering = false;
+        renderTask = undefined;
+        if (active && renderAgain) {
+          renderAgain = false;
+          void render();
+        }
       }
     };
     void render();
