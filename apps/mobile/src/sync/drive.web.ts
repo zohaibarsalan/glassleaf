@@ -37,7 +37,10 @@ type TokenResponse = {
   expires_in?: number;
   error?: string;
 };
-type TokenClient = { requestAccessToken(options?: { prompt?: string }): void };
+type TokenClient = {
+  requestAccessToken(options?: { prompt?: string }): void;
+};
+type TokenError = { type?: string; message?: string };
 type GoogleIdentity = {
   accounts?: {
     oauth2?: {
@@ -45,6 +48,7 @@ type GoogleIdentity = {
         client_id: string;
         scope: string;
         callback: (response: TokenResponse) => void;
+        error_callback?: (error: TokenError) => void;
       }): TokenClient;
       revoke?(token: string, callback?: () => void): void;
     };
@@ -58,25 +62,44 @@ declare global {
 }
 
 let identity: Promise<GoogleIdentity> | undefined;
+let loadedIdentity: GoogleIdentity | undefined;
 let tokenState:
   { accessToken: string; expiresAt: number; account: DriveAccount } | undefined;
 
 function loadGoogleIdentity() {
   if (identity) return identity;
-  identity = new Promise<GoogleIdentity>((resolve, reject) => {
-    if (window.google?.accounts?.oauth2) return resolve(window.google);
+  const pending = new Promise<GoogleIdentity>((resolve, reject) => {
+    if (window.google?.accounts?.oauth2) {
+      loadedIdentity = window.google;
+      return resolve(window.google);
+    }
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
     script.onload = () => {
-      if (window.google?.accounts?.oauth2) resolve(window.google);
-      else reject(new Error("Google Identity Services did not load."));
+      if (window.google?.accounts?.oauth2) {
+        loadedIdentity = window.google;
+        resolve(window.google);
+      } else reject(new Error("Google Identity Services did not load."));
     };
     script.onerror = () =>
       reject(new Error("Could not load Google Identity Services."));
     document.head.appendChild(script);
   });
+  const wrapped = pending.catch((error) => {
+    if (identity === wrapped) identity = undefined;
+    throw error;
+  });
+  identity = wrapped;
   return identity;
+}
+
+export function prepareDriveAuth() {
+  if (!webClientId)
+    return Promise.reject(
+      new Error("Google OAuth client IDs are not configured in this build."),
+    );
+  return loadGoogleIdentity();
 }
 
 async function accountFor(accessToken: string) {
@@ -106,13 +129,24 @@ async function requestToken(interactive: boolean) {
     return tokenState;
   if (!interactive)
     throw new Error("Google sign-in expired. Reconnect your account.");
-  const google = await loadGoogleIdentity();
+  const google = loadedIdentity;
+  if (!google)
+    throw new Error("Google sign-in is still loading. Try again in a moment.");
   const response = await new Promise<TokenResponse>((resolve, reject) => {
     try {
       const client = google.accounts?.oauth2?.initTokenClient({
         client_id: webClientId,
         scope: DRIVE_SCOPE,
         callback: resolve,
+        error_callback: (error) =>
+          reject(
+            new Error(
+              error.message ??
+                (error.type === "popup_closed"
+                  ? "Google sign-in was cancelled."
+                  : "Google sign-in could not open."),
+            ),
+          ),
       });
       if (!client) throw new Error("Google Identity Services is unavailable.");
       client.requestAccessToken({ prompt: "consent" });
@@ -137,11 +171,9 @@ const auth: DriveAuth = {
     return (await requestToken(true)).account;
   },
   async disconnect() {
-    if (tokenState) {
-      const google = await loadGoogleIdentity().catch(() => undefined);
-      google?.accounts?.oauth2?.revoke?.(tokenState.accessToken);
-    }
+    const token = tokenState?.accessToken;
     tokenState = undefined;
+    if (token) loadedIdentity?.accounts?.oauth2?.revoke?.(token);
   },
   async accessToken(interactive) {
     return (await requestToken(interactive)).accessToken;

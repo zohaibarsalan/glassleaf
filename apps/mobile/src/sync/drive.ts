@@ -121,6 +121,10 @@ export function connectDrive(repo: LibraryRepository) {
   return engine.connect(repo);
 }
 
+export function prepareDriveAuth() {
+  return Promise.resolve();
+}
+
 export function disconnectDrive(repo: LibraryRepository) {
   return engine.disconnect(repo);
 }
