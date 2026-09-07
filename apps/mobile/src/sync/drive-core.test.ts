@@ -60,6 +60,23 @@ function listResponse() {
   });
 }
 
+test("rejects connecting a different Google account", async () => {
+  let disconnects = 0;
+  const google = auth();
+  google.disconnect = async () => {
+    disconnects++;
+  };
+  const { repo, values } = repository({
+    "drive-account-binding": "account-b",
+  });
+  const engine = new DriveSyncEngine(google, assets(), async () =>
+    listResponse(),
+  );
+  await assert.rejects(() => engine.connect(repo), /different Google account/);
+  assert.equal(disconnects, 1);
+  assert.equal(values.get("drive-account"), undefined);
+});
+
 test("coalesces concurrent sync calls for one local repository", async () => {
   const { repo } = repository({ "drive-account": "account-a" });
   let calls = 0;
@@ -141,4 +158,82 @@ test("does not require a deleted book's original before uploading its tombstone"
   await engine.sync(repo, () => undefined);
   assert.equal(uploadBodyCalls, 0);
   assert.equal(acknowledgements, 1);
+});
+
+test("removes a corrupted download before reporting checksum failure", async () => {
+  const book = {
+    id: "book-a",
+    title: "Remote",
+    author: "",
+    kind: "novel",
+    format: "epub",
+    tags: [],
+    collections: [],
+    series: "",
+    volume: null,
+    language: "",
+    direction: "ltr",
+    layout: "scroll",
+    pdfNightMode: false,
+    notes: [],
+    bookmarks: [],
+    favorite: false,
+    status: "unread",
+    progress: 0,
+    locator: "",
+    addedAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    revision: 1,
+    device: "device-a",
+    deletedAt: null,
+    asset: {
+      path: "book-a/original.epub",
+      hash: "0123456789abcdef0123456789abcdef",
+      bytes: 1,
+      cover: null,
+      pages: [],
+      chapters: [],
+    },
+  } satisfies Book;
+  const { repo } = repository({ "drive-account": "account-a" }, [], [book]);
+  let removed = 0;
+  let unpacked = 0;
+  let lists = 0;
+  const engine = new DriveSyncEngine(
+    auth(),
+    assets({
+      bookFileReady: () => false,
+      installDownload: async () => undefined,
+      hashFile: async () => "badbadbadbadbadbadbadbadbadbadba",
+      removeFile: async () => {
+        removed++;
+      },
+      unpack: async () => {
+        unpacked++;
+      },
+    }),
+    async (url) => {
+      if (String(url).includes("/drive/v3/files?")) lists++;
+      if (lists === 3)
+        return new Response(
+          JSON.stringify({
+            files: [
+              {
+                id: "asset-id",
+                appProperties: {
+                  glassleaf: "v1",
+                  type: "asset",
+                  hash: book.asset.hash,
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      return listResponse();
+    },
+  );
+  await assert.rejects(() => engine.sync(repo, () => undefined), /checksum/);
+  assert.equal(removed, 1);
+  assert.equal(unpacked, 0);
 });
