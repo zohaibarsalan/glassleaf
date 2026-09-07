@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "The bundled Glassleaf window has no native command, filesystem, shell, or remote API permissions.",
+  "windows": ["main"],
+  "permissions": []
+}
