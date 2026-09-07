@@ -82,7 +82,7 @@ async function epubDocument(
   const raw = await readText(`${book.id}/content/${item.path}`);
   const document = new DOMParser().parseFromString(raw, "text/html");
   document
-    .querySelectorAll("script, iframe, object, embed, form, base")
+    .querySelectorAll("script, iframe, embed, form, base")
     .forEach((node) => node.remove());
   document.querySelectorAll<HTMLElement>("*").forEach((node) => {
     for (const attribute of Array.from(node.attributes)) {
@@ -96,16 +96,49 @@ async function epubDocument(
     node.textContent = cleanCSS(node.textContent ?? "");
   });
   const urls: string[] = [];
-  for (const image of Array.from(document.images)) {
-    const source = image.getAttribute("src");
-    if (!source || /^(data:|https?:)/i.test(source)) continue;
+  for (const image of Array.from(document.querySelectorAll("img, image"))) {
+    const isSvgImage = image.localName === "image";
+    const source = isSvgImage
+      ? (image.getAttribute("href") ?? image.getAttribute("xlink:href"))
+      : image.getAttribute("src");
+    if (!source || /^(data:)/i.test(source)) continue;
+    if (/^https?:/i.test(source)) {
+      image.remove();
+      continue;
+    }
     const resource = await readFile(
       `${book.id}/content/${resolveResource(item.path, source)}`,
     );
-    if (!resource) continue;
+    if (!resource) {
+      image.remove();
+      continue;
+    }
     const url = URL.createObjectURL(resource);
     urls.push(url);
-    image.src = url;
+    if (isSvgImage) {
+      image.setAttribute("href", url);
+      image.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", url);
+    } else image.setAttribute("src", url);
+  }
+  for (const object of Array.from(document.querySelectorAll("object"))) {
+    const source = object.getAttribute("data");
+    if (!source || /^(data:|https?:)/i.test(source)) {
+      object.remove();
+      continue;
+    }
+    const resource = await readFile(
+      `${book.id}/content/${resolveResource(item.path, source)}`,
+    );
+    if (!resource) {
+      object.remove();
+      continue;
+    }
+    const url = URL.createObjectURL(resource);
+    urls.push(url);
+    const replacement = document.createElement("img");
+    replacement.src = url;
+    replacement.alt = object.getAttribute("aria-label") ?? "Illustration";
+    object.replaceWith(replacement);
   }
   const styles: string[] = [];
   for (const link of Array.from(
@@ -284,7 +317,14 @@ function PDFReader({
     let active = true;
     let renderTask:
       { cancel: () => void; promise: Promise<unknown> } | undefined;
+    let rendering = false;
+    let renderAgain = false;
     const render = async () => {
+      if (rendering) {
+        renderAgain = true;
+        return;
+      }
+      rendering = true;
       try {
         const pdfPage = await document.getPage(
           Math.min(page + 1, document.numPages),
@@ -310,6 +350,13 @@ function PDFReader({
           (error as { name?: string }).name !== "RenderingCancelledException"
         )
           onError(error instanceof Error ? error.message : String(error));
+      } finally {
+        rendering = false;
+        renderTask = undefined;
+        if (active && renderAgain) {
+          renderAgain = false;
+          void render();
+        }
       }
     };
     void render();

@@ -7,6 +7,8 @@ import {
 
 let opening: Promise<LibraryRepository> | undefined;
 let releaseLibraryLock: (() => void) | undefined;
+let activeDatabase: Worker1Promiser | undefined;
+let activeWorker: Worker | undefined;
 
 async function claimLibraryTab() {
   if (!navigator.locks) return;
@@ -16,41 +18,67 @@ async function claimLibraryTab() {
     resolveReady = resolve;
     rejectReady = reject;
   });
-  void navigator.locks.request(
-    "glassleaf-browser-library",
-    { ifAvailable: true, mode: "exclusive" },
-    (lock) => {
-      if (!lock) {
-        rejectReady?.(
-          new Error(
-            "Glassleaf is already open in another tab. Close that tab, then reload this page.",
-          ),
-        );
-        return;
-      }
-      resolveReady?.();
-      return new Promise<void>((resolve) => {
-        releaseLibraryLock = resolve;
-      });
-    },
-  );
+  void navigator.locks
+    .request(
+      "glassleaf-browser-library",
+      { ifAvailable: true, mode: "exclusive" },
+      (lock) => {
+        if (!lock) {
+          rejectReady?.(
+            new Error(
+              "Glassleaf is already open in another tab. Close that tab, then reload this page.",
+            ),
+          );
+          return;
+        }
+        resolveReady?.();
+        return new Promise<void>((resolve) => {
+          releaseLibraryLock = resolve;
+        });
+      },
+    )
+    .catch((error: unknown) => {
+      rejectReady?.(
+        error instanceof Error
+          ? error
+          : new Error("Could not claim the browser library lock."),
+      );
+    });
   await ready;
 }
 
 async function openDatabase() {
   // The package's ESM export is already the promise-returning Worker1 factory.
-  const promiser = await sqlite3Worker1Promiser({
-    worker: () =>
-      new Worker("/glassleaf-sqlite-worker.mjs?opfs-disable=1", {
-        type: "module",
-      }),
+  const worker = new Worker("/glassleaf-sqlite-worker.mjs?opfs-disable=1", {
+    type: "module",
   });
-  await promiser("open", {
-    // SAH pool storage needs neither SharedArrayBuffer nor COOP/COEP headers.
-    // It deliberately uses one active library connection per origin.
-    filename: "file:/glassleaf.sqlite3?vfs=opfs-sahpool",
-  });
-  return promiser;
+  try {
+    const promiser = await sqlite3Worker1Promiser({ worker });
+    await promiser("open", {
+      // SAH pool storage needs neither SharedArrayBuffer nor COOP/COEP headers.
+      // It deliberately uses one active library connection per origin.
+      filename: "file:/glassleaf.sqlite3?vfs=opfs-sahpool",
+    });
+    activeDatabase = promiser;
+    activeWorker = worker;
+    return promiser;
+  } catch (error) {
+    worker.terminate();
+    throw error;
+  }
+}
+
+async function releaseLibraryTab() {
+  try {
+    await activeDatabase?.("close", {});
+  } catch {
+    // The worker will be terminated even if an incomplete open cannot close.
+  }
+  activeDatabase = undefined;
+  activeWorker?.terminate();
+  activeWorker = undefined;
+  releaseLibraryLock?.();
+  releaseLibraryLock = undefined;
 }
 
 async function execute(
@@ -121,18 +149,10 @@ export function openLibrary() {
       await seed.setSetting("device", device);
     }
     return new LibraryRepository(sql, device);
-  })().catch((error) => {
-    releaseLibraryLock?.();
-    releaseLibraryLock = undefined;
+  })().catch(async (error) => {
+    await releaseLibraryTab();
     opening = undefined;
     throw error;
   });
   return opening;
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener("pagehide", () => {
-    releaseLibraryLock?.();
-    releaseLibraryLock = undefined;
-  });
 }

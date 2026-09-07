@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glassleaf browser reader compatibility</title>
+    <style>
+      :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+      body { margin: 0; background: #f5f4ef; color: #23362e; }
+      main { max-width: 1120px; margin: auto; padding: clamp(24px, 5vw, 72px) clamp(18px, 4vw, 40px); }
+      h1 { max-width: 720px; margin: 0; font-size: clamp(28px, 5vw, 52px); letter-spacing: -.045em; }
+      .intro { max-width: 710px; margin: 18px 0 42px; color: #587067; font-size: 17px; line-height: 1.55; }
+      .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+      figure { margin: 0; overflow: hidden; border: 1px solid #d9ddd4; border-radius: 18px; background: #fff; box-shadow: 0 12px 32px #26372a12; }
+      img { display: block; width: 100%; height: auto; background: #eeece5; }
+      figcaption { padding: 18px; color: #52665d; font-size: 14px; line-height: 1.45; }
+      strong { display: block; margin-bottom: 4px; color: #1f4637; font-size: 16px; }
+      footer { margin-top: 38px; color: #65776e; font-size: 14px; line-height: 1.5; }
+      @media (max-width: 780px) { .grid { grid-template-columns: 1fr; max-width: 390px; } }
+      @media (prefers-color-scheme: dark) { body { background: #11231d; color: #e9f0e9; } .intro, footer, figcaption { color: #b5c6ba; } figure { background: #1a3027; border-color: #345347; } strong { color: #e5f3e9; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Browser reader compatibility</h1>
+      <p class="intro">Fresh Chromium browser contexts at 390 px, with each book imported through Glassleaf’s visible file chooser. These captures are Chromium web evidence, not iOS or Android native-reader evidence.</p>
+      <section class="grid" aria-label="Reader format captures">
+        <figure>
+          <img src="alice-epub-chapter-3.png" alt="Alice EPUB reader displaying Chapter I prose" />
+          <figcaption><strong>EPUB</strong>Alice opened from Contents at the third spine document; rendered prose.</figcaption>
+        </figure>
+        <figure>
+          <img src="attention-pdf-page-1.png" alt="Attention Is All You Need PDF reader page" />
+          <figcaption><strong>PDF</strong>attention.pdf rendered by a canvas page without an iframe.</figcaption>
+        </figure>
+        <figure>
+          <img src="haruko-cbz-page-1.png" alt="Haruko CBZ reader displaying comic art" />
+          <figcaption><strong>CBZ</strong>Haruko comic image rendered from the imported archive.</figcaption>
+        </figure>
+      </section>
+      <footer>Captured 2026-09-08 in Chromium. The static PWA export also passed an offline shell reload and reopened an imported CBZ after service-worker activation.</footer>
+    </main>
+  </body>
+</html>
