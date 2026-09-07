@@ -51,7 +51,6 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  AppState,
   Platform,
   Pressable,
   useWindowDimensions,
@@ -68,7 +67,7 @@ import { BulkOrganize } from "./src/screens/BulkOrganize";
 import { NotesPanel, SettingsPanel } from "./src/screens/LibraryPanels";
 import { PlanReview } from "./src/screens/PlanReview";
 import { ThemePanel } from "./src/screens/ThemePanel";
-import { syncDrive } from "./src/sync/drive";
+import { useDriveSync } from "./src/sync/useDriveSync";
 import { BookTile, Brand, NavRow } from "./src/ui/LibraryComponents";
 import {
   base,
@@ -323,43 +322,7 @@ function LibraryApp({
       });
   }, [repo]);
   const reload = useCallback(() => refresh((n) => n + 1), []);
-  const syncedOnLaunch = useRef(false);
-  const [syncMessage, setSyncMessage] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      void (async () => {
-        if (!(await repo.setting("drive-account"))) return;
-        if (
-          syncedOnLaunch.current &&
-          !(await repo.pending()).length &&
-          !(await repo.pendingOrganization()).length
-        )
-          return;
-        syncedOnLaunch.current = true;
-        try {
-          await syncDrive(repo, setSyncMessage);
-          setSyncMessage("");
-          reload();
-        } catch (error) {
-          setSyncMessage(
-            error instanceof Error
-              ? error.message
-              : "Sync paused. Your changes are saved locally.",
-          );
-        }
-      })().catch((error) => setSyncMessage(String(error)));
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, [repo, revision, reload]);
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        syncedOnLaunch.current = false;
-        reload();
-      }
-    });
-    return () => subscription.remove();
-  }, [reload]);
+  const { syncMessage } = useDriveSync(repo, revision, reload);
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery((q) => ({ ...q, search })), 180);
