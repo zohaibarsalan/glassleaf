@@ -1,14 +1,18 @@
 import type { LibraryRepository } from "@glassleaf/library";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { syncDrive } from "./drive";
 import {
   createDriveSyncScheduler,
+  isDriveOnline,
   type DriveSyncScheduler,
 } from "./drive-scheduler";
 
 function browserOnline() {
-  return typeof navigator === "undefined" || navigator.onLine;
+  return isDriveOnline(
+    Platform.OS,
+    typeof navigator === "undefined" ? undefined : navigator.onLine,
+  );
 }
 
 export function useDriveSync(
@@ -52,26 +56,33 @@ export function useDriveSync(
       active = state === "active";
       if (active) next.request("foreground");
     });
+    const browserWindow =
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? window
+        : undefined;
+    const browserDocument =
+      Platform.OS === "web" && typeof document !== "undefined"
+        ? document
+        : undefined;
     const pendingPoll = setInterval(() => {
       if (
         active &&
-        (typeof document === "undefined" ||
-          document.visibilityState === "visible")
+        (!browserDocument || browserDocument.visibilityState === "visible")
       )
         next.request("mutation");
     }, 15_000);
-    const browserWindow = typeof window === "undefined" ? undefined : window;
     const online = () => next.request("online");
     const visible = () => {
-      if (document.visibilityState === "visible") next.request("foreground");
+      if (browserDocument?.visibilityState === "visible")
+        next.request("foreground");
     };
     browserWindow?.addEventListener("online", online);
-    browserWindow?.addEventListener("visibilitychange", visible);
+    browserDocument?.addEventListener("visibilitychange", visible);
     return () => {
       appState.remove();
       clearInterval(pendingPoll);
       browserWindow?.removeEventListener("online", online);
-      browserWindow?.removeEventListener("visibilitychange", visible);
+      browserDocument?.removeEventListener("visibilitychange", visible);
       next.dispose();
       scheduler.current = null;
     };

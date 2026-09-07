@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createDriveSyncScheduler } from "./drive-scheduler";
+import { createDriveSyncScheduler, isDriveOnline } from "./drive-scheduler";
 
 const wait = (milliseconds: number) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+test("native scheduling does not depend on a DOM navigator", () => {
+  assert.equal(isDriveOnline("ios", undefined), true);
+  assert.equal(isDriveOnline("android", false), true);
+  assert.equal(isDriveOnline("web", undefined), true);
+  assert.equal(isDriveOnline("web", false), false);
+});
 
 test("coalesces local changes and a foreground event into one sync", async () => {
   let syncs = 0;
@@ -55,4 +62,24 @@ test("does not retry an expired token until a new trigger arrives", async () => 
   await wait(20);
   scheduler.dispose();
   assert.equal(syncs, 2);
+});
+
+test("does not call React callbacks after disposal during a sync", async () => {
+  let finish!: (value: boolean) => void;
+  let completed = 0;
+  const scheduler = createDriveSyncScheduler({
+    hasPending: async () => true,
+    sync: () => new Promise<boolean>((resolve) => (finish = resolve)),
+    onError: () => assert.fail("scheduler error"),
+    onSynced: () => {
+      completed++;
+    },
+    delayMs: 1,
+  });
+  scheduler.request("foreground");
+  await wait(10);
+  scheduler.dispose();
+  finish(true);
+  await wait(10);
+  assert.equal(completed, 0);
 });
