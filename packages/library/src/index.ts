@@ -115,6 +115,13 @@ export const metadataPatchSchema = bookSchema
   .partial()
   .strict();
 export type MetadataPatch = z.infer<typeof metadataPatchSchema>;
+export const organizationEvidenceSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(2000),
+    confidence: z.number().min(0).max(1).optional(),
+    sources: z.array(z.string().trim().min(1).max(1000)).max(10).default([]),
+  })
+  .strict();
 export const planSchema = z.object({
   version: z.literal(1),
   id: z.string(),
@@ -125,6 +132,7 @@ export const planSchema = z.object({
         bookId: z.string(),
         expectedRevision: z.number().int().nonnegative(),
         patch: metadataPatchSchema,
+        evidence: organizationEvidenceSchema.optional(),
       }),
     )
     .min(1)
@@ -448,6 +456,23 @@ export class LibraryRepository {
       ...params,
     );
     return rows.map((row) => bookSchema.parse(JSON.parse(row.data)));
+  }
+  async nextVolume(book: Book): Promise<Book | undefined> {
+    if (!book.series.trim() || book.volume === null) return undefined;
+    const rows = await this.sql.all<{ data: string }>(
+      `SELECT data FROM books WHERE deleted IS NULL AND id<>?
+       AND json_extract(data,'$.series')=? COLLATE NOCASE
+       AND json_extract(data,'$.kind')=? AND json_extract(data,'$.language')=? COLLATE NOCASE
+       AND json_extract(data,'$.format')=? AND json_extract(data,'$.volume')>?
+       ORDER BY json_extract(data,'$.volume'),title COLLATE NOCASE,id LIMIT 1`,
+      book.id,
+      book.series,
+      book.kind,
+      book.language,
+      book.format,
+      book.volume,
+    );
+    return rows[0] ? bookSchema.parse(JSON.parse(rows[0].data)) : undefined;
   }
   async update(
     id: string,

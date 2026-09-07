@@ -1,17 +1,20 @@
 import type { Book } from "@glassleaf/library";
 import { View, StyleSheet } from "react-native";
 import Pdf from "react-native-pdf";
+import { pdfOutline, type OutlineEntry } from "./pdfOutline";
 import { fileURI } from "../data/files";
 export function PDFPages({
   book,
   page,
   onPage,
   onError,
+  onOutline,
 }: {
   book: Book;
   page: number;
   onPage: (page: number, count: number) => void;
   onError: (message: string) => void;
+  onOutline: (entries: OutlineEntry[]) => void;
 }) {
   return (
     <View style={{ flex: 1, isolation: "isolate", backgroundColor: "#171717" }}>
@@ -26,7 +29,10 @@ export function PDFPages({
         maxScale={5}
         trustAllCerts={false}
         onPageChanged={(current, count) => onPage(current - 1, count)}
-        onLoadComplete={(count) => onPage(page, count)}
+        onLoadComplete={(count, _path, _size, contents) => {
+          onPage(page, count);
+          onOutline(pdfOutline(contents, count));
+        }}
         onError={(error) => onError(String(error))}
       />
       {book.pdfNightMode && (

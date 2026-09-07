@@ -4,7 +4,7 @@ import type {
   OrganizationPlan,
 } from "@glassleaf/library";
 import { useEffect, useState } from "react";
-import { Box, Button, Sheet, Text } from "../ui/theme";
+import { Box, Button, Chip, Sheet, Text } from "../ui/theme";
 export function PlanReview({
   plan,
   repo,
@@ -14,9 +14,11 @@ export function PlanReview({
   plan: OrganizationPlan;
   repo: LibraryRepository;
   onClose: () => void;
-  onApply: () => void;
+  onApply: (plan: OrganizationPlan) => void;
 }) {
   const [page, setPage] = useState(0);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const selectedCount = plan.changes.length - excluded.size;
   const [books, setBooks] = useState<Map<string, Book>>(new Map());
   const [error, setError] = useState("");
   const size = 40;
@@ -54,7 +56,19 @@ export function PlanReview({
       title={plan.title}
       onClose={onClose}
       footer={
-        <Button onPress={onApply}>Apply {plan.changes.length} changes</Button>
+        <Button
+          disabled={!selectedCount}
+          onPress={() =>
+            onApply({
+              ...plan,
+              changes: plan.changes.filter(
+                (change) => !excluded.has(change.bookId),
+              ),
+            })
+          }
+        >
+          Apply {selectedCount} changes
+        </Button>
       }
     >
       <Text color="secondary">
@@ -81,6 +95,36 @@ export function PlanReview({
               <Text color="danger" variant="caption">
                 This book changed after the plan was created.
               </Text>
+            )}
+            <Chip
+              label={excluded.has(change.bookId) ? "Excluded" : "Included"}
+              active={!excluded.has(change.bookId)}
+              onPress={() =>
+                setExcluded((current) => {
+                  const next = new Set(current);
+                  if (next.has(change.bookId)) next.delete(change.bookId);
+                  else next.add(change.bookId);
+                  return next;
+                })
+              }
+            />
+            {change.evidence && (
+              <Box gap="xs">
+                <Text variant="eyebrow">WHY THIS CHANGE</Text>
+                <Text>{change.evidence.reason}</Text>
+                {change.evidence.confidence !== undefined && (
+                  <Text variant="caption">
+                    Agent confidence:{" "}
+                    {Math.round(change.evidence.confidence * 100)}% · Not
+                    independently verified
+                  </Text>
+                )}
+                {change.evidence.sources.map((source, index) => (
+                  <Text key={index} variant="caption">
+                    Source: {source}
+                  </Text>
+                ))}
+              </Box>
             )}
             {Object.entries(change.patch).map(([field, value]) => (
               <Box key={field} gap="xs">

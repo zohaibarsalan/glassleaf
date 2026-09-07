@@ -104,6 +104,11 @@ try {
           bookId: book.id,
           expectedRevision: 1,
           patch: { series: "Shared", collections: ["Favorites"] },
+          evidence: {
+            reason: "Series identified in supplied metadata",
+            confidence: 0.8,
+            sources: ["snapshot:fixture"],
+          },
         },
       ],
     },
@@ -115,6 +120,11 @@ try {
     JSON.parse(await readFile(output.path, "utf8")),
   );
   assert.equal(plan.changes[0]?.patch.series, "Shared");
+  assert.deepEqual(plan.changes[0]?.evidence, {
+    reason: "Series identified in supplied metadata",
+    confidence: 0.8,
+    sources: ["snapshot:fixture"],
+  });
   const structured = await client.callTool({
     name: "prepare_structure",
     arguments: {

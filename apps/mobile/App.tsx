@@ -520,7 +520,9 @@ function LibraryApp({
   if (reader)
     return (
       <Reader
+        key={reader.id}
         book={reader}
+        onOpen={setReader}
         repo={repo}
         onSearch={(book) => {
           setSearchScope({ query: { bookId: book.id }, name: book.title });
@@ -1258,9 +1260,9 @@ function LibraryApp({
           plan={plan}
           repo={repo}
           onClose={() => setPlan(undefined)}
-          onApply={() =>
+          onApply={(selected) =>
             void run("Applying organization…", async () => {
-              await repo.applyPlan(plan);
+              await repo.applyPlan(selected);
               setPlan(undefined);
             })
           }

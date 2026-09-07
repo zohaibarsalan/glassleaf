@@ -41,3 +41,23 @@ assert.equal(readingPreferencesSchema.safeParse({ size: 300 }).success, false);
 console.log(
   "Reader locations: legacy migration, anchored round trips and invalid persisted values checked.",
 );
+
+import { pdfOutline } from "../apps/mobile/src/readers/pdfOutline";
+assert.deepEqual(
+  pdfOutline(
+    [
+      {
+        title: "Overview",
+        pageIdx: "0",
+        children: [{ title: "Details", pageIdx: 2 }],
+      },
+      { title: "Broken", pageIdx: 99 },
+      { title: "Null page", pageIdx: null },
+    ],
+    10,
+  ),
+  [
+    { title: "Overview", page: 0, depth: 0 },
+    { title: "Details", page: 2, depth: 1 },
+  ],
+);

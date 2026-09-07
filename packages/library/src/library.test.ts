@@ -540,3 +540,40 @@ test("Chapter jobs resume, retry unavailable files, and reject stale asset work"
     db.close();
   }
 });
+
+test("Series continuation selects the next volume without crossing adaptations, languages or Trash", async () => {
+  const { db, repo } = setup();
+  try {
+    await repo.initialize();
+    const current = { ...book("current"), series: "River", volume: 1 };
+    for (const entry of [
+      current,
+      { ...book("later"), series: "River", volume: 3 },
+      { ...book("next"), series: "river", volume: 2 },
+      {
+        ...book("adaptation"),
+        series: "River",
+        volume: 1.1,
+        kind: "novel" as const,
+      },
+      { ...book("translation"), series: "River", volume: 1.1, language: "en" },
+      { ...book("duplicate"), series: "River", volume: 1 },
+      {
+        ...book("trashed"),
+        series: "River",
+        volume: 1.5,
+        deletedAt: "2026-09-06T00:00:00.000Z",
+      },
+    ])
+      await repo.add(entry);
+    assert.equal((await repo.nextVolume(current))?.id, "next");
+    assert.equal(await repo.nextVolume({ ...current, volume: 3 }), undefined);
+    assert.equal(
+      await repo.nextVolume({ ...current, volume: null }),
+      undefined,
+    );
+    assert.equal(await repo.nextVolume({ ...current, series: "" }), undefined);
+  } finally {
+    db.close();
+  }
+});

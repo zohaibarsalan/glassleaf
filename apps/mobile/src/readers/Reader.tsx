@@ -42,17 +42,20 @@ import { EPUBPage } from "./EPUBPage";
 import { parseLocator, encodeLocator, type TextAnchor } from "./location";
 import { ReadingAppearance } from "./ReadingAppearance";
 import { readingPreferencesSchema } from "./preferences";
+import type { OutlineEntry } from "./pdfOutline";
 import { PDFPages } from "./PDFPages";
 export function Reader({
   book: initialBook,
   repo,
   onClose,
   onSearch,
+  onOpen,
 }: {
   book: Book;
   repo: LibraryRepository;
   onClose: () => void;
   onSearch: (book: Book) => void;
+  onOpen: (book: Book) => void;
 }) {
   const [book, setBook] = useState(initialBook);
   useEffect(() => {
@@ -108,6 +111,20 @@ export function Reader({
   const selectionRange = useRef<{ start?: TextAnchor; end?: TextAnchor }>({});
   const [footnote, setFootnote] = useState<string>();
   const [annotations, setAnnotations] = useState(false);
+  const [outline, setOutline] = useState<OutlineEntry[]>([]);
+  const [nextVolume, setNextVolume] = useState<Book>();
+  useEffect(() => {
+    let cancelled = false;
+    void repo
+      .nextVolume(initialBook)
+      .then((next) => {
+        if (!cancelled) setNextVolume(next);
+      })
+      .catch((error) => setError(String(error)));
+    return () => {
+      cancelled = true;
+    };
+  }, [repo, initialBook]);
   const [jump, setJump] = useState("");
   const scrollList = useRef<FlashListRef<string>>(null);
   const current = useRef({ page, fraction });
@@ -307,6 +324,7 @@ export function Reader({
         ) : book.format === "pdf" ? (
           <PDFPages
             book={book}
+            onOutline={setOutline}
             page={page}
             onPage={(p, total) => {
               setPage(p);
@@ -453,6 +471,22 @@ export function Reader({
           </View>
         </Box>
       )}
+      {controls &&
+        nextVolume &&
+        page >= count - 1 &&
+        (book.format !== "epub" || fraction >= 0.98) && (
+          <Box padding="s">
+            <Button
+              onPress={() => {
+                void save()
+                  .then(() => onOpen(nextVolume))
+                  .catch((error) => setError(String(error)));
+              }}
+            >
+              Continue · {nextVolume.title}
+            </Button>
+          </Box>
+        )}
       {!!selection && (
         <Box padding="s" gap="s" flexDirection="row" flexWrap="wrap">
           <Button
@@ -495,7 +529,13 @@ export function Reader({
           >
             Look up online
           </Button>
-          <Button secondary onPress={() => setSelection("")}>
+          <Button
+            secondary
+            onPress={() => {
+              setSelection("");
+              setCommand({ id: Date.now() });
+            }}
+          >
             Dismiss
           </Button>
         </Box>
@@ -780,6 +820,26 @@ export function Reader({
           >
             Go
           </Button>
+          {book.format === "pdf" &&
+            outline.map((entry, index) => (
+              <Pressable
+                key={`${entry.page}-${index}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to ${entry.title}, page ${entry.page + 1}`}
+                onPress={() => {
+                  setPage(entry.page);
+                  setContents(false);
+                }}
+              >
+                <Box
+                  paddingVertical="s"
+                  style={{ paddingLeft: Math.min(entry.depth, 3) * 12 }}
+                >
+                  <Text>{entry.title}</Text>
+                  <Text variant="caption">Page {entry.page + 1}</Text>
+                </Box>
+              </Pressable>
+            ))}
           {book.format === "epub" &&
             book.asset.chapters.map((chapter, index) => (
               <Chip

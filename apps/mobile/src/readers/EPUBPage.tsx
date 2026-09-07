@@ -179,7 +179,7 @@ export function EPUBPage({
         if (cancelled) return;
         const paginated = book.layout === "pages";
         const pageCSS = paginated
-          ? "html{height:100%;overflow:hidden;}body{height:100vh;max-width:none;padding:24px;column-width:calc(100vw - 48px);column-gap:48px;column-fill:auto;}"
+          ? `html{height:100%;overflow:hidden;}body{height:100vh;max-width:none;padding:24px ${preferences.margin}px;column-width:calc(100vw - ${preferences.margin * 2}px);column-gap:${preferences.margin * 2}px;column-fill:auto;}`
           : "";
         const document = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=3"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src file: data:; style-src file: 'unsafe-inline'; font-src file: data:; script-src 'nonce-glassleaf';"><style>
           html{background:${c.bg};color:${c.text};}body{box-sizing:border-box;margin:0 auto;padding:24px ${preferences.margin}px 50px;max-width:740px;${preferences.font === "publisher" ? "" : `font-family:${font};`}font-size:${size}px;line-height:${preferences.lineHeight};overflow-wrap:break-word;}
@@ -214,7 +214,7 @@ export function EPUBPage({
           const marks=${JSON.stringify(book.notes.filter((note) => note.quote && note.endAnchor).map((note) => ({ locator: note.locator, end: note.endAnchor }))).replace(/</g, "\\u003c")};
           if(globalThis.Highlight&&CSS.highlights){const ranges=[];for(const mark of marks){try{const location=JSON.parse(mark.locator);if(location.href!==${JSON.stringify(path)})continue;const start=rangeNode(location.anchor),end=rangeNode(mark.end);if(!start||!end)continue;const range=document.createRange();range.setStart(start,Math.min(location.anchor.offset,start.length));range.setEnd(end,Math.min(mark.end.offset,end.length));ranges.push(range)}catch{}}CSS.highlights.set('glassleaf',new Highlight(...ranges));}
           document.addEventListener('selectionchange',()=>{const selection=getSelection();if(!selection?.rangeCount){send('selection',{text:''});return;}const range=selection.getRangeAt(0);send('selection',{text:String(selection).slice(0,5000),start:anchorFor(range.startContainer,range.startOffset),end:anchorFor(range.endContainer,range.endOffset)})});
-          document.addEventListener('click',e=>{const a=e.target.closest('a');if(a){e.preventDefault();const href=a.getAttribute('href')||'';if(href.startsWith('#')){const target=document.getElementById(decodeURIComponent(href.slice(1)));if(a.getAttribute('epub:type')==='noteref'||a.getAttribute('role')==='doc-noteref')send('footnote',target?.textContent?.slice(0,10000)||'Footnote unavailable.');else target?.scrollIntoView();}else send('link',href);}else if(!String(getSelection()))send('tap',true)});
+          document.addEventListener('click',e=>{const a=e.target.closest('a');if(a){e.preventDefault();const href=a.getAttribute('href')||'';if(href.startsWith('#')){const target=document.getElementById(decodeURIComponent(href.slice(1)));if((a.getAttribute('epub:type')||'').split(/\\s+/).includes('noteref')||a.getAttribute('role')==='doc-noteref')send('footnote',target?.textContent?.slice(0,10000)||'Footnote unavailable.');else target?.scrollIntoView();}else send('link',href);}else if(!String(getSelection()))send('tap',true)});
         </script></body></html>`;
         const rendered = nativeFile(
           `${book.id}/content/${path.slice(0, path.lastIndexOf("/") + 1)}.glassleaf-reader-${Date.now()}.html`,
@@ -244,6 +244,9 @@ export function EPUBPage({
   ]);
   useEffect(() => {
     if (!command) return;
+    web.current?.injectJavaScript(
+      "window.getSelection()?.removeAllRanges();true;",
+    );
     if (command.delta !== undefined)
       web.current?.injectJavaScript(
         `window.glassleafTurn?.(${command.delta});true;`,

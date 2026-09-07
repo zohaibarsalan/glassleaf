@@ -8,6 +8,7 @@ import {
   snapshotSchema,
   planSchema,
   metadataPatchSchema,
+  organizationEvidenceSchema,
   kinds,
   rulesSchema,
   matchesRules,
@@ -139,7 +140,7 @@ server.registerTool(
   "prepare_organization",
   {
     description:
-      "Create a reviewable organization plan for the Glassleaf app. Does not modify the snapshot or original books. Import the resulting JSON into Settings to preview and apply atomically, with undo.",
+      "Create a reviewable organization plan for the Glassleaf app. Does not modify the snapshot or original books. Include evidence with a reason, source references and optional confidence for inferred metadata. Confidence is agent-reported, not independently verified. Import the resulting JSON into Settings to review, exclude individual changes and apply atomically, with undo.",
     inputSchema: {
       title: z.string().min(1).max(200),
       changes: z
@@ -148,6 +149,7 @@ server.registerTool(
             bookId: z.string(),
             expectedRevision: z.number().int().nonnegative(),
             patch: metadataPatchSchema,
+            evidence: organizationEvidenceSchema.optional(),
           }),
         )
         .min(1)
