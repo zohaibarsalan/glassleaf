@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
@@ -50,11 +51,23 @@ const precache = (await files(output))
   )
   .sort();
 const source = await readFile(join(root, "apps/mobile/public/sw.js"), "utf8");
+const cacheId = `glassleaf-shell-${createHash("sha256")
+  .update(JSON.stringify(precache))
+  .digest("hex")
+  .slice(0, 16)}`;
+if (!source.includes('const CACHE = "glassleaf-shell-dev";')) {
+  throw new Error("Service worker cache placeholder is missing.");
+}
 await writeFile(
   join(output, "sw.js"),
-  source.replace(
-    '["/", "/index.html", "/manifest.json", "/favicon.ico"]',
-    JSON.stringify(precache),
-  ),
+  source
+    .replace(
+      'const CACHE = "glassleaf-shell-dev";',
+      `const CACHE = ${JSON.stringify(cacheId)};`,
+    )
+    .replace(
+      '["/", "/index.html", "/manifest.json", "/favicon.ico"]',
+      JSON.stringify(precache),
+    ),
 );
-console.log(`Generated offline shell with ${precache.length} immutable files.`);
+console.log(`Generated ${cacheId} with ${precache.length} immutable files.`);
