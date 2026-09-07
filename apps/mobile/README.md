@@ -28,15 +28,15 @@ After installation, `pnpm mobile` starts Metro. Settings → Sample library impo
 
 ## Google Drive setup
 
-The app works locally without configuration. Live sign-in has **not** been validated: no Google project or OAuth credentials were provided.
+The app works locally without configuration. Live sign-in has **not** been validated: no Google project or OAuth credentials were provided. Native builds use Google Sign-In; web/PWA uses Google Identity Services. Both request the least-privilege `https://www.googleapis.com/auth/drive.file` scope and bind one local library to one Google account.
 
 1. Create a Google Cloud project and enable **Google Drive API**.
 2. Configure Google Auth Platform branding/audience. While the app is in Testing, add your Google account as a test user. Request `https://www.googleapis.com/auth/drive.file`, which limits access to files created/opened through the app.
 3. Create an **iOS** OAuth client for bundle ID `app.glassleaf.mobile`.
-4. Create a **Web application** OAuth client for the native SDK's `webClientId`. No client secret belongs in the app.
+4. Create a **Web application** OAuth client for the native SDK's `webClientId` and add every HTTPS PWA origin to its authorized JavaScript origins. No client secret belongs in the app. The web client ID is also used by the browser Google Identity Services flow.
 5. Create an **Android** OAuth client for package `app.glassleaf.mobile` and the signing certificate SHA-1. After generating Android, run `./gradlew signingReport` from `apps/mobile/android`. Register the certificate for each build you use; store signing certificates differ from development signing.
 6. Copy `.env.example` to `.env.local`, fill the iOS and Web client IDs, then rebuild with the commands above. The iOS URL scheme is generated from its client ID. Android identifies its client through the registered package/certificate.
-7. Settings → Google Drive → Connect → Sync now. Repeat on a second device with the **same Google account** and test imports, reading progress, notes, offline edits, trash/restore, and reconnect before relying on synchronization.
+7. Settings → Google Drive → Connect → Sync now. On the PWA, the first connection must be a user gesture; access tokens remain in memory and an expired browser session requires pressing Connect again. Repeat on a second device with the **same Google account** and test imports, reading progress, notes, offline edits, trash/restore, and reconnect before relying on synchronization.
 
 Drive files live in a Glassleaf folder in your own storage. There is no Glassleaf subscription in this implementation; your Google storage capacity and API quotas still apply. Sync runs on launch, foreground, local edits, or manually while the app is open. It is not an OS background service. Account binding prevents accidentally merging another account into this local library. Conflict versions are retained in SQLite, but a conflict-resolution screen remains to be built. Original uploads use a Drive resumable session but send the file in one PUT; checkpointed chunk retries are not implemented, so very large assets need further work.
 

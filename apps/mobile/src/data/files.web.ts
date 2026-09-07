@@ -124,6 +124,13 @@ export function hasFile(path: string) {
   return objectURLs.has(path) || !!cachedCover(path);
 }
 
+export async function removeFile(path: string) {
+  await withStore("readwrite", (store) => store.delete(path));
+  const url = objectURLs.get(path);
+  if (url) URL.revokeObjectURL(url);
+  objectURLs.delete(path);
+}
+
 export async function hashFile(path: string) {
   const file = await readFile(path);
   if (!file) throw new Error("This file is not stored in this browser.");
