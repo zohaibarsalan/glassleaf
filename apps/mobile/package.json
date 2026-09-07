@@ -11,6 +11,7 @@
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@shopify/flash-list": "^2.0.2",
     "@shopify/restyle": "^2.4.5",
+    "@sqlite.org/sqlite-wasm": "3.51.2-build9",
     "expo": "~57.0.20",
     "expo-asset": "~57.0.16",
     "expo-crypto": "~57.0.2",
@@ -25,6 +26,7 @@
     "fast-xml-parser": "^5.11.1",
     "jszip": "^3.10.1",
     "lucide-react-native": "^1.41.0",
+    "pdfjs-dist": "4.10.38",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -50,6 +52,8 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
+    "web": "node ../../scripts/prepare-browser-workers.mjs && expo start --web",
+    "build:web": "node ../../scripts/build-web-pwa.mjs",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
     "samples": "EXPO_PUBLIC_SAMPLE_LIBRARY=1 expo start"
