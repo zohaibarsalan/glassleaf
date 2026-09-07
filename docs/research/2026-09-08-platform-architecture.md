@@ -54,6 +54,8 @@ On iPhone, installation is a user action in Safari’s Share menu → Add to Hom
 
 Google Identity Services for web should use its authentication flow for identity and its authorization flow for Drive. Keep the web access token in memory; on expiry/401, mark Drive disconnected and ask the user to reconnect. A service worker or visibility timer must not trigger consent.
 
+There is a deployment-header conflict to resolve before claiming web SQLite and browser OAuth work together: Expo’s SQLite/WASM path requires cross-origin isolation (`COOP: same-origin` plus `COEP: require-corp`), while Google documents that popup GIS may need `COOP: same-origin` with `same-origin-allow-popups` when FedCM is unavailable. Do not add `same-origin-allow-popups` blindly or claim this is validated on iPhone; test the selected hosted headers with real OAuth, or choose an IndexedDB metadata adapter that does not require cross-origin isolation. Chrome’s newer `COOP: restrict-properties` is a possible Chromium-only experiment, not an iPhone compatibility decision.
+
 ### Desktop
 
 Package the browser export in Tauri. Tauri supplies platform installers and signing paths for macOS, Windows, and Linux, while the UI remains the same React Native Web UI. Give Tauri a narrow bridge for native file import, large asset storage, secure credential storage, and optional system file associations. If the bridge is unavailable, the desktop build can use the browser adapter. Desktop Google OAuth should use the installed-app PKCE flow with a loopback/custom redirect and an OS secure store; do not put a client secret in the package.
@@ -105,11 +107,13 @@ If an independent Glassleaf account becomes necessary, choose Clerk first for th
 - [Expo Progressive Web Apps](https://docs.expo.dev/guides/progressive-web-apps/)
 - [Expo SQLite web setup and limitations](https://docs.expo.dev/versions/v57.0.0/sdk/sqlite/)
 - [Google Identity Services: web authentication and authorization](https://developers.google.com/identity/oauth2/web/guides/overview)
+- [Google Identity Services web setup and COOP popup requirement](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)
 - [Google OAuth 2.0 for iOS and desktop apps](https://developers.google.com/identity/protocols/oauth2/native-app)
 - [Google Drive scopes, `drive.file`, and refresh-token guidance](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)
 - [Google Drive usage limits and current pricing note](https://developers.google.com/workspace/drive/api/guides/limits)
 - [Apple: add a website as an iPhone web app](https://support.apple.com/en-euro/guide/iphone/iphea86e5236/ios)
 - [WebKit: Web Push and Home Screen web-app behavior](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)
 - [Tauri distribution and installers](https://tauri.app/distribute/)
+- [Chrome: COOP `restrict-properties` and cross-origin isolation](https://developer.chrome.com/blog/coop-restrict-properties)
 - [Clerk pricing](https://clerk.com/pricing) and [Clerk Expo Google sign-in](https://clerk.com/docs/expo/guides/configure/auth-strategies/sign-in-with-google)
 - [WorkOS AuthKit pricing](https://workos.com/pricing), [production/staging requirements](https://workos.com/docs/authkit/environments), and [public OAuth/PKCE](https://workos.com/docs/authkit/connect/oauth)
