@@ -8,7 +8,7 @@ use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -24,14 +24,16 @@ const KEYRING_SERVICE: &str = "app.glassleaf.desktop.google-drive";
 #[derive(Default)]
 pub struct OAuthState {
     token: Mutex<Option<Token>>,
-    client_id: Mutex<Option<String>>,
     cancelled: Arc<AtomicBool>,
+    generation: AtomicU64,
+    lifecycle: Mutex<()>,
 }
 
 #[derive(Clone)]
 struct Token {
     access_token: String,
     expires_at: u64,
+    client_id: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -102,6 +104,21 @@ fn http_client() -> Result<Client, String> {
         .timeout(Duration::from_secs(30))
         .build()
         .map_err(|e| error(format!("Could not prepare Google Drive networking: {e}")))
+}
+
+fn ensure_active(state: &OAuthState, generation: u64) -> Result<(), String> {
+    if state.cancelled.load(Ordering::Acquire)
+        || state.generation.load(Ordering::Acquire) != generation
+    {
+        return Err(error("Google sign-in was cancelled."));
+    }
+    Ok(())
+}
+
+fn cached_token(token: Option<&Token>, client_id: &str) -> Option<String> {
+    token
+        .filter(|token| token.client_id == client_id && token.expires_at > now().saturating_add(60))
+        .map(|token| token.access_token.clone())
 }
 
 fn refresh_entry(client_id: &str) -> Result<Entry, String> {
@@ -309,10 +326,7 @@ pub async fn desktop_drive_connect(
     client_id: String,
 ) -> Result<DriveSession, String> {
     let client_id = validate_client_id(&client_id)?.to_owned();
-    *state
-        .client_id
-        .lock()
-        .map_err(|_| error("Desktop OAuth state was unavailable."))? = Some(client_id.clone());
+    let generation = state.generation.fetch_add(1, Ordering::AcqRel) + 1;
     state.cancelled.store(false, Ordering::Release);
     let verifier = random_string(64);
     let oauth_state = random_string(48);
@@ -344,6 +358,7 @@ pub async fn desktop_drive_connect(
     })
     .await
     .map_err(|e| error(format!("OAuth callback task failed: {e}")))??;
+    ensure_active(&state, generation)?;
     let response = http_client()?
         .post(TOKEN_ENDPOINT)
         .form(&[
@@ -361,7 +376,18 @@ pub async fn desktop_drive_connect(
         .json::<TokenResponse>()
         .await
         .map_err(|_| error("Google returned an invalid token response."))?;
-    match response.refresh_token {
+    ensure_active(&state, generation)?;
+    let refresh_token = response.refresh_token;
+    let access_token = response.access_token;
+    let expires_in = response.expires_in;
+    let client = http_client()?;
+    let session = account_for(&client, &access_token).await?;
+    let _lifecycle = state
+        .lifecycle
+        .lock()
+        .map_err(|_| error("Desktop OAuth state was unavailable."))?;
+    ensure_active(&state, generation)?;
+    match refresh_token {
         Some(token) => {
             save_refresh_token(&client_id, &token)?;
         }
@@ -371,14 +397,13 @@ pub async fn desktop_drive_connect(
             })?;
         }
     };
-    let client = http_client()?;
-    let session = account_for(&client, &response.access_token).await?;
     *state
         .token
         .lock()
         .map_err(|_| error("Desktop OAuth state was unavailable."))? = Some(Token {
-        access_token: response.access_token,
-        expires_at: now().saturating_add(response.expires_in),
+        access_token,
+        expires_at: now().saturating_add(expires_in),
+        client_id,
     });
     Ok(session)
 }
@@ -388,29 +413,32 @@ pub async fn desktop_drive_access_token(
     state: State<'_, OAuthState>,
     client_id: String,
 ) -> Result<String, String> {
+    let client_id = validate_client_id(&client_id)?.to_owned();
+    let generation = state.generation.load(Ordering::Acquire);
     if let Some(token) = state
         .token
         .lock()
         .map_err(|_| error("Desktop OAuth state was unavailable."))?
-        .clone()
-        .filter(|token| token.expires_at > now().saturating_add(60))
+        .as_ref()
+        .and_then(|token| cached_token(Some(token), &client_id))
     {
-        return Ok(token.access_token);
+        return Ok(token);
     }
-    let client_id = validate_client_id(&client_id)?.to_owned();
     let refresh_token = load_refresh_token(&client_id)?
         .ok_or_else(|| error("Google Drive is disconnected. Connect again."))?;
-    *state
-        .client_id
-        .lock()
-        .map_err(|_| error("Desktop OAuth state was unavailable."))? = Some(client_id.clone());
     let response = refresh_access_token(&refresh_token, &client_id).await?;
+    let _lifecycle = state
+        .lifecycle
+        .lock()
+        .map_err(|_| error("Desktop OAuth state was unavailable."))?;
+    ensure_active(&state, generation)?;
     *state
         .token
         .lock()
         .map_err(|_| error("Desktop OAuth state was unavailable."))? = Some(Token {
         access_token: response.access_token.clone(),
         expires_at: now().saturating_add(response.expires_in),
+        client_id: client_id.clone(),
     });
     if let Some(token) = response.refresh_token {
         save_refresh_token(&client_id, &token)?;
@@ -420,6 +448,7 @@ pub async fn desktop_drive_access_token(
 
 #[tauri::command]
 pub fn desktop_drive_cancel(state: State<'_, OAuthState>) {
+    state.generation.fetch_add(1, Ordering::AcqRel);
     state.cancelled.store(true, Ordering::Release);
 }
 
@@ -428,8 +457,13 @@ pub fn desktop_drive_disconnect(
     state: State<'_, OAuthState>,
     client_id: String,
 ) -> Result<(), String> {
-    let client_id = validate_client_id(&client_id)?;
+    state.generation.fetch_add(1, Ordering::AcqRel);
     state.cancelled.store(true, Ordering::Release);
+    let client_id = validate_client_id(&client_id)?;
+    let _lifecycle = state
+        .lifecycle
+        .lock()
+        .map_err(|_| error("Desktop OAuth state was unavailable."))?;
     *state
         .token
         .lock()
@@ -475,5 +509,31 @@ mod tests {
                 .unwrap_err()
                 .contains("access_denied")
         );
+    }
+
+    #[test]
+    fn cached_access_tokens_are_bound_to_the_requested_client() {
+        let token = Token {
+            access_token: "access".to_owned(),
+            expires_at: now() + 3_600,
+            client_id: "desktop.apps.googleusercontent.com".to_owned(),
+        };
+        assert_eq!(
+            cached_token(Some(&token), "desktop.apps.googleusercontent.com"),
+            Some("access".to_owned())
+        );
+        assert_eq!(
+            cached_token(Some(&token), "other.apps.googleusercontent.com"),
+            None
+        );
+    }
+
+    #[test]
+    fn cancellation_invalidates_an_in_flight_generation() {
+        let state = OAuthState::default();
+        let generation = state.generation.load(Ordering::Acquire);
+        ensure_active(&state, generation).expect("generation starts active");
+        state.generation.fetch_add(1, Ordering::AcqRel);
+        assert!(ensure_active(&state, generation).is_err());
     }
 }
