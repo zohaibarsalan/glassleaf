@@ -6,8 +6,12 @@ import {
 } from "@glassleaf/library";
 import { FlashList } from "@shopify/flash-list";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable } from "react-native";
-import { Box, Chip, Field, Text, usePalette } from "../ui/theme";
+import {
+  ActivityIndicator,
+  Pressable,
+  useWindowDimensions,
+} from "react-native";
+import { Box, Chip, Field, Surface, Text, usePalette } from "../ui/theme";
 const scopes = [
   { label: "All", kind: undefined },
   { label: "Books", kind: "book" },
@@ -33,6 +37,8 @@ export function SearchPanel({
   onRetryIndex: () => void;
 }) {
   const c = usePalette();
+  const { width } = useWindowDimensions();
+  const wide = width >= 700;
   const [term, setTerm] = useState(""),
     [kind, setKind] = useState<SearchHit["kind"]>(),
     [rows, setRows] = useState<SearchHit[]>([]),
@@ -91,44 +97,50 @@ export function SearchPanel({
   }
   return (
     <Box flex={1}>
-      <Box paddingHorizontal="l" gap="m" paddingBottom="m">
-        <Box flexDirection="row" gap="s" alignItems="center">
-          <Text variant="caption" flex={1}>
-            Searching {scopeName}
-          </Text>
-          {scopeName !== "everywhere" && (
-            <Chip label="Everywhere" onPress={onEverywhere} />
+      <Box
+        paddingHorizontal={wide ? "xxl" : "l"}
+        paddingBottom="m"
+        style={{ maxWidth: 920, width: "100%", alignSelf: "center" }}
+      >
+        <Surface subtle style={{ padding: wide ? 16 : 12, gap: 12 }}>
+          <Box flexDirection="row" gap="s" alignItems="center">
+            <Text variant="caption" flex={1} numberOfLines={1}>
+              Searching {scopeName}
+            </Text>
+            {scopeName !== "everywhere" && (
+              <Chip label="Everywhere" onPress={onEverywhere} />
+            )}
+          </Box>
+          <Field
+            label={
+              scope.bookId
+                ? "Search this book"
+                : scopeName === "everywhere"
+                  ? "Search everything"
+                  : "Search this view"
+            }
+            testID="field-Search everything"
+            value={term}
+            onChangeText={setTerm}
+            placeholder="A title, a thought, a line you remember…"
+            autoCorrect={false}
+          />
+          <Box flexDirection="row" flexWrap="wrap" gap="s">
+            {scopes.map((s) => (
+              <Chip
+                key={s.label}
+                label={s.label}
+                active={kind === s.kind}
+                onPress={() => setKind(s.kind)}
+              />
+            ))}
+          </Box>
+          {!!indexStatus && <Text variant="caption">{indexStatus}</Text>}
+          {indexStatus.includes("unavailable") && (
+            <Chip label="Retry chapter indexing" onPress={onRetryIndex} />
           )}
-        </Box>
-        <Field
-          label={
-            scope.bookId
-              ? "Search this book"
-              : scopeName === "everywhere"
-                ? "Search everything"
-                : "Search this view"
-          }
-          testID="field-Search everything"
-          value={term}
-          onChangeText={setTerm}
-          placeholder="A title, a thought, a line you remember…"
-          autoCorrect={false}
-        />
-        <Box flexDirection="row" flexWrap="wrap" gap="s">
-          {scopes.map((s) => (
-            <Chip
-              key={s.label}
-              label={s.label}
-              active={kind === s.kind}
-              onPress={() => setKind(s.kind)}
-            />
-          ))}
-        </Box>
-        {!!indexStatus && <Text variant="caption">{indexStatus}</Text>}
-        {indexStatus.includes("unavailable") && (
-          <Chip label="Retry chapter indexing" onPress={onRetryIndex} />
-        )}
-        {!!error && <Text color="danger">{error}</Text>}
+          {!!error && <Text color="danger">{error}</Text>}
+        </Surface>
       </Box>
       {busy ? (
         <ActivityIndicator color={c.accent} />
@@ -139,18 +151,28 @@ export function SearchPanel({
           data={rows}
           keyExtractor={(r, i) => `${r.bookId}-${r.kind}-${r.locator}-${i}`}
           onEndReached={() => void next()}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
+          contentContainerStyle={{
+            width: "100%",
+            maxWidth: 920,
+            alignSelf: "center",
+            paddingHorizontal: wide ? 40 : 20,
+            paddingBottom: 32,
+            gap: 8,
+          }}
           renderItem={({ item }) => (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`${item.kind}: ${item.title}`}
               onPress={() => void open(item)}
-              style={{
-                paddingVertical: 18,
-                borderBottomWidth: 1,
+              style={({ pressed }) => ({
+                padding: 16,
+                borderRadius: 16,
+                borderWidth: 1,
                 borderColor: c.line,
+                backgroundColor: pressed ? c.muted : c.surface,
                 gap: 6,
-              }}
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
             >
               <Text variant="eyebrow" color="accent">
                 {item.kind === "passage"
