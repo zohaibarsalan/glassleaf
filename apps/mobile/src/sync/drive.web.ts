@@ -1,5 +1,13 @@
 import type { LibraryRepository } from "@glassleaf/library";
 import {
+  connectDrive as connectDesktopDrive,
+  disconnectDrive as disconnectDesktopDrive,
+  driveConfigured as desktopDriveConfigured,
+  isDesktop,
+  prepareDriveAuth as prepareDesktopDriveAuth,
+  syncDrive as syncDesktopDrive,
+} from "./drive.desktop";
+import {
   bookFileReady,
   hasFile,
   hashFile,
@@ -92,14 +100,6 @@ function loadGoogleIdentity() {
   });
   identity = wrapped;
   return identity;
-}
-
-export function prepareDriveAuth() {
-  if (!webClientId)
-    return Promise.reject(
-      new Error("Google OAuth client IDs are not configured in this build."),
-    );
-  return loadGoogleIdentity();
 }
 
 async function accountFor(accessToken: string) {
@@ -199,19 +199,33 @@ const assets = {
 
 const engine = new DriveSyncEngine(auth, assets);
 
-export const driveConfigured = auth.configured;
+export const driveConfigured = isDesktop
+  ? desktopDriveConfigured
+  : auth.configured;
+
+export function prepareDriveAuth() {
+  return isDesktop ? prepareDesktopDriveAuth() : prepareWebDriveAuth();
+}
+
+function prepareWebDriveAuth() {
+  if (!webClientId)
+    return Promise.reject(
+      new Error("Google OAuth client IDs are not configured in this build."),
+    );
+  return loadGoogleIdentity();
+}
 
 export function connectDrive(repo: LibraryRepository) {
-  return engine.connect(repo);
+  return isDesktop ? connectDesktopDrive(repo) : engine.connect(repo);
 }
 
 export function disconnectDrive(repo: LibraryRepository) {
-  return engine.disconnect(repo);
+  return isDesktop ? disconnectDesktopDrive(repo) : engine.disconnect(repo);
 }
 
 export function syncDrive(
   repo: LibraryRepository,
   status: (message: string) => void,
 ) {
-  return engine.sync(repo, status);
+  return isDesktop ? syncDesktopDrive(repo, status) : engine.sync(repo, status);
 }
