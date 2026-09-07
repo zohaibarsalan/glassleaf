@@ -52,7 +52,7 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "web": "expo start --web",
+    "web": "node ../../scripts/prepare-browser-workers.mjs && expo start --web",
     "build:web": "node ../../scripts/build-web-pwa.mjs",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
