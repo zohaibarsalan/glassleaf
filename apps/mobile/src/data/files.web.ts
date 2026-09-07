@@ -8,9 +8,11 @@ import JSZip from "jszip";
 
 const databaseName = "glassleaf-files-v1";
 const storeName = "files";
-const maxArchiveEntries = 50_000;
-const maxArchiveBytes = 2 * 1024 ** 3;
-const maxEntryBytes = 128 * 1024 ** 2;
+// Browser imports share the native archive contract, but use lower caps to
+// avoid turning a tab into a multi-gigabyte decompressor.
+const maxArchiveEntries = 20_000;
+const maxArchiveBytes = 512 * 1024 ** 2;
+const maxEntryBytes = 64 * 1024 ** 2;
 const objectURLs = new Map<string, string>();
 
 type StoredFile = { path: string; blob: Blob };
@@ -36,11 +38,20 @@ async function withStore<T>(
     return await new Promise<T>((resolve, reject) => {
       const transaction = db.transaction(storeName, mode);
       const request = action(transaction.objectStore(storeName));
-      request.onsuccess = () => resolve(request.result);
+      let result!: T;
+      request.onsuccess = () => {
+        // A request can succeed before the transaction is durably committed.
+        // Return only after oncomplete so callers can safely use the result as
+        // evidence that a write survived the transaction.
+        result = request.result;
+      };
       request.onerror = () =>
         reject(request.error ?? new Error("Browser storage failed."));
-      transaction.onerror = () =>
+      transaction.oncomplete = () => resolve(result);
+      const rejectTransaction = () =>
         reject(transaction.error ?? new Error("Browser storage failed."));
+      transaction.onerror = rejectTransaction;
+      transaction.onabort = rejectTransaction;
     });
   } finally {
     db.close();
@@ -120,14 +131,27 @@ export async function readExternal(uri: string) {
   return response.text();
 }
 
-export function hasFile(path: string) {
-  return objectURLs.has(path) || !!cachedCover(path);
+export async function hasFile(path: string) {
+  if (objectURLs.has(path) || !!cachedCover(path)) return true;
+  return Boolean(await readFile(path));
+}
+
+export async function removeFile(path: string) {
+  await withStore("readwrite", (store) => store.delete(path));
+  const url = objectURLs.get(path);
+  if (url) URL.revokeObjectURL(url);
+  objectURLs.delete(path);
+  try {
+    localStorage.removeItem(`glassleaf-cover:${path}`);
+  } catch {
+    // A missing cover cache must not make the canonical file removal fail.
+  }
 }
 
 export async function hashFile(path: string) {
   const file = await readFile(path);
   if (!file) throw new Error("This file is not stored in this browser.");
-  return sha256(file);
+  return md5(file);
 }
 
 export async function installDownload(
@@ -137,7 +161,7 @@ export async function installDownload(
 ) {
   const response = await fetch(url, { headers });
   if (!response.ok) throw new Error(`Download failed (${response.status}).`);
-  await storeFile(path, await response.blob());
+  await storeFile(path, await responseBlob(response));
 }
 
 export function bookFileReady(book: Book) {
@@ -160,7 +184,11 @@ function safePath(path: string) {
   );
 }
 
-async function unpackArchive(id: string, source: Blob) {
+async function unpackArchive(
+  id: string,
+  source: Blob,
+  writtenPaths?: string[],
+) {
   const zip = await JSZip.loadAsync(source);
   const entries = Object.values(zip.files).filter((entry) => !entry.dir);
   if (
@@ -168,17 +196,90 @@ async function unpackArchive(id: string, source: Blob) {
     entries.some((entry) => !safePath(entry.name))
   )
     throw new Error("This archive is unsafe or exceeds the extraction limit.");
-  let total = 0;
+
+  let declaredTotal = 0;
   for (const entry of entries) {
-    const blob = await entry.async("blob");
-    total += blob.size;
-    if (blob.size > maxEntryBytes || total > maxArchiveBytes)
+    const declared = declaredUncompressedSize(entry);
+    if (declared === undefined) continue;
+    if (declared > maxEntryBytes || declaredTotal > maxArchiveBytes - declared)
       throw new Error(
         "This archive is unsafe or exceeds the extraction limit.",
       );
-    await storeFile(`${id}/content/${entry.name}`, blob);
+    declaredTotal += declared;
+  }
+
+  let total = 0;
+  const written = writtenPaths ?? [];
+  for (const entry of entries) {
+    const blob = await readZipEntry(
+      entry,
+      Math.min(maxEntryBytes, maxArchiveBytes - total),
+    );
+    total += blob.size;
+    const path = `${id}/content/${entry.name}`;
+    try {
+      await storeFile(path, blob);
+      written.push(path);
+    } catch (error) {
+      await Promise.allSettled(written.map(removeFile));
+      throw error;
+    }
   }
   return entries;
+}
+
+function declaredUncompressedSize(entry: JSZip.JSZipObject) {
+  const data = (
+    entry as JSZip.JSZipObject & {
+      _data?: { uncompressedSize?: unknown };
+    }
+  )._data;
+  const size = data?.uncompressedSize;
+  return typeof size === "number" && Number.isSafeInteger(size) && size >= 0
+    ? size
+    : undefined;
+}
+
+async function readZipEntry(entry: JSZip.JSZipObject, limit: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    const chunks: ArrayBuffer[] = [];
+    const stream = (
+      entry as JSZip.JSZipObject & {
+        internalStream: (
+          type: "uint8array",
+        ) => JSZip.JSZipStreamHelper<Uint8Array>;
+      }
+    ).internalStream("uint8array");
+    let size = 0;
+    let settled = false;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      stream.pause();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+    stream
+      .on("data", (chunk) => {
+        if (settled) return;
+        size += chunk.byteLength;
+        if (size > limit) {
+          fail(
+            new Error(
+              "This archive is unsafe or exceeds the extraction limit.",
+            ),
+          );
+          return;
+        }
+        chunks.push(copyChunk(chunk));
+      })
+      .on("error", fail)
+      .on("end", () => {
+        if (settled) return;
+        settled = true;
+        resolve(new Blob(chunks));
+      })
+      .resume();
+  });
 }
 
 const parser = new XMLParser({
@@ -212,18 +313,115 @@ function relative(base: string, target: string) {
   return decodeURIComponent(url.pathname.slice(1));
 }
 
-async function sha256(blob: Blob) {
-  const bytes = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-  return Array.from(new Uint8Array(bytes), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
+async function responseBlob(response: Response) {
+  const length = Number(response.headers.get("content-length"));
+  if (Number.isFinite(length) && length > maxArchiveBytes)
+    throw new Error("This file exceeds the browser import limit.");
+  if (!response.body) {
+    const blob = await response.blob();
+    if (blob.size > maxArchiveBytes)
+      throw new Error("This file exceeds the browser import limit.");
+    return blob;
+  }
+  const reader = response.body.getReader();
+  const chunks: ArrayBuffer[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      const chunk = next.value;
+      if (!chunk) break;
+      total += chunk.byteLength;
+      if (total > maxArchiveBytes) {
+        await reader.cancel();
+        throw new Error("This file exceeds the browser import limit.");
+      }
+      chunks.push(copyChunk(chunk));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return new Blob(chunks, { type: response.headers.get("content-type") ?? "" });
+}
+
+function copyChunk(chunk: Uint8Array) {
+  const copy = new ArrayBuffer(chunk.byteLength);
+  new Uint8Array(copy).set(chunk);
+  return copy;
+}
+
+async function md5(blob: Blob) {
+  const input = new Uint8Array(await blob.arrayBuffer());
+  const length = input.length;
+  const paddedLength = (length + 9 + 63) & ~63;
+  const bytes = new Uint8Array(paddedLength);
+  bytes.set(input);
+  bytes[length] = 0x80;
+  const view = new DataView(bytes.buffer);
+  view.setUint32(paddedLength - 8, (length << 3) >>> 0, true);
+  view.setUint32(paddedLength - 4, Math.floor(length / 0x20000000), true);
+
+  const shifts = [
+    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5,
+    9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11,
+    16, 23, 4, 11, 16, 23, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10,
+    15, 21,
+  ];
+  let a0 = 0x67452301;
+  let b0 = 0xefcdab89;
+  let c0 = 0x98badcfe;
+  let d0 = 0x10325476;
+  for (let offset = 0; offset < bytes.length; offset += 64) {
+    const words = Array.from({ length: 16 }, (_, index) =>
+      view.getUint32(offset + index * 4, true),
+    );
+    let a = a0;
+    let b = b0;
+    let c = c0;
+    let d = d0;
+    for (let i = 0; i < 64; i += 1) {
+      let f: number;
+      let g: number;
+      if (i < 16) {
+        f = (b & c) | (~b & d);
+        g = i;
+      } else if (i < 32) {
+        f = (d & b) | (~d & c);
+        g = (5 * i + 1) % 16;
+      } else if (i < 48) {
+        f = b ^ c ^ d;
+        g = (3 * i + 5) % 16;
+      } else {
+        f = c ^ (b | ~d);
+        g = (7 * i) % 16;
+      }
+      const k = Math.floor(Math.abs(Math.sin(i + 1)) * 0x100000000);
+      const rotated = (a + f + k + words[g]!) >>> 0;
+      const shift = shifts[i]!;
+      const next =
+        (b + ((rotated << shift) | (rotated >>> (32 - shift)))) >>> 0;
+      a = d;
+      d = c;
+      c = b;
+      b = next;
+    }
+    a0 = (a0 + a) >>> 0;
+    b0 = (b0 + b) >>> 0;
+    c0 = (c0 + c) >>> 0;
+    d0 = (d0 + d) >>> 0;
+  }
+  return [a0, b0, c0, d0]
+    .flatMap((word) => [0, 8, 16, 24].map((shift) => (word >>> shift) & 0xff))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function selectedBlob(uri: string) {
   const response = await fetch(uri);
   if (!response.ok)
     throw new Error(`Could not read the selected file (${response.status}).`);
-  return response.blob();
+  return responseBlob(response);
 }
 
 export async function importBook(
@@ -240,11 +438,12 @@ export async function importBook(
   const original = await selectedBlob(uri);
   if (!original.size) throw new Error("This file is empty.");
   if (original.size > maxArchiveBytes)
-    throw new Error("This file exceeds the 2 GB browser import limit.");
+    throw new Error("This file exceeds the browser import limit.");
 
   const id = crypto.randomUUID();
   const originalPath = `${id}/original.${format}`;
   await storeFile(originalPath, original);
+  const extractedPaths: string[] = [];
 
   try {
     let title = filename.replace(/\.[^.]+$/, "").replaceAll("_", " ");
@@ -262,7 +461,7 @@ export async function importBook(
       )
         throw new Error("This file is not a PDF.");
     } else {
-      const entries = await unpackArchive(id, original);
+      const entries = await unpackArchive(id, original, extractedPaths);
       if (format === "cbz") {
         pages.push(
           ...entries
@@ -353,10 +552,6 @@ export async function importBook(
       }
     }
 
-    if (cover) {
-      const coverBlob = await readFile(cover);
-      if (coverBlob) await cacheCover(cover, coverBlob);
-    }
     const now = new Date().toISOString();
     const book = bookSchema.parse({
       id,
@@ -383,7 +578,7 @@ export async function importBook(
       deletedAt: null,
       asset: {
         path: originalPath,
-        hash: await sha256(original),
+        hash: await md5(original),
         bytes: original.size,
         cover,
         pages,
@@ -391,9 +586,15 @@ export async function importBook(
       },
     });
     await repository.add(book);
+    if (cover) {
+      const coverBlob = await readFile(cover);
+      if (coverBlob) await cacheCover(cover, coverBlob);
+    }
     return book;
   } catch (error) {
-    // IndexedDB does not provide recursive deletion; retained orphaned files are safe and can be reclaimed by browser storage controls.
+    await Promise.allSettled(
+      [originalPath, ...extractedPaths].map((path) => removeFile(path)),
+    );
     throw error;
   }
 }
