@@ -448,6 +448,10 @@ pub async fn desktop_drive_access_token(
 
 #[tauri::command]
 pub fn desktop_drive_cancel(state: State<'_, OAuthState>) {
+    let _lifecycle = state
+        .lifecycle
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
     state.generation.fetch_add(1, Ordering::AcqRel);
     state.cancelled.store(true, Ordering::Release);
 }
