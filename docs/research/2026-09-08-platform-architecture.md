@@ -17,7 +17,7 @@ This meets the free/local-first requirement without adding a hosted identity dat
 
 - `apps/mobile` is Expo SDK 57 / React Native 0.86 with `expo-sqlite`; the SQLite database is the local source of truth.
 - `packages/library` exposes a small `SQL` interface and the repository already owns revisions, tombstones, outbox, conflicts, organization records, and FTS5 search.
-- `apps/mobile/src/sync/drive.ts` and `drive.web.ts` now share the Drive engine. Native Google Sign-In and browser GIS both request `drive.file`; browser access tokens are memory-only and require an explicit reconnect after expiry. Tauri builds currently remove the web client ID and disable Drive until a native OAuth bridge exists.
+- `apps/mobile/src/sync/drive.ts` and `drive.web.ts` now share the Drive engine. Native Google Sign-In and browser GIS both request `drive.file`; browser access tokens are memory-only and require an explicit reconnect after expiry. Tauri builds remove the web client ID and select a separate Rust installed-app PKCE bridge when a Desktop client ID is configured.
 - Native readers still use `react-native-webview`/`react-native-pdf` and native file APIs; the web path now has browser EPUB/PDF/CBZ readers backed by IndexedDB/OPFS assets. Browser annotations and physical iPhone storage/OAuth behavior remain validation gaps.
 - `apps/apple` has a separate Swift/CloudKit implementation. Treat it as an existing product/compatibility surface while the new cross-platform path is validated; do not share CloudKit and Drive cursors or run two writers against one library.
 
@@ -58,9 +58,9 @@ The current SAH-pool deployment has no COOP/COEP-versus-GIS header conflict beca
 
 ### Desktop
 
-Package the browser export in Tauri. Tauri supplies platform installers and signing paths for macOS, Windows, and Linux, while the UI remains the same React Native Web UI. Give Tauri a narrow bridge for native file import, large asset storage, secure credential storage, and optional system file associations. The current desktop build deliberately removes the web client ID, so it has no Drive UI or OAuth claim. The future bridge should use a Google **Desktop application** client, a random-port loopback redirect such as `http://127.0.0.1:<port>`, PKCE S256, state validation, and the authorization-code exchange. Store the refresh token in Tauri Stronghold or an OS keychain; never put it in the web database or localStorage. Do not use a web client ID or register `tauri://` as a JavaScript origin.
+Package the browser export in Tauri. Tauri supplies platform installers and signing paths for macOS, Windows, and Linux, while the UI remains the same React Native Web UI. The desktop build deliberately removes the web client ID and selects a narrow Rust OAuth bridge when `EXPO_PUBLIC_GOOGLE_DESKTOP_CLIENT_ID` is configured. That bridge uses a Google **Desktop application** client, a random-port loopback redirect such as `http://127.0.0.1:<port>/callback`, PKCE S256, state validation, and the authorization-code exchange. It opens the system browser, stores the refresh token in the platform keychain, and exposes only memory access tokens to the web adapter. Do not use a web client ID, put tokens in the web database/localStorage, or register `tauri://` as a JavaScript origin. The bridge and callback tests compile, but live Drive use remains unverified until a registered Google project/client is exercised.
 
-This is a packaging decision, not a promise of identical native capabilities: the Tauri WebView and browser still require the browser reader adapters. Code signing/notarization, WebView2/WebKit prerequisites, a Rust/Stronghold bridge, loopback listener, token refresh, and Google Desktop client registration are release work.
+This is a packaging decision, not a promise of identical native capabilities: the Tauri WebView and browser still require the browser reader adapters. Code signing/notarization, WebView2/WebKit prerequisites, platform keychain behavior, loopback listener, token refresh, and Google Desktop client registration remain release validation work.
 
 ## Clerk versus WorkOS
 
@@ -96,7 +96,7 @@ If an independent Glassleaf account becomes necessary, choose Clerk first for th
 - iOS client for bundle `app.glassleaf.mobile`.
 - Android client for package `app.glassleaf.mobile` and every debug/release signing SHA-1.
 - Web client and authorized JavaScript origins/redirect behavior.
-- Desktop client/redirect choice for Tauri (loopback versus custom scheme).
+- Desktop Google OAuth client registration and live loopback callback/token-refresh validation for Tauri.
 - Whether Glassleaf needs only `drive.file` (current visible Glassleaf folder/batches) or an app-private `drive.appdata` record in addition. Do not broaden to `drive`/`drive.readonly` without a product requirement and verification plan.
 - Hosting that can supply HTTPS, PWA manifest/service worker, and the exact authorized JavaScript origins for browser GIS. Cross-origin isolation headers are only needed if the web SQLite adapter changes back to a mode that requires them.
 - No Clerk or WorkOS instance/keys are configured. Keep them out of the initial implementation until the independent-account requirement is explicit.

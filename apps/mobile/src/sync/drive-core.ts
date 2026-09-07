@@ -227,12 +227,12 @@ export class DriveSyncEngine {
   ) {
     const account = await repo.setting("drive-account");
     if (!account) throw new Error("Connect Google Drive first.");
+    await this.auth.accessToken(false);
     const current = this.auth.account();
     if (current && current.id !== account)
       throw new Error(
         "Google account changed. Reconnect the library’s original account.",
       );
-    await this.auth.accessToken(false);
 
     const batches = await this.listFiles("batch");
     for (const [index, batch] of batches.entries()) {

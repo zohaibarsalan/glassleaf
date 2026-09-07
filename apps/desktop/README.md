@@ -5,11 +5,12 @@ Native Web export used by the PWA. The WebView keeps imported books and reader
 state in the web adapter's local SQLite/OPFS and IndexedDB stores, so the shell
 does not add a second filesystem or reader implementation.
 
-The Rust side intentionally registers no commands and no plugins. The only
-capability attached to the main window has an empty permission list, which
-keeps filesystem, shell, HTTP, and remote command APIs unavailable to the
-frontend. This follows Tauri's capability model, where permissions are granted
-per window and scopes are explicit:
+The Rust side registers only the narrow Google Drive OAuth commands needed by
+the desktop adapter. The only capability attached to the main window still has
+an empty permission list, which keeps filesystem, shell, HTTP, and unrelated
+remote command APIs unavailable to the frontend. This follows Tauri's
+capability model, where permissions are granted per window and scopes are
+explicit:
 
 - [Tauri capabilities](https://v2.tauri.app/security/capabilities/)
 - [Tauri permissions](https://v2.tauri.app/security/permissions/)
@@ -25,15 +26,17 @@ pnpm tauri:build
 ```
 
 `build-web.mjs` removes `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` before exporting.
-Google Identity Services does not support the installed Tauri origin, so Drive
-sync is deliberately disabled in the installed desktop app. A future desktop
-sync implementation should use a Google **Desktop application** OAuth client,
-a random-port loopback redirect (`http://127.0.0.1:<port>`), PKCE S256, and state
-validation. Exchange the code at Google’s token endpoint and keep the refresh
-token in Tauri Stronghold or the platform keychain. Do not use the browser web
-client ID, register `tauri://` as a JavaScript origin, or put tokens in the web
-database/localStorage. Until that Rust bridge and Google Desktop client are
-registered, this wrapper does not claim Drive support.
+Google Identity Services does not support the installed Tauri origin, so the
+desktop adapter uses a separate Google **Desktop application** OAuth client,
+random-port loopback redirect (`http://127.0.0.1:<port>/callback`), PKCE S256, and state
+validation. Rust exchanges the code at Google’s token endpoint, keeps the
+short-lived access token in memory, and stores the refresh token in the
+platform keychain. Set the public
+`EXPO_PUBLIC_GOOGLE_DESKTOP_CLIENT_ID` when exporting the web bundle; no client
+secret belongs in the app. The bridge and callback tests are build-validated,
+but no live Drive claim is made until a Google project/client is registered and
+tested. Do not use the browser web client ID, register `tauri://` as a
+JavaScript origin, or put tokens in the web database/localStorage.
 
 References: [Google installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app),
 [Google loopback guidance](https://developers.google.com/identity/protocols/oauth2/resources/loopback-migration),

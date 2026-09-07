@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 const cwd = fileURLToPath(new URL(".", import.meta.url));
 const env = { ...process.env };
 
-// Google Identity Services does not support the installed Tauri origin. Keep
-// Drive hidden in this bundle until a native PKCE flow exists.
+// Google Identity Services does not support the installed Tauri origin. The
+// desktop bundle uses its Rust installed-app PKCE bridge instead.
 delete env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 execFileSync(
