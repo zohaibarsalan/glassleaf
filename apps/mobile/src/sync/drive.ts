@@ -28,6 +28,7 @@ export const driveConfigured =
   (Platform.OS !== "ios" || !!iosClientId);
 
 let configured = false;
+let accountState: DriveAccount | undefined;
 function configure() {
   if (!driveConfigured)
     throw new Error(
@@ -49,11 +50,14 @@ const auth: DriveAuth = {
     await GoogleSignin.hasPlayServices();
     const response = await GoogleSignin.signIn();
     if (!isSuccessResponse(response)) throw new Error("Sign-in was cancelled.");
-    return { id: response.data.user.id, email: response.data.user.email };
+    const account = await accountFor(await GoogleSignin.getTokens());
+    accountState = account;
+    return account;
   },
   async disconnect() {
     configure();
     await GoogleSignin.signOut();
+    accountState = undefined;
   },
   async accessToken(interactive) {
     configure();
@@ -70,13 +74,32 @@ const auth: DriveAuth = {
         throw new Error("Google sign-in expired. Reconnect your account.");
       }
     }
-    return (await GoogleSignin.getTokens()).accessToken;
+    const tokens = await GoogleSignin.getTokens();
+    if (!accountState) accountState = await accountFor(tokens);
+    return tokens.accessToken;
   },
   account() {
-    const user = GoogleSignin.getCurrentUser()?.user;
-    return user ? { id: user.id, email: user.email } : undefined;
+    return accountState;
   },
 };
+
+async function accountFor(tokens: { accessToken: string }) {
+  const response = await expoFetch(
+    "https://www.googleapis.com/drive/v3/about?fields=user(permissionId,emailAddress)",
+    { headers: { Authorization: `Bearer ${tokens.accessToken}` } },
+  );
+  if (!response.ok)
+    throw new Error("Google sign-in did not return a Drive account.");
+  const data = (await response.json()) as {
+    user?: { permissionId?: string; emailAddress?: string };
+  };
+  if (!data.user?.permissionId)
+    throw new Error("Google did not return a valid Drive account.");
+  return {
+    id: data.user.permissionId,
+    email: data.user.emailAddress,
+  };
+}
 
 const assets = {
   hasFile,
