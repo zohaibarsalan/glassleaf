@@ -5,6 +5,13 @@ export type DriveSyncScheduler = {
   dispose(): void;
 };
 
+export function isDriveOnline(
+  platform: string,
+  navigatorOnline: boolean | undefined,
+) {
+  return platform !== "web" || navigatorOnline !== false;
+}
+
 export function createDriveSyncScheduler({
   hasPending,
   isOnline = () => true,
@@ -40,13 +47,15 @@ export function createDriveSyncScheduler({
     const current = new Set(triggers);
     triggers.clear();
     try {
-      if (!isOnline()) return;
+      if (disposed || !isOnline()) return;
       const remoteTrigger = ["startup", "foreground", "online"].some((key) =>
         current.has(key as DriveSyncTrigger),
       );
       if (!remoteTrigger && !(await hasPending())) return;
-      if (await sync()) onSynced();
+      const synced = await sync();
+      if (!disposed && synced) onSynced();
     } catch (error) {
+      if (disposed) return;
       blocked = true;
       onError(error);
     } finally {
