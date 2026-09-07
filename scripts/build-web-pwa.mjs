@@ -1,8 +1,8 @@
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import { pwaCacheId } from "./pwa-cache-id.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const output = join(root, "apps/mobile/dist");
@@ -43,18 +43,27 @@ async function files(directory) {
   return nested.flat();
 }
 
-const precache = (await files(output))
-  .map((file) => `/${relative(output, file).split(sep).join("/")}`)
+const precacheFiles = (await files(output))
+  .map((file) => ({
+    file,
+    path: `/${relative(output, file).split(sep).join("/")}`,
+  }))
   .filter(
-    (file) =>
-      /\.(?:html|m?js|wasm|ttf|ico|json)$/.test(file) && file !== "/sw.js",
+    ({ path }) =>
+      /\.(?:html|m?js|wasm|ttf|ico|json)$/.test(path) && path !== "/sw.js",
   )
-  .sort();
+  .sort((left, right) => left.path.localeCompare(right.path));
+const precache = precacheFiles.map(({ path }) => path);
 const source = await readFile(join(root, "apps/mobile/public/sw.js"), "utf8");
-const cacheId = `glassleaf-shell-${createHash("sha256")
-  .update(JSON.stringify(precache))
-  .digest("hex")
-  .slice(0, 16)}`;
+const cacheId = pwaCacheId(
+  source,
+  await Promise.all(
+    precacheFiles.map(async ({ file, path }) => ({
+      path,
+      bytes: await readFile(file),
+    })),
+  ),
+);
 if (!source.includes('const CACHE = "glassleaf-shell-dev";')) {
   throw new Error("Service worker cache placeholder is missing.");
 }
