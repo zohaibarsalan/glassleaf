@@ -35,3 +35,8 @@ apps/mobile/android/
 
 # Downloaded reader compatibility corpus
 /outputs/compatibility/
+
+# Generated browser workers
+/apps/mobile/public/glassleaf-sqlite-worker.mjs
+/apps/mobile/public/sqlite3.wasm
+/apps/mobile/public/pdf.worker.min.mjs

@@ -24,7 +24,13 @@
       "package": "app.glassleaf.mobile"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Glassleaf",
+      "shortName": "Glassleaf",
+      "themeColor": "#264839",
+      "backgroundColor": "#f8f7f1"
     },
     "plugins": [
       "expo-sqlite",
