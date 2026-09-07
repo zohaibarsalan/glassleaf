@@ -27,8 +27,17 @@ pnpm tauri:build
 `build-web.mjs` removes `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` before exporting.
 Google Identity Services does not support the installed Tauri origin, so Drive
 sync is deliberately disabled in the installed desktop app. A future desktop
-sync implementation should use a native OAuth authorization-code + PKCE flow;
-this wrapper does not claim Drive support.
+sync implementation should use a Google **Desktop application** OAuth client,
+a random-port loopback redirect (`http://127.0.0.1:<port>`), PKCE S256, and state
+validation. Exchange the code at Google’s token endpoint and keep the refresh
+token in Tauri Stronghold or the platform keychain. Do not use the browser web
+client ID, register `tauri://` as a JavaScript origin, or put tokens in the web
+database/localStorage. Until that Rust bridge and Google Desktop client are
+registered, this wrapper does not claim Drive support.
+
+References: [Google installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app),
+[Google loopback guidance](https://developers.google.com/identity/protocols/oauth2/resources/loopback-migration),
+and [Tauri Stronghold](https://v2.tauri.app/reference/javascript/stronghold/).
 
 For local development:
 
