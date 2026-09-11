@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Glassleaf",
+  "version": "0.1.0",
+  "identifier": "app.glassleaf.desktop",
+  "build": {
+    "beforeDevCommand": "node dev-web.mjs",
+    "beforeBuildCommand": "node build-web.mjs",
+    "devUrl": "http://localhost:8081",
+    "frontendDist": "../../mobile/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Glassleaf",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 900,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "capabilities": ["main-capability"],
+      "csp": "default-src 'self'; connect-src 'self' blob:; img-src 'self' asset: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; font-src 'self' asset: data:; frame-src 'self' blob:",
+      "devCsp": "default-src 'self' http://localhost:8081; connect-src 'self' http://localhost:8081 ws://localhost:8081 blob:; img-src 'self' http://localhost:8081 asset: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' http://localhost:8081 'wasm-unsafe-eval'; worker-src 'self' http://localhost:8081 blob:; font-src 'self' http://localhost:8081 asset: data:; frame-src 'self' http://localhost:8081 blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": ["icons/icon.png"],
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    }
+  }
+}

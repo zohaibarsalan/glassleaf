@@ -4,10 +4,12 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "mobile": "pnpm --filter @glassleaf/mobile start",
+    "web:build": "pnpm --filter @glassleaf/mobile build:web",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @glassleaf/library test && pnpm --filter @glassleaf/mcp test && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-mobile-themes.ts && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-reader-locations.ts",
+    "test": "pnpm --filter @glassleaf/library test && pnpm --filter @glassleaf/mcp test && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-mobile-themes.ts && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-reader-locations.ts && pnpm test:sync",
     "mcp": "pnpm --filter @glassleaf/mcp start",
-    "format:check": "prettier --check apps/mobile/App.tsx \"apps/mobile/src/**/*.{ts,tsx}\" \"packages/{library,mcp}/src/*.ts\""
+    "format:check": "prettier --check apps/mobile/App.tsx \"apps/mobile/src/**/*.{ts,tsx}\" \"packages/{library,mcp}/src/*.ts\"",
+    "test:sync": "pnpm --filter @glassleaf/library exec tsx --test ../../apps/mobile/src/sync/drive-core.test.ts ../../apps/mobile/src/sync/drive-scheduler.test.ts"
   },
   "devDependencies": {
     "prettier": "^3.9.6"

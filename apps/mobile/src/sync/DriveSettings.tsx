@@ -6,6 +6,7 @@ import {
   connectDrive,
   disconnectDrive,
   driveConfigured,
+  prepareDriveAuth,
   syncDrive,
 } from "./drive";
 export function DriveSettings({
@@ -18,9 +19,31 @@ export function DriveSettings({
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [authReady, setAuthReady] = useState(!driveConfigured);
+  const [authError, setAuthError] = useState("");
+  async function ensureAuthReady() {
+    setAuthError("");
+    try {
+      await prepareDriveAuth();
+      setAuthReady(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Google sign-in could not load.";
+      setAuthError(message);
+      throw error;
+    }
+  }
   useEffect(() => {
     void repo.setting("drive-account").then((value) => setConnected(!!value));
   }, [repo]);
+  useEffect(() => {
+    if (!driveConfigured) return;
+    setAuthReady(false);
+    setAuthError("");
+    void ensureAuthReady().catch(() => undefined);
+  }, []);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     try {
@@ -44,9 +67,13 @@ export function DriveSettings({
         <>
           <Button
             icon={connected ? RefreshCw : Cloud}
-            disabled={busy}
+            disabled={busy || (!authReady && !authError)}
             onPress={() =>
               void run(async () => {
+                if (!authReady) {
+                  await ensureAuthReady();
+                  return;
+                }
                 if (!connected) {
                   await connectDrive(repo);
                   setConnected(true);
@@ -59,9 +86,13 @@ export function DriveSettings({
           >
             {busy
               ? "Working…"
-              : connected
-                ? "Sync now"
-                : "Connect Google Drive"}
+              : authError
+                ? "Retry Google setup"
+                : !authReady
+                  ? "Preparing Google sign-in…"
+                  : connected
+                    ? "Sync now"
+                    : "Connect Google Drive"}
           </Button>
           {connected && (
             <Button
@@ -91,6 +122,7 @@ export function DriveSettings({
           </Text>
         </Box>
       )}
+      {!!authError && <Text color="danger">{authError}</Text>}
       {!!status && <Text variant="caption">{status}</Text>}
     </Box>
   );

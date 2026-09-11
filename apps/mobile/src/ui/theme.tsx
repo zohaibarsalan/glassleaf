@@ -12,14 +12,16 @@ import {
   TextInput,
   View,
   useWindowDimensions,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from "react-native";
 
 const paper = builtinThemes[0]!.colors;
 export const base = createTheme({
   colors: paper,
   spacing: { none: 0, xs: 4, s: 8, m: 12, l: 20, xl: 28, xxl: 40 },
-  borderRadii: { s: 8, m: 14, l: 22, pill: 999 },
+  borderRadii: { s: 10, m: 16, l: 24, pill: 999 },
   textVariants: {
     defaults: { fontFamily: "DM", fontSize: 15, lineHeight: 22, color: "text" },
     title: { fontFamily: "Lora", fontSize: 27, lineHeight: 35, color: "text" },
@@ -63,6 +65,54 @@ export const themeNames: Record<string, string> = Object.fromEntries(
 export const Box = createBox<Theme>();
 export const Text = createText<Theme>();
 export const usePalette = () => useTheme<Theme>().colors;
+
+/**
+ * A semantic content surface shared by the library, organization and settings
+ * flows. It deliberately only relies on palette roles so imported community
+ * themes keep the same hierarchy as the built-in palettes.
+ */
+export function Surface({
+  children,
+  subtle,
+  style,
+}: PropsWithChildren<{
+  subtle?: boolean;
+  style?: StyleProp<ViewStyle>;
+}>) {
+  const c = usePalette();
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: subtle ? c.muted : c.surface,
+          borderColor: c.line,
+          borderWidth: 1,
+          borderRadius: 16,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+export function SectionHeading({
+  title,
+  action,
+}: {
+  title: string;
+  action?: ReactNode;
+}) {
+  return (
+    <Box flexDirection="row" alignItems="center" gap="m">
+      <Text variant="eyebrow" flex={1}>
+        {title}
+      </Text>
+      {action}
+    </Box>
+  );
+}
 export function IconButton({
   icon: Icon,
   label,
@@ -95,6 +145,7 @@ export function IconButton({
             ? c.muted
             : "transparent",
         opacity: disabled ? 0.35 : 1,
+        transform: [{ scale: pressed && !disabled ? 0.96 : 1 }],
       })}
     >
       <Icon size={21} color={active ? c.accent : c.text} strokeWidth={1.7} />
@@ -107,16 +158,19 @@ export function Button({
   icon: Icon,
   secondary,
   disabled,
+  accessibilityLabel,
 }: PropsWithChildren<{
   onPress: () => void;
   icon?: LucideIcon;
   secondary?: boolean;
   disabled?: boolean;
+  accessibilityLabel?: string;
 }>) {
   const c = usePalette();
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => ({
@@ -129,7 +183,8 @@ export function Button({
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: secondary ? c.muted : c.accent,
-        opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
+        opacity: disabled ? 0.45 : 1,
+        transform: [{ scale: pressed && !disabled ? 0.96 : 1 }],
       })}
     >
       {Icon && <Icon size={18} color={secondary ? c.text : c.onAccent} />}
@@ -191,7 +246,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
             backgroundColor: c.muted,
             color: c.text,
             fontFamily: "DM",
-            fontSize: 15,
+            fontSize: 16,
             borderRadius: 12,
             padding: 14,
             minHeight: 48,
@@ -244,6 +299,8 @@ export function Sheet({
             maxHeight: "90%",
             flexShrink: 1,
             backgroundColor: c.bg,
+            borderColor: c.line,
+            borderWidth: 1,
             borderRadius: 24,
             paddingBottom: width > 700 ? 20 : 34,
           }}

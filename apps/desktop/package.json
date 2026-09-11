@@ -1,0 +1,9 @@
+{
+  "name": "@glassleaf/desktop",
+  "private": true,
+  "scripts": {
+    "tauri:dev": "cargo tauri dev",
+    "tauri:build": "cargo tauri build",
+    "web:build": "node build-web.mjs"
+  }
+}
