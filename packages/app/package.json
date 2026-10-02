@@ -1,10 +1,15 @@
 {
-  "name": "@glassleaf/mobile",
+  "name": "@glassleaf/app",
   "version": "0.1.0",
-  "main": "index.ts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/App.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
-    "@config-plugins/react-native-blob-util": "^14.0.2",
-    "@config-plugins/react-native-pdf": "^14.0.2",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/lora": "^0.4.2",
     "@glassleaf/library": "workspace:*",
@@ -43,22 +48,11 @@
     "react-native-zip-archive": "^9.5.1",
     "sanitize-html": "^2.17.7",
     "yaml": "^2.9.0",
-    "zod": "^4.5.4",
-    "@glassleaf/app": "workspace:*"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
     "@types/sanitize-html": "^2.16.1",
     "typescript": "~6.0.3"
-  },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "web": "pnpm --filter @glassleaf/web dev",
-    "build:web": "pnpm --filter @glassleaf/web build",
-    "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit",
-    "samples": "EXPO_PUBLIC_SAMPLE_LIBRARY=1 expo start"
-  },
-  "private": true
+  }
 }

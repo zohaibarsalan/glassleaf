@@ -37,6 +37,9 @@ apps/mobile/android/
 /outputs/compatibility/
 
 # Generated browser workers
-/apps/mobile/public/glassleaf-sqlite-worker.mjs
-/apps/mobile/public/sqlite3.wasm
-/apps/mobile/public/pdf.worker.min.mjs
+/apps/web/public/glassleaf-sqlite-worker.mjs
+/apps/web/public/sqlite3.wasm
+/apps/web/public/pdf.worker.min.mjs
+
+# Local validation artifacts
+/outputs/app-system/

@@ -8,22 +8,8 @@ const env = { ...process.env };
 // desktop bundle uses its Rust installed-app PKCE bridge instead.
 delete env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
-execFileSync(
-  "pnpm",
-  [
-    "--dir",
-    "../mobile",
-    "exec",
-    "expo",
-    "export",
-    "--platform",
-    "web",
-    "--output-dir",
-    "dist",
-  ],
-  {
-    cwd,
-    env,
-    stdio: "inherit",
-  },
-);
+execFileSync("pnpm", ["--filter", "@glassleaf/web", "build"], {
+  cwd,
+  env,
+  stdio: "inherit",
+});

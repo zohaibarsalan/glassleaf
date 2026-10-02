@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Glassleaf",
+    "slug": "glassleaf-web",
+    "version": "0.1.0",
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "../mobile/assets/favicon.png"
+    }
+  }
+}
