@@ -1,3 +1,5 @@
+import { BrowserFileStore, type FileRecord } from "./blob-store";
+import { opfsDisk } from "./opfs-disk.web";
 import {
   bookSchema,
   type Book,
@@ -15,7 +17,25 @@ const maxArchiveBytes = 512 * 1024 ** 2;
 const maxEntryBytes = 64 * 1024 ** 2;
 const objectURLs = new Map<string, string>();
 
-type StoredFile = { path: string; blob: Blob };
+const fileStore = new BrowserFileStore(
+  {
+    get: (path) =>
+      withStore(
+        "readonly",
+        (store) => store.get(path) as IDBRequest<FileRecord | undefined>,
+      ),
+    put: async (record) => {
+      await withStore("readwrite", (store) => store.put(record));
+    },
+    remove: async (path) => {
+      await withStore("readwrite", (store) => store.delete(path));
+    },
+  },
+  typeof navigator !== "undefined" &&
+    typeof navigator.storage?.getDirectory === "function"
+    ? opfsDisk
+    : undefined,
+);
 
 function openFilesDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -59,18 +79,12 @@ async function withStore<T>(
 }
 
 async function storeFile(path: string, blob: Blob) {
-  await withStore("readwrite", (store) =>
-    store.put({ path, blob } satisfies StoredFile),
-  );
+  await fileStore.set(path, blob);
   setObjectURL(path, blob);
 }
 
-export async function readFile(path: string): Promise<Blob | undefined> {
-  const record = await withStore(
-    "readonly",
-    (store) => store.get(path) as IDBRequest<StoredFile | undefined>,
-  );
-  return record?.blob;
+export function readFile(path: string): Promise<Blob | undefined> {
+  return fileStore.get(path);
 }
 
 function setObjectURL(path: string, blob: Blob) {
@@ -98,7 +112,7 @@ async function cacheCover(path: string, blob: Blob) {
     });
     localStorage.setItem(`glassleaf-cover:${path}`, value);
   } catch {
-    // Covers are an enhancement. IndexedDB remains the canonical local copy.
+    // Covers are an enhancement. The file store remains the canonical local copy.
   }
 }
 
@@ -132,12 +146,11 @@ export async function readExternal(uri: string) {
 }
 
 export async function hasFile(path: string) {
-  if (objectURLs.has(path) || !!cachedCover(path)) return true;
   return Boolean(await readFile(path));
 }
 
 export async function removeFile(path: string) {
-  await withStore("readwrite", (store) => store.delete(path));
+  await fileStore.remove(path);
   const url = objectURLs.get(path);
   if (url) URL.revokeObjectURL(url);
   objectURLs.delete(path);
@@ -164,8 +177,11 @@ export async function installDownload(
   await storeFile(path, await responseBlob(response));
 }
 
-export function bookFileReady(book: Book) {
-  return hasFile(book.asset.path);
+export async function bookFileReady(book: Book) {
+  return (
+    (await hasFile(book.asset.path)) &&
+    (book.format === "pdf" || (await hasFile(`${book.id}/ready`)))
+  );
 }
 
 export async function unpack(book: Book) {
@@ -225,6 +241,9 @@ async function unpackArchive(
       throw error;
     }
   }
+  const ready = `${id}/ready`;
+  await storeFile(ready, new Blob(["1"]));
+  written.push(ready);
   return entries;
 }
 
