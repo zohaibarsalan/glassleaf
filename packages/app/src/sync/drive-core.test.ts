@@ -53,7 +53,9 @@ function assets(overrides: Partial<DriveAssets> = {}): DriveAssets {
   };
 }
 
-function listResponse() {
+function listResponse(url?: unknown) {
+  if (String(url).includes("/changes/startPageToken"))
+    return new Response(JSON.stringify({ startPageToken: "start" }));
   return new Response(JSON.stringify({ files: [] }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
@@ -80,16 +82,16 @@ test("rejects connecting a different Google account", async () => {
 test("coalesces concurrent sync calls for one local repository", async () => {
   const { repo } = repository({ "drive-account": "account-a" });
   let calls = 0;
-  const engine = new DriveSyncEngine(auth(), assets(), async () => {
+  const engine = new DriveSyncEngine(auth(), assets(), async (url) => {
     calls++;
     await new Promise((resolve) => setTimeout(resolve, 1));
-    return listResponse();
+    return listResponse(url);
   });
   const first = engine.sync(repo, () => undefined);
   const second = engine.sync(repo, () => undefined);
   assert.strictEqual(first, second);
   await first;
-  assert.equal(calls, 3);
+  assert.equal(calls, 4);
 });
 
 test("does not require a deleted book's original before uploading its tombstone", async () => {
@@ -148,7 +150,7 @@ test("does not require a deleted book's original before uploading its tombstone"
       if (init?.method === "PUT") return new Response(null, { status: 200 });
       if (address.endsWith("/drive/v3/files") && init?.method === "POST")
         return new Response(JSON.stringify({ id: "folder" }), { status: 200 });
-      return listResponse();
+      return listResponse(url);
     },
   );
   (repo.acknowledge as unknown as (records: Book[]) => Promise<void>) =
@@ -230,7 +232,7 @@ test("removes a corrupted download before reporting checksum failure", async () 
           }),
           { status: 200 },
         );
-      return listResponse();
+      return listResponse(url);
     },
   );
   await assert.rejects(() => engine.sync(repo, () => undefined), /checksum/);
