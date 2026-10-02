@@ -39,12 +39,35 @@ export type DriveFetch = typeof fetch;
 const driveFileSchema = z.object({
   id: z.string(),
   appProperties: z.record(z.string(), z.string()).optional(),
+  trashed: z.boolean().optional(),
 });
 const fileListSchema = z.object({
   files: z.array(driveFileSchema),
   nextPageToken: z.string().optional(),
 });
 type DriveFile = z.infer<typeof driveFileSchema>;
+
+const catalogSchema = z.object({
+  version: z.literal(1),
+  cursor: z.string().min(1),
+  files: z.array(driveFileSchema),
+});
+const changesSchema = z.object({
+  changes: z.array(
+    z.object({
+      fileId: z.string(),
+      removed: z.boolean().optional(),
+      file: driveFileSchema.optional(),
+    }),
+  ),
+  nextPageToken: z.string().optional(),
+  newStartPageToken: z.string().optional(),
+});
+class DriveRequestError extends Error {
+  constructor(readonly status: number) {
+    super(`Google Drive request failed (${status}).`);
+  }
+}
 
 function isValidHash(value: string) {
   return /^[a-f0-9]{32}$/i.test(value);
@@ -120,7 +143,7 @@ export class DriveSyncEngine {
           "Google Drive denied access. Check available storage and the app’s Drive permission.",
         );
       if ((response.status !== 429 && response.status < 500) || attempt >= 2)
-        throw new Error(`Google Drive request failed (${response.status}).`);
+        throw new DriveRequestError(response.status);
       await new Promise((resolve) =>
         setTimeout(resolve, Math.min(2 ** attempt * 500, 2_000)),
       );
@@ -144,6 +167,84 @@ export class DriveSyncEngine {
       pageToken = result.nextPageToken;
     } while (pageToken);
     return files;
+  }
+
+  /** Capture the cursor before listing, so uploads arriving during bootstrap are replayed. */
+  private async bootstrapCatalog() {
+    const { startPageToken } = z
+      .object({ startPageToken: z.string().min(1) })
+      .parse(
+        await (
+          await this.request(`${DRIVE_API}/changes/startPageToken`)
+        ).json(),
+      );
+    const [books, organization, assets] = await Promise.all([
+      this.listFiles("batch"),
+      this.listFiles("organization-batch"),
+      this.listFiles("asset"),
+    ]);
+    return {
+      version: 1 as const,
+      cursor: startPageToken,
+      files: [...books, ...organization, ...assets],
+    };
+  }
+
+  private async remoteCatalog(repo: LibraryRepository, account: string) {
+    const stored = await repo.setting(`drive-catalog:${account}`);
+    let parsed: ReturnType<typeof catalogSchema.safeParse> | undefined;
+    try {
+      parsed = stored ? catalogSchema.safeParse(JSON.parse(stored)) : undefined;
+    } catch {
+      /* Rebuild an invalid local cache. */
+    }
+    if (!parsed?.success) return this.bootstrapCatalog();
+    const files = new Map(parsed.data.files.map((file) => [file.id, file]));
+    let pageToken = parsed.data.cursor;
+    try {
+      for (;;) {
+        const params = new URLSearchParams({
+          pageToken,
+          pageSize: "1000",
+          includeRemoved: "true",
+          fields:
+            "changes(fileId,removed,file(id,appProperties,trashed)),nextPageToken,newStartPageToken",
+        });
+        const result = changesSchema.parse(
+          await (await this.request(`${DRIVE_API}/changes?${params}`)).json(),
+        );
+        for (const change of result.changes) {
+          if (change.removed || change.file?.trashed) {
+            files.delete(change.fileId);
+            continue;
+          }
+          const file = change.file;
+          if (
+            file?.appProperties?.glassleaf === "v1" &&
+            ["batch", "organization-batch", "asset"].includes(
+              file.appProperties.type ?? "",
+            )
+          )
+            files.set(file.id, file);
+        }
+        if (result.nextPageToken) {
+          pageToken = result.nextPageToken;
+          continue;
+        }
+        if (!result.newStartPageToken)
+          throw new Error("Google Drive did not return a new sync cursor.");
+        return {
+          version: 1 as const,
+          cursor: result.newStartPageToken,
+          files: [...files.values()],
+        };
+      }
+    } catch (error) {
+      // An expired cursor needs a new snapshot. Authentication/network errors must retain it.
+      if (error instanceof DriveRequestError && error.status === 410)
+        return this.bootstrapCatalog();
+      throw error;
+    }
   }
 
   private async folder(repo: LibraryRepository, account: string) {
@@ -234,7 +335,10 @@ export class DriveSyncEngine {
         "Google account changed. Reconnect the library’s original account.",
       );
 
-    const batches = await this.listFiles("batch");
+    const catalog = await this.remoteCatalog(repo, account);
+    const batches = catalog.files.filter(
+      (file) => file.appProperties?.type === "batch",
+    );
     for (const [index, batch] of batches.entries()) {
       if (await repo.setting(`drive-batch:${account}:${batch.id}`)) continue;
       status(`Reading library changes ${index + 1} of ${batches.length}…`);
@@ -249,7 +353,9 @@ export class DriveSyncEngine {
       await repo.setSetting(`drive-batch:${account}:${batch.id}`, "1");
     }
 
-    const structures = await this.listFiles("organization-batch");
+    const structures = catalog.files.filter(
+      (file) => file.appProperties?.type === "organization-batch",
+    );
     for (const batch of structures) {
       const key = `drive-organization:${account}:${batch.id}`;
       if (await repo.setting(key)) continue;
@@ -262,8 +368,13 @@ export class DriveSyncEngine {
       await repo.setSetting(key, "1");
     }
 
+    // One durable value advances the catalog and cursor only after every remote batch merges.
+    // A crash before this write replays idempotent merges; missing downloads retry from the catalog.
+    await repo.setSetting(`drive-catalog:${account}`, JSON.stringify(catalog));
     const pending = await repo.pending();
-    const pendingAssets = pending.length ? await this.listFiles("asset") : [];
+    const pendingAssets = catalog.files.filter(
+      (file) => file.appProperties?.type === "asset",
+    );
     const pendingHashes = new Set(
       pendingAssets
         .map((file) => file.appProperties?.hash)
@@ -319,7 +430,7 @@ export class DriveSyncEngine {
     }
 
     const snapshot = await repo.snapshot();
-    const assetFiles = await this.listFiles("asset");
+    const assetFiles = pendingAssets;
     const assetsByHash = new Map(
       assetFiles
         .map((file) => [file.appProperties?.hash, file.id] as const)
