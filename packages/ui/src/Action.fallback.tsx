@@ -1,3 +1,4 @@
+import type {} from "uniwind/types";
 import { Pressable, Text } from "react-native";
 import type { ActionProps } from "./Action.types";
 export function Action({
