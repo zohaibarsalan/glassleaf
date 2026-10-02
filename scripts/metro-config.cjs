@@ -26,6 +26,7 @@ module.exports = (appRoot) => {
   };
   return withUniwindConfig(config, {
     cssEntryFile: "./global.css",
+    dtsFile: "./.expo/uniwind-types.d.ts",
     extraThemes: require("../packages/ui/theme-names.json"),
     polyfills: { rem: 16 },
   });

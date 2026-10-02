@@ -21,9 +21,7 @@ assert.throws(() =>
 assert.throws(() =>
   validateTheme({ ...theme, unexpected: "ignored configuration" }),
 );
-console.log(
-  "Theme validation rejects unreadable, invalid and unknown values.",
-);
+console.log("Theme validation rejects unreadable, invalid and unknown values.");
 
 import { readFileSync } from "node:fs";
 import { importTheme, adaptScheme } from "../packages/ui/src/themeImport";

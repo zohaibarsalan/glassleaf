@@ -50,7 +50,8 @@ const precacheFiles = (await files(output))
   }))
   .filter(
     ({ path }) =>
-      /\.(?:html|css|m?js|wasm|ttf|ico|json)$/.test(path) && path !== "/sw.js",
+      /\.(?:html|css|m?js|wasm|ttf|ico|png|svg|json)$/.test(path) &&
+      path !== "/sw.js",
   )
   .sort((left, right) => left.path.localeCompare(right.path));
 const precache = precacheFiles.map(({ path }) => path);

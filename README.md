@@ -26,12 +26,12 @@ pnpm web:build       # installable static PWA in apps/web/dist
 pnpm desktop:build   # package on the target OS
 ```
 
-Native modules require an Expo development build. Local reading requires no cloud account. Google Drive setup is documented in [the mobile guide](apps/mobile/README.md#google-drive-setup).
+Native modules require an Expo development build. Local reading requires no cloud account. See [PWA installation and deployment](apps/web/README.md) and [Google Drive setup](apps/mobile/README.md#google-drive-setup).
 
 ## Verification and pull requests
 
-Run checks locally before merging. This repository does not schedule hosted CI workflows for this work. Keep PRs focused and stacked: each branch targets the preceding branch so its diff contains one increment. Run `pnpm typecheck`, `pnpm test`, `pnpm format:check` and `pnpm web:build`; native and desktop changes also need their platform checks. Record exact commands and results in each PR.
+Run checks locally before merging. This repository does not schedule hosted CI workflows for this work. Keep PRs focused and stacked: each branch targets the preceding branch so its diff contains one increment. Run `pnpm verify` for the complete shared/PWA gate; it records the commit, dirty state and individual results in `outputs/app-system/local-verification.json`. Use `pnpm verify:native` for iOS/Android JavaScript exports and `pnpm verify:desktop` for Rust checks/tests. Native development builds and desktop packaging remain separate platform checks. Record exact commands and results in each PR.
 
 Live OAuth, actual multi-device sync, installed iPhone PWA behavior and Windows packaging require separate validation; a source build does not certify them.
 
-See [the app architecture](docs/APP_SYSTEM.md) and [the existing reader validation](docs/REACT_NATIVE_VALIDATION.md).
+See [the app architecture](docs/APP_SYSTEM.md), [current validation and PR stack](docs/APP_SYSTEM_VALIDATION.md), and [the earlier reader validation](docs/REACT_NATIVE_VALIDATION.md).

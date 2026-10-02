@@ -44,6 +44,7 @@ export function DriveSettings({
     setAuthError("");
     void ensureAuthReady().catch(() => undefined);
   }, []);
+  const reconnect = connected && /expired|reconnect/i.test(status);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     try {
@@ -74,7 +75,7 @@ export function DriveSettings({
                   await ensureAuthReady();
                   return;
                 }
-                if (!connected) {
+                if (!connected || reconnect) {
                   await connectDrive(repo);
                   setConnected(true);
                 }
@@ -90,9 +91,11 @@ export function DriveSettings({
                 ? "Retry Google setup"
                 : !authReady
                   ? "Preparing Google sign-in…"
-                  : connected
-                    ? "Sync now"
-                    : "Connect Google Drive"}
+                  : reconnect
+                    ? "Reconnect Google Drive"
+                    : connected
+                      ? "Sync now"
+                      : "Connect Google Drive"}
           </Button>
           {connected && (
             <Button

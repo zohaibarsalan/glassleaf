@@ -1,6 +1,6 @@
 # Glassleaf mobile
 
-React Native / Expo app for iOS and Android. The UI uses Shopify Restyle, FlashList, Lucide icons, and bundled DM Sans / Lora fonts. SQLite is the local source of truth. No hosted Glassleaf backend or in-app AI is required.
+React Native / Expo SDK 57 app for iOS and Android. This directory owns native configuration and the entry point; screens and adapters live in `packages/app`. The UI uses Uniwind / Tailwind 4, shared semantic theme roles in `packages/ui`, Expo UI native actions, FlashList, Lucide icons, and bundled DM Sans / Lora fonts. SQLite is the local source of truth. No hosted Glassleaf backend or in-app AI is required.
 
 ## Run
 
@@ -15,7 +15,7 @@ pnpm --filter @glassleaf/mobile android
 
 These commands generate and build the native projects. Use a **development build**, not Expo Go: PDF, ZIP extraction, and Google sign-in need native modules. Xcode/CocoaPods are needed for iOS; JDK 17 and the Android SDK for Android. Native generated directories are ignored; configuration belongs in `app.json` / `app.config.ts`.
 
-After installation, `pnpm mobile` starts Metro. Settings → Sample library imports eight original, redistributable EPUB/PDF/CBZ fixtures. Development-only `EXPO_PUBLIC_SAMPLE_LIBRARY=1` seeds those fixtures; `EXPO_PUBLIC_READER_PREVIEW=epub` (or `pdf`, `cbz`) opens a reader for visual checks. These shortcuts are disabled in release builds.
+After installation, `pnpm mobile` starts Metro. Settings → Library tools → Add original sample books imports eight original, redistributable EPUB/PDF/CBZ fixtures. Development-only `EXPO_PUBLIC_SAMPLE_LIBRARY=1` seeds those fixtures; `EXPO_PUBLIC_READER_PREVIEW=epub` (or `pdf`, `cbz`) opens a reader for visual checks. These shortcuts are disabled in release builds.
 
 ## Implemented
 
@@ -35,12 +35,12 @@ The app works locally without configuration. Live sign-in has **not** been valid
 3. Create an **iOS** OAuth client for bundle ID `app.glassleaf.mobile`.
 4. Create a **Web application** OAuth client for the native SDK's `webClientId` and add each exact browser origin to its authorized JavaScript origins: for local Expo web, `http://localhost:8081` (or the port printed by Expo), and for deployment, the full `https://host.example` origin without a path. Add every preview/custom HTTPS host separately; Google origins do not accept a path wildcard. No client secret belongs in the app. The web client ID is also used by the browser Google Identity Services flow.
 5. Create an **Android** OAuth client for package `app.glassleaf.mobile` and the signing certificate SHA-1. After generating Android, run `./gradlew signingReport` from `apps/mobile/android`. Register the certificate for each build you use; store signing certificates differ from development signing.
-6. Copy `.env.example` to `.env.local`, fill the iOS and Web client IDs, and fill the Desktop application client ID only when building the Tauri shell. These are public client identifiers; do not add a client secret. Rebuild with the commands above. The iOS URL scheme is generated from its client ID. Android identifies its client through the registered package/certificate.
-7. Settings → Google Drive → Connect → Sync now. On the PWA, the first connection must be a user gesture; access tokens remain in memory and an expired browser session requires pressing Connect again. Repeat on a second device with the **same Google account** and test imports, reading progress, notes, offline edits, trash/restore, and reconnect before relying on synchronization.
+6. For native builds, copy `apps/mobile/.env.example` to `apps/mobile/.env.local` and fill the iOS and Web client IDs. For PWA or desktop builds, use `apps/web/.env.example` and `apps/web/.env.local`; set the Desktop application client ID only for the Tauri shell. These are public client identifiers; do not add a client secret. Rebuild with the commands above. The iOS URL scheme is generated from its client ID. Android identifies its client through the registered package/certificate.
+7. Settings → Sync & backups → Connect Google Drive → Sync now. On the PWA, the first connection must be a user gesture; access tokens remain in memory and an expired browser session requires pressing Reconnect Google Drive. Repeat on a second device with the **same Google account** and test imports, reading progress, notes, offline edits, trash/restore, and reconnect before relying on synchronization.
 
 Drive files live in a Glassleaf folder in your own storage. There is no Glassleaf subscription in this implementation; your Google storage capacity and API quotas still apply. Sync runs on launch, foreground, browser online/visibility events, local edits, or manually while the app is open. It is not an OS background service. Account binding prevents accidentally merging another account into this local library. Conflict versions are retained in SQLite, but a conflict-resolution screen remains to be built. Original uploads use a Drive resumable session but send the file in one PUT; checkpointed chunk retries are not implemented, so very large assets need further work.
 
-The browser adapter is for HTTPS browser/PWA origins only. Tauri desktop has a separate installed-app OAuth PKCE bridge: configure a Google Desktop application client ID, then the Rust side opens the system browser on a random localhost loopback port, validates state, and stores only the refresh token in the platform keychain. The bridge is buildable but has not been validated with a registered Google project. Do not register `tauri://` as a Google web origin, put a client secret in the bundle, or present the browser popup as a supported desktop flow. If web SQLite/WASM is enabled, deployment also needs COOP/COEP isolation headers; Google popup authentication has a separate COOP requirement, so validate the chosen headers with real OAuth before release.
+The browser adapter is for HTTPS browser/PWA origins only. Tauri desktop has a separate installed-app OAuth PKCE bridge: configure a Google Desktop application client ID, then the Rust side opens the system browser on a random localhost loopback port, validates state, and stores only the refresh token in the platform keychain. The bridge is buildable but has not been validated with a registered Google project. Do not register `tauri://` as a Google web origin, put a client secret in the bundle, or present the browser popup as a supported desktop flow. The SQLite WASM SAH-pool backend uses OPFS without SharedArrayBuffer or COOP/COEP isolation headers. Validate the deployed headers with real Google popup authentication before release.
 
 ## External agents through MCP
 
@@ -79,7 +79,7 @@ For personal Android installation, build `assembleRelease` from the generated An
 
 ## Theme studio and organization (September 6 refinement)
 
-Settings → Appearance offers Paper, Midnight, Forest, and Tokyo Night. Select a starting palette, choose Create theme, edit its name/colors, then Save and apply. Custom themes are stored on the device and survive relaunch. Import/export uses the versioned JSON examples in `themes/`. Unknown fields, malformed colors, and insufficient text contrast are rejected. Custom themes can be edited or removed; removing the current one returns to Paper. Theme sync between devices is not yet implemented.
+Settings → Appearance offers Paper, Midnight, Forest, and Tokyo Night. Select a starting palette, choose Create theme, edit its name/colors, then Save and apply. Custom themes are stored on the device and survive relaunch. Import/export uses the versioned JSON examples in `packages/ui/themes/`. Unknown fields, malformed colors, and insufficient text contrast are rejected. Custom themes can be edited or removed; removing the current one returns to Paper. Theme sync between devices is not yet implemented.
 
 Library → Filters & sort combines file format, story type, reading state, favorite status, collection, tag, and sorting. Active filter chips can be removed individually. Library → Select books → Organize selected adds tags/collections to multiple books without removing existing values, and can change their story type. The transaction checks every revision; Settings → Undo last organization batch reverses it when no intervening edits exist. The Organize tab browses collections and tags.
 
@@ -89,7 +89,7 @@ The dated screenshot journal is in `docs/ui-gallery`. Run `python3 scripts/build
 
 ### Community themes
 
-Appearance includes all four Catppuccin flavors, Nord, Dracula and Gruvbox alongside the original themes. Import downloaded Base16/Base24 YAML or JSON (including legacy flat Base16) from Settings → Appearance → Import. Review/edit the mapped colors and choose Save and apply. Existing Glassleaf JSON imports and exports remain supported. See [format support and palette attribution](themes/community/README.md). Editor extensions and arbitrary application theme files are not interchangeable with these scheme formats.
+Appearance includes all four Catppuccin flavors, Nord, Dracula and Gruvbox alongside the original themes. Import downloaded Base16/Base24 YAML or JSON (including legacy flat Base16) from Settings → Appearance → Import. Review/edit the mapped colors and choose Save and apply. Existing Glassleaf JSON imports and exports remain supported. See [format support and palette attribution](../../packages/ui/themes/community/README.md). Editor extensions and arbitrary application theme files are not interchangeable with these scheme formats.
 
 ### Reading home, search, and saved views
 

@@ -4,6 +4,10 @@
   "scripts": {
     "tauri:dev": "cargo tauri dev",
     "tauri:build": "cargo tauri build",
-    "web:build": "node build-web.mjs"
+    "web:build": "node build-web.mjs",
+    "check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "build:mac": "cargo tauri build --bundles app,dmg",
+    "build:windows": "cargo tauri build --bundles nsis"
   }
 }
