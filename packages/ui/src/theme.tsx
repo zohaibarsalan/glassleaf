@@ -1,3 +1,4 @@
+import type {} from "./themeRegistry";
 import { Action } from "./Action";
 import {
   builtinThemes,

@@ -22,7 +22,8 @@ const books = [
     slug: "the-garden-beyond",
     title: "The Garden Beyond",
     author: "Mira Ellison",
-    description: "A quiet journey through a garden that remembers everyone who cared for it.",
+    description:
+      "A quiet journey through a garden that remembers everyone who cared for it.",
     color: "#A8B9A1",
     ink: "#243227",
     chapters: 6,
@@ -36,7 +37,8 @@ const books = [
     slug: "a-map-of-small-stars",
     title: "A Map of Small Stars",
     author: "Noah Vale",
-    description: "Short essays on night skies, observation, and finding scale in ordinary life.",
+    description:
+      "Short essays on night skies, observation, and finding scale in ordinary life.",
     color: "#243351",
     ink: "#E5E8EF",
     chapters: 7,
@@ -50,7 +52,8 @@ const books = [
     slug: "the-shape-of-rain",
     title: "The Shape of Rain",
     author: "Iris Rowan",
-    description: "A coastal mystery where each witness remembers the storm differently.",
+    description:
+      "A coastal mystery where each witness remembers the storm differently.",
     color: "#5790A6",
     ink: "#102D36",
     chapters: 8,
@@ -64,7 +67,8 @@ const books = [
     slug: "common-ground",
     title: "Common Ground",
     author: "Elias North",
-    description: "Field notes about resilient neighborhoods and the people who keep them working.",
+    description:
+      "Field notes about resilient neighborhoods and the people who keep them working.",
     color: "#B87959",
     ink: "#311B12",
     chapters: 5,
@@ -78,7 +82,8 @@ const books = [
     slug: "letters-from-the-orchard",
     title: "Letters from the Orchard",
     author: "June Bell",
-    description: "Warm correspondence about seasons, friendship, and beginning again.",
+    description:
+      "Warm correspondence about seasons, friendship, and beginning again.",
     color: "#D8CFB0",
     ink: "#3C3425",
     chapters: 7,
@@ -106,7 +111,8 @@ const books = [
     slug: "the-long-way-home",
     title: "The Long Way Home",
     author: "Rowan Mercer",
-    description: "A full-length sample adventure built to stress-test reading, pagination, search, and chapter navigation.",
+    description:
+      "A full-length sample adventure built to stress-test reading, pagination, search, and chapter navigation.",
     color: "#31405D",
     ink: "#E8ECF5",
     chapters: 32,
@@ -123,12 +129,16 @@ const books = [
 ];
 
 const escapeXML = (value) =>
-  value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 
 function chapterBody(book, chapterIndex) {
   const count = book.paragraphsPerChapter ?? 5;
   return Array.from({ length: count }, (_, paragraphIndex) => {
-    const source = book.seed[(chapterIndex + paragraphIndex) % book.seed.length];
+    const source =
+      book.seed[(chapterIndex + paragraphIndex) % book.seed.length];
     const connective = [
       "The detail changed the meaning of what came before.",
       "For a moment, the way ahead seemed almost simple.",
@@ -165,7 +175,9 @@ function makeBook(book) {
   const navigation = [];
   for (let index = 1; index <= book.chapters; index += 1) {
     const filename = `chapter-${String(index).padStart(2, "0")}.xhtml`;
-    manifest.push(`<item id="chapter-${index}" href="text/${filename}" media-type="application/xhtml+xml"/>`);
+    manifest.push(
+      `<item id="chapter-${index}" href="text/${filename}" media-type="application/xhtml+xml"/>`,
+    );
     spine.push(`<itemref idref="chapter-${index}"/>`);
     navigation.push(`<li><a href="text/${filename}">Chapter ${index}</a></li>`);
     writeFileSync(
@@ -243,8 +255,12 @@ p { margin: 0 0 1.15em; }
   mkdirSync(outputRoot, { recursive: true });
   const output = join(outputRoot, `${book.slug}.epub`);
   rmSync(output, { force: true });
-  execFileSync("zip", ["-X", "-q", "-0", output, "mimetype"], { cwd: workRoot });
-  execFileSync("zip", ["-X", "-q", "-r", output, "META-INF", "OEBPS"], { cwd: workRoot });
+  execFileSync("zip", ["-X", "-q", "-0", output, "mimetype"], {
+    cwd: workRoot,
+  });
+  execFileSync("zip", ["-X", "-q", "-r", output, "META-INF", "OEBPS"], {
+    cwd: workRoot,
+  });
   rmSync(workRoot, { recursive: true, force: true });
   return output;
 }

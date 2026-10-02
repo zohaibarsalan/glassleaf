@@ -8,7 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @glassleaf/library test && pnpm --filter @glassleaf/mcp test && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-mobile-themes.ts && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-reader-locations.ts && pnpm test:sync && pnpm test:storage",
     "mcp": "pnpm --filter @glassleaf/mcp start",
-    "format:check": "prettier --check \"apps/{mobile,web}/*.{ts,tsx,json,cjs}\" \"packages/{app,ui,library,mcp}/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"apps/{mobile,web}/*.{ts,tsx,json,cjs}\" \"packages/{app,ui,library,mcp}/src/**/*.{ts,tsx}\" \"scripts/*.{mjs,mts,ts}\" \"apps/web/workers/*.ts\"",
     "test:sync": "pnpm --filter @glassleaf/library exec tsx --test ../../packages/app/src/sync/drive-core.test.ts ../../packages/app/src/sync/drive-scheduler.test.ts ../../packages/app/src/sync/drive-changes.test.ts",
     "web": "pnpm --filter @glassleaf/web dev",
     "ios": "pnpm --filter @glassleaf/mobile ios",
@@ -16,7 +16,12 @@
     "desktop": "pnpm --filter @glassleaf/desktop tauri:dev",
     "desktop:build": "pnpm --filter @glassleaf/desktop tauri:build",
     "themes:generate": "pnpm --filter @glassleaf/library exec tsx ../../scripts/generate-ui-themes.mts",
-    "test:storage": "pnpm --filter @glassleaf/library exec tsx --test ../../packages/app/src/data/blob-store.test.ts"
+    "test:storage": "pnpm --filter @glassleaf/library exec tsx --test ../../packages/app/src/data/blob-store.test.ts",
+    "themes:check": "pnpm --filter @glassleaf/library exec tsx ../../scripts/generate-ui-themes.mts --check",
+    "test:pwa": "node --test scripts/pwa-shell.test.mjs",
+    "verify": "node scripts/verify-local.mjs",
+    "verify:native": "pnpm --filter @glassleaf/mobile exec expo export --platform ios --output-dir dist-ios && pnpm --filter @glassleaf/mobile exec expo export --platform android --output-dir dist-android",
+    "verify:desktop": "pnpm --filter @glassleaf/desktop check && pnpm --filter @glassleaf/desktop test"
   },
   "devDependencies": {
     "prettier": "^3.9.6"
