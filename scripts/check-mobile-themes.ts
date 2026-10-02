@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {
   builtinThemes,
   validateTheme,
-} from "../packages/app/src/ui/themeDefinition";
+} from "../packages/ui/src/themeDefinition";
 for (const theme of builtinThemes) {
   assert.deepEqual(validateTheme(JSON.parse(JSON.stringify(theme))), theme);
 }
@@ -26,13 +26,13 @@ console.log(
 );
 
 import { readFileSync } from "node:fs";
-import { importTheme, adaptScheme } from "../packages/app/src/ui/themeImport";
-import catalog from "../packages/app/themes/community/catalog.json";
+import { importTheme, adaptScheme } from "../packages/ui/src/themeImport";
+import catalog from "../packages/ui/themes/community/catalog.json";
 for (const source of catalog) {
   const theme = adaptScheme(source);
   const yaml = readFileSync(
     new URL(
-      `../packages/app/themes/community/${theme.id}.yaml`,
+      `../packages/ui/themes/community/${theme.id}.yaml`,
       import.meta.url,
     ),
     "utf8",

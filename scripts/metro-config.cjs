@@ -2,6 +2,9 @@ const { getDefaultConfig } = require("expo/metro-config");
 const path = require("node:path");
 module.exports = (appRoot) => {
   const config = getDefaultConfig(appRoot);
+  const { withUniwindConfig } = require(
+    require.resolve("uniwind/metro", { paths: [appRoot] }),
+  );
   config.resolver.assetExts.push("wasm", "epub", "cbz", "pdf");
   const resolveRequest = config.resolver.resolveRequest;
   config.resolver.resolveRequest = (context, moduleName, platform) => {
@@ -21,5 +24,9 @@ module.exports = (appRoot) => {
       context.resolveRequest(context, moduleName, platform)
     );
   };
-  return config;
+  return withUniwindConfig(config, {
+    cssEntryFile: "./global.css",
+    extraThemes: require("../packages/ui/theme-names.json"),
+    polyfills: { rem: 16 },
+  });
 };
