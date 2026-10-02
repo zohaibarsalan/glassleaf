@@ -15,6 +15,9 @@ const evidence = {
   }).trim(),
   node: process.version,
   platform: process.platform,
+  dirty: Boolean(
+    execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim(),
+  ),
   steps: [],
 };
 mkdirSync("outputs/app-system", { recursive: true });
@@ -22,10 +25,20 @@ try {
   for (const step of steps) {
     const start = Date.now();
     console.log(`\nLocal verification: ${step}`);
-    execFileSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", [step], {
-      stdio: "inherit",
-      shell: process.platform === "win32",
-    });
+    try {
+      execFileSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", [step], {
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+    } catch (error) {
+      evidence.passed = false;
+      evidence.steps.push({
+        step,
+        passed: false,
+        durationMs: Date.now() - start,
+      });
+      throw error;
+    }
     evidence.steps.push({ step, passed: true, durationMs: Date.now() - start });
   }
   evidence.passed = true;
