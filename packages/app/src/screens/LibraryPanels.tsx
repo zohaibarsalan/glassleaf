@@ -323,8 +323,8 @@ export function SettingsPanel({
               Open Trash
             </Button>
             <Text variant="caption">
-              Glassleaf 0.1 · Local first. No account needed to read.\nEPUB,
-              PDF, and CBZ · CBR support is still to come.
+              Glassleaf 0.1 · Local first. No account needed to read. EPUB, PDF,
+              and CBZ · CBR support is still to come.
             </Text>
           </Box>
         </Sheet>

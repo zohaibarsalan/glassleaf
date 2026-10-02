@@ -15,7 +15,12 @@ export function Brand() {
   return (
     <Box flexDirection="row" alignItems="center" gap="s">
       <Leaf color={c.accent} size={22} strokeWidth={1.6} />
-      <Text fontFamily="DMBold" fontSize={18} letterSpacing={-0.4}>
+      <Text
+        fontFamily="Lora"
+        fontSize={24}
+        lineHeight={32}
+        letterSpacing={-0.8}
+      >
         glassleaf
       </Text>
     </Box>
@@ -98,10 +103,14 @@ export function BookTile({
           flexDirection: list ? "row" : "column",
           gap: list ? 16 : 0,
           minHeight: list ? 108 : undefined,
-          padding: list ? 10 : 8,
+          padding: list ? 10 : 0,
           borderRadius: 16,
-          backgroundColor: selected ? c.accentSoft : c.surface,
-          borderWidth: 1,
+          backgroundColor: selected
+            ? c.accentSoft
+            : list
+              ? c.surface
+              : "transparent",
+          borderWidth: list || selected ? 1 : 0,
           borderColor: selected ? c.accent : c.line,
           opacity: pressed ? 0.92 : 1,
           transform: [{ scale: pressed ? 0.96 : 1 }],
@@ -111,9 +120,10 @@ export function BookTile({
           style={{
             width: list ? 64 : "100%",
             aspectRatio: 0.67,
-            borderRadius: 10,
+            borderRadius: 6,
             overflow: "hidden",
             backgroundColor: c.accentSoft,
+            boxShadow: list ? undefined : "0px 8px 18px #00000020",
             borderWidth: 1,
             borderColor: c.line,
           }}
