@@ -7,11 +7,22 @@
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
-    <meta name="theme-color" content="#264839" />
+    <meta name="theme-color" content="#152C25" />
     <meta name="description" content="A quiet home for your stories." />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Glassleaf</title>
+    <style>
+      [role="button"]:focus-visible, [role="tab"]:focus-visible, input:focus-visible, textarea:focus-visible {
+        outline: 2px solid var(--color-accent, #D6DDA7);
+        outline-offset: 3px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
     <style id="expo-reset">
       html,
       body {
@@ -20,7 +31,7 @@
       body {
         overflow: hidden;
         margin: 0;
-        background: #f8f7f1;
+        background: #152C25;
       }
       #root {
         display: flex;
