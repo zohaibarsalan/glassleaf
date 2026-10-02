@@ -1,3 +1,4 @@
+import { StoragePanel } from "../ui/StoragePanel";
 import type { Book, LibraryRepository, Stats } from "@glassleaf/library";
 import {
   Bookmark,
@@ -315,6 +316,7 @@ export function SettingsPanel({
       {section === "library" && (
         <Sheet title="Library tools" onClose={() => setSection(undefined)}>
           <Box gap="m">
+            <StoragePanel />
             <Text variant="eyebrow">YOUR LIBRARY</Text>
             <Button secondary icon={BookOpen} onPress={onSamples}>
               Add original sample books

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -40,3 +41,9 @@ await Promise.all([
     join(publicDir, "pdf.worker.min.mjs"),
   ),
 ]);
+
+execFileSync(
+  "pnpm",
+  ["--filter", "@glassleaf/web", "exec", "tsc", "-p", "tsconfig.workers.json"],
+  { cwd: root, stdio: "inherit" },
+);

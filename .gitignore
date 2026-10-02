@@ -47,3 +47,5 @@ apps/mobile/android/
 # Platform export verification
 dist-ios/
 dist-android/
+
+/apps/web/public/glassleaf-files-worker.js

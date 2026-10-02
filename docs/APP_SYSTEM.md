@@ -12,6 +12,7 @@ The organization follows useful patterns from [T3 Code](https://github.com/pingd
 - `apps/mobile`: Expo native configuration, icons and registration.
 - `apps/desktop`: Tauri packaging and installed-app OAuth bridge.
 - `packages/app`: shared screens, reader orchestration, platform adapters and application state.
+- `packages/ui`: validated theme definitions, generated Uniwind variables, semantic components and Expo UI platform controls.
 - `packages/library`: typed catalog, SQLite access, search, organization and revision checks.
 - `packages/mcp`: explicit snapshot/plan exchange with external agents.
 - `apps/apple` and `packages/domain`: preserved legacy Swift implementation. Do not mix its CloudKit journal with the shared Drive library.
@@ -20,7 +21,9 @@ The organization follows useful patterns from [T3 Code](https://github.com/pingd
 
 Each device owns its SQLite database, search index, downloaded originals and sync state. Google Drive holds original publications and portable shared records. Local mutations commit before upload. Changes are acknowledged only when the uploaded version still matches the pending record. Downloaded originals are checksum-verified.
 
-Browser SQLite runs in a dedicated worker with the official SQLite WASM SAH-pool backend. One worker owns the library; tab locking prevents concurrent owners. The browser file adapter currently stores blobs in IndexedDB. OPFS files and incremental Drive Changes API tracking are subsequent platform increments, not claims about this initial structural refactor.
+Browser SQLite runs in a dedicated worker with the official SQLite WASM SAH-pool backend. One worker owns the library; tab locking prevents concurrent owners. Originals and extracted publication resources live in OPFS through a separate file worker. IndexedDB holds only the path-to-file index; legacy blobs migrate on read. Each new file has a unique identifier: flush bytes first, then commit the metadata transaction, then remove the replaced file. A failed migration leaves the old copy readable. Crashes between these steps can leave an unreferenced file, but never publish incomplete bytes. The app requests persistent storage from the Library tools screen; browser retention remains a browser decision.
+
+Drive captures a start cursor before bootstrap listing. Later syncs use paginated Changes API responses and the cached asset catalog. The catalog and cursor are saved together after all incoming batches merge; a failed merge or page keeps the old cursor. Applied batches are replay-safe. HTTP 410 triggers bootstrap, while sign-in and network errors retain the previous cursor. Drive file deletion does not imply a local book tombstone. Local revision records remain the conflict-resolution authority.
 
 ## Product design
 

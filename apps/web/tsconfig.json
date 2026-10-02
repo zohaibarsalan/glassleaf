@@ -6,5 +6,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "exclude": ["dist", "public", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": ["dist", "public", "workers"]
 }
