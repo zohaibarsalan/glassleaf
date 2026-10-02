@@ -2,7 +2,11 @@
 
 This file is the canonical starting point for AI agents and contributors working on Glassleaf. Read it before proposing architecture, changing product behavior, or writing code. Keep it current as decisions are made.
 
-## Project status
+## Current app system (2026-10-02)
+
+The current direction is PWA first for personal iPhone use, Expo React Native for native iOS/Android, and Tauri for macOS/Windows. Entry points live in `apps/web`, `apps/mobile`, and `apps/desktop`; screens and adapters live in `packages/app`. See `docs/APP_SYSTEM.md` and the root README for current commands. The older Apple architecture and dated milestones below are historical reference.
+
+## Historical project status
 
 Glassleaf has a functional local-native MVP. Application code and repeatable Apple-platform checks exist; no deployment or cloud infrastructure exists.
 

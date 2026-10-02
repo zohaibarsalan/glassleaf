@@ -5,9 +5,9 @@ import { join } from "node:path";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const dist = join(
   root,
-  "apps/mobile/node_modules/@sqlite.org/sqlite-wasm/dist",
+  "packages/app/node_modules/@sqlite.org/sqlite-wasm/dist",
 );
-const publicDir = join(root, "apps/mobile/public");
+const publicDir = join(root, "apps/web/public");
 const worker = await readFile(join(dist, "sqlite3-worker1.mjs"), "utf8");
 const entrypoint =
   "sqlite3InitModule().then((sqlite3) => sqlite3.initWorker1API());";
@@ -35,7 +35,7 @@ await Promise.all([
   cp(
     join(
       root,
-      "apps/mobile/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+      "packages/app/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
     ),
     join(publicDir, "pdf.worker.min.mjs"),
   ),

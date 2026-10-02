@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from reportlab.pdfgen import canvas
 import zipfile, json, io, math
-root=Path(__file__).resolve().parents[1]/'apps/mobile/assets/samples'
+root=Path(__file__).resolve().parents[1]/'packages/app/assets/samples'
 root.mkdir(parents=True,exist_ok=True)
 font='/System/Library/Fonts/Supplemental/Georgia.ttf'
 sans='/System/Library/Fonts/Supplemental/Arial.ttf'

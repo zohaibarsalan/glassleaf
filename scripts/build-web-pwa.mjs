@@ -5,7 +5,7 @@ import { join, relative, sep } from "node:path";
 import { pwaCacheId } from "./pwa-cache-id.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const output = join(root, "apps/mobile/dist");
+const output = join(root, "apps/web/dist");
 
 execFileSync("node", [join(root, "scripts/prepare-browser-workers.mjs")], {
   cwd: root,
@@ -16,7 +16,7 @@ execFileSync(
   "pnpm",
   [
     "--filter",
-    "@glassleaf/mobile",
+    "@glassleaf/web",
     "exec",
     "expo",
     "export",
@@ -54,7 +54,7 @@ const precacheFiles = (await files(output))
   )
   .sort((left, right) => left.path.localeCompare(right.path));
 const precache = precacheFiles.map(({ path }) => path);
-const source = await readFile(join(root, "apps/mobile/public/sw.js"), "utf8");
+const source = await readFile(join(root, "apps/web/public/sw.js"), "utf8");
 const cacheId = pwaCacheId(
   source,
   await Promise.all(

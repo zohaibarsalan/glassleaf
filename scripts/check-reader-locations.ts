@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import {
   encodeLocator,
   parseLocator,
-} from "../apps/mobile/src/readers/location";
-import { readingPreferencesSchema } from "../apps/mobile/src/readers/preferences";
+} from "../packages/app/src/readers/location";
+import { readingPreferencesSchema } from "../packages/app/src/readers/preferences";
 
 const anchor = {
   text: "The rabbit-hole went straight on",
@@ -42,7 +42,7 @@ console.log(
   "Reader locations: legacy migration, anchored round trips and invalid persisted values checked.",
 );
 
-import { pdfOutline } from "../apps/mobile/src/readers/pdfOutline";
+import { pdfOutline } from "../packages/app/src/readers/pdfOutline";
 assert.deepEqual(
   pdfOutline(
     [
