@@ -104,7 +104,7 @@ const initialStats: Stats = {
 export default function App() {
   const [repo, setRepo] = useState<LibraryRepository>();
   const [error, setError] = useState("");
-  const [theme, setTheme] = useState<ThemeName>("paper");
+  const [theme, setTheme] = useState<ThemeName>("forest");
   const [customThemes, setCustomThemes] = useState<ThemeDefinition[]>([]);
   const definitions: ThemeDefinition[] = [...builtinThemes, ...customThemes];
   const activeTheme =
@@ -433,7 +433,7 @@ function LibraryApp({
     setSearch("");
     setTab("library");
   };
-  const contentWidth = width - (wide ? 264 : 0) - (wide ? 80 : 40);
+  const contentWidth = width - (wide ? 240 : 0) - (wide ? 80 : 40);
   const columns = Math.max(2, Math.min(6, Math.floor(contentWidth / 168)));
   const hasFilters = !!(
     query.series ||
@@ -505,7 +505,7 @@ function LibraryApp({
       <Box flex={1} flexDirection="row">
         {wide && (
           <Box
-            width={264}
+            width={240}
             backgroundColor="surface"
             borderRightWidth={1}
             borderRightColor="line"
@@ -656,6 +656,7 @@ function LibraryApp({
               repo={repo}
               revision={revision}
               views={views}
+              stats={stats}
               onOpen={setReader}
               onBrowse={browse}
               onImport={() => void pickBooks()}

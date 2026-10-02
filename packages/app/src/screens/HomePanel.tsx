@@ -1,25 +1,29 @@
-import {
-  type Book,
-  type LibraryRepository,
-  type LibraryQuery,
-  type SavedView,
+import type {
+  Book,
+  LibraryRepository,
+  LibraryQuery,
+  SavedView,
+  Stats,
 } from "@glassleaf/library";
-import { ArrowRight, BookOpen, Play } from "lucide-react-native";
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, useWindowDimensions } from "react-native";
-import { BookTile, NavRow } from "../ui/LibraryComponents";
 import {
-  Box,
-  Button,
-  SectionHeading,
-  Surface,
-  Text,
-  usePalette,
-} from "../ui/theme";
+  ArrowUpRight,
+  BookOpen,
+  Bookmark,
+  Heart,
+  Plus,
+} from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { Image } from "expo-image";
+import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
+import { fileURI } from "../data/files";
+import { BookTile, NavRow } from "../ui/LibraryComponents";
+import { Box, Button, SectionHeading, Text, usePalette } from "@glassleaf/ui";
+
 export function HomePanel({
   repo,
   revision,
   views,
+  stats,
   onOpen,
   onBrowse,
   onImport,
@@ -27,13 +31,15 @@ export function HomePanel({
   repo: LibraryRepository;
   revision: number;
   views: SavedView[];
+  stats: Stats;
   onOpen: (book: Book) => void;
   onBrowse: (query: LibraryQuery) => void;
   onImport: () => void;
 }) {
   const c = usePalette();
   const { width } = useWindowDimensions();
-  const wide = width >= 700;
+  const roomy = width >= 1100,
+    wide = width >= 700;
   const [reading, setReading] = useState<Book[]>([]),
     [recent, setRecent] = useState<Book[]>([]),
     [error, setError] = useState("");
@@ -41,12 +47,13 @@ export function HomePanel({
     let live = true;
     void Promise.all([
       repo.list({ status: "reading", sort: "last-read", limit: 2 }),
-      repo.list({ limit: 6 }),
+      repo.list({ limit: 8 }),
     ])
       .then(([a, b]) => {
         if (live) {
           setReading(a);
           setRecent(b);
+          setError("");
         }
       })
       .catch((e) => {
@@ -56,98 +63,236 @@ export function HomePanel({
       live = false;
     };
   }, [repo, revision]);
+  const featured = reading[0] ?? recent[0];
+  const progress = Math.round((featured?.progress ?? 0) * 100);
   return (
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{
         width: "100%",
-        maxWidth: 1180,
+        maxWidth: 1200,
         alignSelf: "center",
         paddingHorizontal: wide ? 40 : 20,
-        paddingTop: wide ? 8 : 0,
-        gap: 28,
-        paddingBottom: 48,
+        paddingTop: wide ? 16 : 12,
+        paddingBottom: 40,
+        gap: 32,
       }}
     >
-      <Box gap="s">
-        <Text
-          accessibilityRole="header"
-          fontFamily="Lora"
-          fontSize={wide ? 38 : 32}
-          lineHeight={wide ? 47 : 40}
-          letterSpacing={-0.7}
+      <View className="gap-3">
+        <Text variant="eyebrow" color="accent">
+          YOUR READING ROOM
+        </Text>
+        <Box flexDirection="row" alignItems="center" gap="l">
+          <Box flex={1} gap="s">
+            <Text
+              accessibilityRole="header"
+              fontFamily="Lora"
+              fontSize={wide ? 42 : 34}
+              lineHeight={wide ? 53 : 43}
+              letterSpacing={-1}
+            >
+              A little room to escape.
+            </Text>
+            <Text color="secondary">
+              Your books. Your pace. Your next great story.
+            </Text>
+          </Box>
+          {wide && (
+            <Button secondary icon={Plus} onPress={onImport}>
+              Add books
+            </Button>
+          )}
+        </Box>
+      </View>
+      {!!error && (
+        <Text color="danger" accessibilityRole="alert">
+          {error}
+        </Text>
+      )}
+      <View
+        className="gap-5"
+        style={{ flexDirection: roomy ? "row" : "column" }}
+      >
+        <View
+          className="rounded-3xl border border-line bg-surface"
+          style={{
+            flex: roomy ? 2 : undefined,
+            padding: wide ? 28 : 20,
+            gap: 24,
+          }}
         >
-          A good place to pause.
-        </Text>
-        <Text color="secondary">
-          Pick up a story. Leave the rest for later.
-        </Text>
-      </Box>
-      {!!error && <Text color="danger">{error}</Text>}
-      <Surface subtle style={{ padding: wide ? 24 : 20, gap: 18 }}>
+          <SectionHeading
+            title={
+              reading.length
+                ? "PICK UP WHERE YOU LEFT OFF"
+                : "SOMETHING TO GET LOST IN"
+            }
+          />
+          {featured ? (
+            <>
+              <View className="flex-row items-center gap-5">
+                <View
+                  style={{
+                    width: wide ? 132 : 92,
+                    aspectRatio: 0.67,
+                    borderRadius: 6,
+                    overflow: "hidden",
+                    backgroundColor: c.accentSoft,
+                    boxShadow: "0px 8px 20px #00000025",
+                  }}
+                >
+                  {featured.asset.cover ? (
+                    <Image
+                      source={fileURI(featured.asset.cover)}
+                      style={{ width: "100%", height: "100%" }}
+                      contentFit="cover"
+                      recyclingKey={featured.id}
+                    />
+                  ) : (
+                    <Box flex={1} alignItems="center" justifyContent="center">
+                      <BookOpen color={c.accent} size={32} />
+                    </Box>
+                  )}
+                </View>
+                <Box flex={1} gap="s">
+                  <Text variant="eyebrow" color="accent">
+                    {featured.format.toUpperCase()} ·{" "}
+                    {reading.length ? "IN PROGRESS" : "READY WHEN YOU ARE"}
+                  </Text>
+                  <Text
+                    fontFamily="Lora"
+                    fontSize={wide ? 28 : 23}
+                    lineHeight={wide ? 37 : 31}
+                    numberOfLines={3}
+                  >
+                    {featured.title}
+                  </Text>
+                  <Text color="secondary" numberOfLines={2}>
+                    {featured.author}
+                  </Text>
+                  {progress > 0 && (
+                    <View className="mt-3 gap-2">
+                      <View className="h-1 overflow-hidden rounded-full bg-muted">
+                        <View
+                          style={{
+                            width: `${progress}%`,
+                            height: "100%",
+                            backgroundColor: c.accent,
+                          }}
+                        />
+                      </View>
+                      <Text variant="caption" color="secondary">
+                        {progress}% of the way through
+                      </Text>
+                    </View>
+                  )}
+                </Box>
+              </View>
+              <Button
+                icon={BookOpen}
+                accessibilityLabel={`${reading.length ? "Continue reading" : "Start reading"} ${featured.title}`}
+                onPress={() => onOpen(featured)}
+              >
+                {reading.length ? "Continue reading" : "Start reading"}
+              </Button>
+            </>
+          ) : (
+            <Box gap="m">
+              <BookOpen color={c.accent} size={32} />
+              <Text fontFamily="Lora" fontSize={28} lineHeight={37}>
+                Every shelf starts with a story.
+              </Text>
+              <Text color="secondary">
+                Bring an EPUB, a PDF, or a comic. We'll keep your place, even
+                when you're offline.
+              </Text>
+              <Button icon={Plus} onPress={onImport}>
+                Add your first book
+              </Button>
+            </Box>
+          )}
+        </View>
+        {roomy && (
+          <View className="flex-1 gap-4 rounded-3xl border border-line p-6">
+            <SectionHeading title="ON YOUR SHELVES" />
+            <Text fontFamily="Lora" fontSize={40} lineHeight={50}>
+              {stats.total}
+              <Text color="secondary" fontSize={15}>
+                {" "}
+                {stats.total === 1 ? "book" : "books"}, all yours
+              </Text>
+            </Text>
+            {[
+              {
+                title: "Currently reading",
+                count: stats.reading,
+                query: { status: "reading", sort: "last-read" } as LibraryQuery,
+                icon: BookOpen,
+              },
+              {
+                title: "Finished",
+                count: stats.finished,
+                query: { status: "finished" } as LibraryQuery,
+                icon: Bookmark,
+              },
+              {
+                title: "Favorites",
+                count: stats.favorites,
+                query: { favorite: true } as LibraryQuery,
+                icon: Heart,
+              },
+            ].map((item) => (
+              <NavRow
+                key={item.title}
+                icon={item.icon}
+                title={item.title}
+                count={item.count}
+                onPress={() => onBrowse(item.query)}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+      <Box gap="l">
         <SectionHeading
-          title="CONTINUE READING"
+          title="FRESH ON YOUR SHELVES"
           action={
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Browse currently reading"
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 12,
-                backgroundColor: pressed ? c.surface : "transparent",
-                transform: [{ scale: pressed ? 0.96 : 1 }],
-              })}
-              onPress={() => onBrowse({ status: "reading", sort: "last-read" })}
+              accessibilityLabel="Browse all books"
+              onPress={() => onBrowse({})}
+              className="flex-row items-center gap-2 rounded-xl p-3"
             >
-              <ArrowRight size={20} color={c.accent} />
+              <Text variant="label" color="secondary">
+                View all
+              </Text>
+              <ArrowUpRight size={17} color={c.secondary} />
             </Pressable>
           }
         />
-        {reading.length ? (
-          <>
-            <BookTile
-              book={reading[0]!}
-              list
-              onOpen={() => onOpen(reading[0]!)}
-            />
-            <Box flexDirection={wide ? "row" : "column"} gap="s">
-              <Box flex={1}>
-                <Button
-                  icon={Play}
-                  accessibilityLabel={`Continue reading ${reading[0]!.title}`}
-                  onPress={() => onOpen(reading[0]!)}
-                >
-                  Continue reading
-                </Button>
+        {recent.length ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: wide ? 20 : 12, paddingBottom: 8 }}
+          >
+            {recent.map((book) => (
+              <Box key={book.id} width={wide ? 158 : 142}>
+                <BookTile
+                  book={book}
+                  list={false}
+                  onOpen={() => onOpen(book)}
+                />
               </Box>
-              {reading[1] && (
-                <Box flex={1}>
-                  <Button secondary onPress={() => onOpen(reading[1]!)}>
-                    Switch book
-                  </Button>
-                </Box>
-              )}
-            </Box>
-          </>
+            ))}
+          </ScrollView>
         ) : (
-          <Box gap="m">
-            <BookOpen color={c.accent} size={28} />
-            <Text variant="heading">Your next chapter is waiting.</Text>
-            <Text color="secondary">
-              Open a book and your place will be kept here.
-            </Text>
-            <Button secondary onPress={() => onBrowse({})}>
-              Browse your library
-            </Button>
-          </Box>
+          <Text color="secondary">Your collection will feel at home here.</Text>
         )}
-      </Surface>
+      </Box>
       {views.some((v) => v.pinned) && (
         <Box gap="m">
-          <SectionHeading title="YOUR VIEWS" />
+          <SectionHeading title="MADE FOR YOU" />
           {views
             .filter((v) => v.pinned)
             .map((v) => (
@@ -162,43 +307,6 @@ export function HomePanel({
             ))}
         </Box>
       )}
-      <Box gap="m">
-        <SectionHeading
-          title="RECENTLY ADDED"
-          action={
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Browse all books"
-              onPress={() => onBrowse({})}
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 12,
-                backgroundColor: pressed ? c.muted : "transparent",
-                transform: [{ scale: pressed ? 0.96 : 1 }],
-              })}
-            >
-              <ArrowRight size={20} color={c.accent} />
-            </Pressable>
-          }
-        />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 12, paddingRight: 12 }}
-        >
-          {recent.map((book) => (
-            <Box key={book.id} width={wide ? 172 : 150}>
-              <BookTile book={book} list={false} onOpen={() => onOpen(book)} />
-            </Box>
-          ))}
-        </ScrollView>
-        {!recent.length && (
-          <Button onPress={onImport}>Bring your first books</Button>
-        )}
-      </Box>
     </ScrollView>
   );
 }
