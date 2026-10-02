@@ -8,12 +8,10 @@ import { SpacesPanel } from "./screens/SpacesPanel";
 import { ViewEditor } from "./screens/ViewEditor";
 import { indexLocalChapters } from "./data/searchIndex";
 import { type SavedView } from "@glassleaf/library";
-import {
-  DMSans_400Regular,
-  DMSans_500Medium,
-  DMSans_700Bold,
-} from "@expo-google-fonts/dm-sans";
-import { Lora_400Regular } from "@expo-google-fonts/lora";
+import { DMSans_400Regular } from "@expo-google-fonts/dm-sans/400Regular";
+import { DMSans_500Medium } from "@expo-google-fonts/dm-sans/500Medium";
+import { DMSans_700Bold } from "@expo-google-fonts/dm-sans/700Bold";
+import { Lora_400Regular } from "@expo-google-fonts/lora/400Regular";
 import {
   kindLabels,
   kinds,
@@ -25,7 +23,7 @@ import {
   type Stats,
 } from "@glassleaf/library";
 import { FlashList } from "@shopify/flash-list";
-import { ThemeProvider } from "@shopify/restyle";
+import { ThemeProvider } from "@glassleaf/ui";
 import * as DocumentPicker from "expo-document-picker";
 import { useFonts } from "expo-font";
 import * as Sharing from "expo-sharing";
@@ -70,7 +68,6 @@ import { ThemePanel } from "./screens/ThemePanel";
 import { useDriveSync } from "./sync/useDriveSync";
 import { BookTile, Brand, NavRow } from "./ui/LibraryComponents";
 import {
-  base,
   Box,
   Button,
   Chip,
@@ -146,7 +143,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider theme={{ ...base, colors: activeTheme.colors }}>
+        <ThemeProvider definition={activeTheme}>
           <StatusBar style={activeTheme.mode === "light" ? "dark" : "light"} />
           {error ? (
             <Box
