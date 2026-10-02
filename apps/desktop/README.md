@@ -2,7 +2,7 @@
 
 Glassleaf desktop is a Tauri 2 application shell around the same Expo React
 Native Web export used by the PWA. The WebView keeps imported books and reader
-state in the web adapter's local SQLite/OPFS and IndexedDB stores, so the shell
+state in the web adapter's local SQLite/OPFS database and OPFS files indexed by IndexedDB, so the shell
 does not add a second filesystem or reader implementation.
 
 The Rust side registers only the narrow Google Drive OAuth commands needed by
@@ -15,6 +15,12 @@ explicit:
 - [Tauri capabilities](https://v2.tauri.app/security/capabilities/)
 - [Tauri permissions](https://v2.tauri.app/security/permissions/)
 - [Tauri project setup](https://v2.tauri.app/start/create-project/)
+
+## Build environment and styles
+
+The desktop folder pins Rust 1.99.0; rustup installs it without changing the global default. Build on macOS 14+ or Windows with the platform's Tauri prerequisites. Windows uses NSIS and a generated ICO asset; `pnpm build:mac` and `pnpm build:windows` select the installers on their respective hosts.
+
+React Native Web, Expo fonts and Uniwind create styles at runtime. The explicit CSP already allows inline styles. Tauri's automatic style nonce injection would override that policy and reject those runtime styles in the packaged app. `dangerousDisableAssetCspModification` therefore names only `style-src`; script nonce/hash generation and the restricted script/network/worker directives remain enabled. This follows the [Tauri maintainer guidance for CSS-in-JS](https://github.com/tauri-apps/tauri/discussions/8578).
 
 ## Build
 
@@ -49,7 +55,7 @@ pnpm tauri:dev
 ```
 
 The development script starts Expo Web on port 8081 with the same Drive
-environment guard. Local book import, SQLite/OPFS persistence, IndexedDB
+environment guard. Local book import, SQLite/OPFS persistence, OPFS
 assets, EPUB/PDF/CBZ readers, and the shared desktop-width RN Web shell are the
 desktop surface to validate.
 

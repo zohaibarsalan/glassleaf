@@ -12,6 +12,8 @@ import {
   createContext,
   useContext,
   useLayoutEffect,
+  useRef,
+  type Ref,
   type PropsWithChildren,
   type ReactNode,
 } from "react";
@@ -289,7 +291,9 @@ export function IconButton({
   onPress,
   active,
   disabled,
+  ref,
 }: {
+  ref?: Ref<View>;
   icon: LucideIcon;
   label: string;
   onPress: () => void;
@@ -301,6 +305,7 @@ export function IconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      ref={ref}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => ({
@@ -430,11 +435,15 @@ export function Sheet({
 }>) {
   const { width } = useWindowDimensions();
   const c = usePalette();
+  const closeRef = useRef<View>(null);
   return (
     <Modal
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      onShow={() => {
+        if (Platform.OS === "web") closeRef.current?.focus();
+      }}
       statusBarTranslucent
     >
       <KeyboardAvoidingView
@@ -454,6 +463,8 @@ export function Sheet({
         />
         <View
           accessibilityViewIsModal
+          role="dialog"
+          accessibilityLabel={title}
           style={{
             width: "100%",
             maxWidth: 560,
@@ -467,10 +478,15 @@ export function Sheet({
           }}
         >
           <Box flexDirection="row" alignItems="center" padding="l">
-            <Text variant="heading" flex={1}>
+            <Text accessibilityRole="header" variant="heading" flex={1}>
               {title}
             </Text>
-            <IconButton icon={X} label="Close" onPress={onClose} />
+            <IconButton
+              ref={closeRef}
+              icon={X}
+              label="Close"
+              onPress={onClose}
+            />
           </Box>
           <ScrollView
             style={{ flexGrow: 0, flexShrink: 1, minHeight: 0 }}

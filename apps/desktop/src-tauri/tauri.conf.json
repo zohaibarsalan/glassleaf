@@ -23,21 +23,16 @@
       }
     ],
     "security": {
-      "capabilities": [
-        "main-capability"
-      ],
+      "capabilities": ["main-capability"],
       "csp": "default-src 'self'; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com blob:; img-src 'self' asset: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; font-src 'self' asset: data:; frame-src 'self' blob:",
-      "devCsp": "default-src 'self' http://localhost:8081; connect-src 'self' http://localhost:8081 https://www.googleapis.com https://oauth2.googleapis.com ws://localhost:8081 blob:; img-src 'self' http://localhost:8081 asset: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' http://localhost:8081 'wasm-unsafe-eval'; worker-src 'self' http://localhost:8081 blob:; font-src 'self' http://localhost:8081 asset: data:; frame-src 'self' http://localhost:8081 blob:"
+      "devCsp": "default-src 'self' http://localhost:8081; connect-src 'self' http://localhost:8081 https://www.googleapis.com https://oauth2.googleapis.com ws://localhost:8081 blob:; img-src 'self' http://localhost:8081 asset: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' http://localhost:8081 'wasm-unsafe-eval'; worker-src 'self' http://localhost:8081 blob:; font-src 'self' http://localhost:8081 asset: data:; frame-src 'self' http://localhost:8081 blob:",
+      "dangerousDisableAssetCspModification": ["style-src"]
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": [
-      "icons/icon.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ],
+    "icon": ["icons/icon.png", "icons/icon.icns", "icons/icon.ico"],
     "macOS": {
       "minimumSystemVersion": "14.0"
     }
