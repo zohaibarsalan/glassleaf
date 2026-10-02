@@ -6,7 +6,7 @@
     "mobile": "pnpm --filter @glassleaf/mobile start",
     "web:build": "pnpm --filter @glassleaf/web build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @glassleaf/library test && pnpm --filter @glassleaf/mcp test && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-mobile-themes.ts && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-reader-locations.ts && pnpm test:sync",
+    "test": "pnpm --filter @glassleaf/library test && pnpm --filter @glassleaf/mcp test && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-mobile-themes.ts && pnpm --filter @glassleaf/library exec tsx ../../scripts/check-reader-locations.ts && pnpm test:sync && pnpm test:storage",
     "mcp": "pnpm --filter @glassleaf/mcp start",
     "format:check": "prettier --check \"apps/{mobile,web}/*.{ts,tsx,json,cjs}\" \"packages/{app,ui,library,mcp}/src/**/*.{ts,tsx}\"",
     "test:sync": "pnpm --filter @glassleaf/library exec tsx --test ../../packages/app/src/sync/drive-core.test.ts ../../packages/app/src/sync/drive-scheduler.test.ts ../../packages/app/src/sync/drive-changes.test.ts",
@@ -15,7 +15,8 @@
     "android": "pnpm --filter @glassleaf/mobile android",
     "desktop": "pnpm --filter @glassleaf/desktop tauri:dev",
     "desktop:build": "pnpm --filter @glassleaf/desktop tauri:build",
-    "themes:generate": "pnpm --filter @glassleaf/library exec tsx ../../scripts/generate-ui-themes.mts"
+    "themes:generate": "pnpm --filter @glassleaf/library exec tsx ../../scripts/generate-ui-themes.mts",
+    "test:storage": "pnpm --filter @glassleaf/library exec tsx --test ../../packages/app/src/data/blob-store.test.ts"
   },
   "devDependencies": {
     "prettier": "^3.9.6"
