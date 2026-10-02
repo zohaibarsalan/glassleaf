@@ -43,3 +43,7 @@ apps/mobile/android/
 
 # Local validation artifacts
 /outputs/app-system/
+
+# Platform export verification
+dist-ios/
+dist-android/

@@ -1,3 +1,4 @@
+import { Action } from "./Action";
 import {
   builtinThemes,
   contrast,
@@ -334,34 +335,25 @@ export function Button({
   disabled?: boolean;
   accessibilityLabel?: string;
 }>) {
-  const c = usePalette();
+  const colors = usePalette();
+  const appearance = useAppearance();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
-        minHeight: 46,
-        paddingHorizontal: 18,
-        paddingVertical: 11,
-        borderRadius: 14,
-        flexDirection: "row",
-        gap: 9,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: secondary ? c.muted : c.accent,
-        opacity: disabled ? 0.45 : 1,
-        transform: [{ scale: pressed && !disabled ? 0.96 : 1 }],
-      })}
+    <Action
+      {...{
+        onPress,
+        icon: Icon,
+        secondary,
+        disabled,
+        accessibilityLabel,
+        colors,
+        appearance,
+      }}
     >
-      {Icon && <Icon size={18} color={secondary ? c.text : c.onAccent} />}
-      <Text variant="label" style={{ color: secondary ? c.text : c.onAccent }}>
-        {children}
-      </Text>
-    </Pressable>
+      {children}
+    </Action>
   );
 }
+
 export function Chip({
   label,
   active,
