@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { Box, Button, Text } from "@glassleaf/ui";
+const desktop = isTauri();
 function size(bytes: number) {
   return bytes >= 1024 ** 3
     ? `${(bytes / 1024 ** 3).toFixed(1)} GB`
@@ -53,14 +55,16 @@ export function StoragePanel() {
         </Text>
       )}
       <Text color="secondary">
-        Downloaded books work offline. Keep a copy in Drive so your library,
-        notes, and progress can be restored if you clear this browser's data.
+        {desktop
+          ? "Downloaded books work offline. Keep a copy in Drive to restore your library, notes, and progress after reinstalling Glassleaf or clearing its local data."
+          : "Downloaded books work offline. Keep a copy in Drive so your library, notes, and progress can be restored if you clear this browser's data."}
       </Text>
       {persisted ? (
         <Text color="accent">
           Downloads are protected from automatic cleanup.
         </Text>
       ) : (
+        !desktop &&
         typeof navigator.storage?.persist === "function" && (
           <Button secondary disabled={busy} onPress={() => void retain()}>
             {busy ? "Checking storage…" : "Protect downloaded books"}
@@ -72,7 +76,7 @@ export function StoragePanel() {
           {message}
         </Text>
       )}
-      {!matchMedia("(display-mode: standalone)").matches && (
+      {!desktop && !matchMedia("(display-mode: standalone)").matches && (
         <Text variant="caption" color="secondary">
           On iPhone, use Share → Add to Home Screen to install Glassleaf.
         </Text>

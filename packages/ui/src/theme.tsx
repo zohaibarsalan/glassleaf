@@ -439,7 +439,9 @@ export function Sheet({
   return (
     <Modal
       transparent
-      animationType="fade"
+      // RN Web activates its focus trap on animationend. Runtime styles can
+      // omit that event, so activate browser dialogs immediately.
+      animationType={Platform.OS === "web" ? "none" : "fade"}
       onRequestClose={onClose}
       onShow={() => {
         if (Platform.OS === "web") closeRef.current?.focus();
